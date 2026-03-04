@@ -13,6 +13,11 @@ public record Route(
         List<Leg> legs,
         Comparison comparison
 ) {
+    // compact constructor: 모든 생성 경로에서 불변 컬렉션 강제
+    public Route {
+        legs = List.copyOf(legs);
+    }
+
     public static Route of(List<Leg> legs, RouteType type) {
         int total = legs.stream().mapToInt(Leg::durationMinutes).sum();
         return new Route(
