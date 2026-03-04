@@ -40,7 +40,13 @@ public class OdsayRouteClient {
                         .build())
                 .retrieve()
                 .bodyToMono(OdsayRouteResponse.class)
-                .map(response -> mapper.toLegs(response.result().path()));
+                .map(response -> {
+                    var paths = response.result().path();
+                    if (paths == null || paths.isEmpty()) {
+                        return List.<Leg>of();
+                    }
+                    return mapper.toLegs(paths.get(0));
+                });
     }
 
     public Mono<Integer> getTransitTimeMinutes(Location origin, Location destination) {

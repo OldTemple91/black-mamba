@@ -18,8 +18,9 @@ class OdsayRouteClientTest {
         OdsayRouteResponse.Path path = buildSamplePath();
         List<Leg> legs = mapper.toLegs(path);
 
-        assertThat(legs).isNotEmpty();
+        assertThat(legs).hasSize(2);  // TRANSIT 1개 + WALK 1개
         assertThat(legs.get(0).type()).isEqualTo(LegType.TRANSIT);
+        assertThat(legs.get(1).type()).isEqualTo(LegType.WALK);  // 추가
     }
 
     @Test
