@@ -20,12 +20,13 @@ public class OdsayRouteClient {
     private final String apiKey;
 
     public OdsayRouteClient(
+            WebClient.Builder webClientBuilder,
             OdsayRouteMapper mapper,
             @Value("${odsay.api-key}") String apiKey
     ) {
         this.mapper = mapper;
         this.apiKey = apiKey;
-        this.webClient = WebClient.builder().baseUrl(BASE_URL).build();
+        this.webClient = webClientBuilder.baseUrl(BASE_URL).build();
     }
 
     public Mono<List<Leg>> getTransitRoute(Location origin, Location destination) {
@@ -39,6 +40,12 @@ public class OdsayRouteClient {
                         .queryParam("EY", destination.lat())
                         .build())
                 .retrieve()
+                .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(),
+                        response -> response.bodyToMono(String.class)
+                                .flatMap(body -> Mono.error(
+                                        new RuntimeException("ODsay API 오류: " + response.statusCode() + " " + body)
+                                ))
+                )
                 .bodyToMono(OdsayRouteResponse.class)
                 .map(response -> {
                     var paths = response.result().path();
