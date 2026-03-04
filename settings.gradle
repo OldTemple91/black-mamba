@@ -1,0 +1,6 @@
+rootProject.name = 'black-mamba'
+
+include 'api'
+include 'application'
+include 'domain'
+include 'infra'
