@@ -48,19 +48,19 @@ public class OdsayRouteMapper {
 
     private Location extractStart(OdsayRouteResponse.SubPath subPath) {
         List<OdsayRouteResponse.Station> stations = subPath.passStopList();
-        if (stations != null && !stations.isEmpty()) {
-            OdsayRouteResponse.Station s = stations.get(0);
-            return new Location(s.stationName(), s.lat(), s.lng());
+        if (stations == null || stations.isEmpty()) {
+            return null;  // 도보 구간은 별도 좌표 없음
         }
-        return new Location("출발", 0, 0);
+        OdsayRouteResponse.Station s = stations.get(0);
+        return new Location(s.stationName(), s.lat(), s.lng());
     }
 
     private Location extractEnd(OdsayRouteResponse.SubPath subPath) {
         List<OdsayRouteResponse.Station> stations = subPath.passStopList();
-        if (stations != null && !stations.isEmpty()) {
-            OdsayRouteResponse.Station s = stations.get(stations.size() - 1);
-            return new Location(s.stationName(), s.lat(), s.lng());
+        if (stations == null || stations.isEmpty()) {
+            return null;  // 도보 구간은 별도 좌표 없음
         }
-        return new Location("도착", 0, 0);
+        OdsayRouteResponse.Station s = stations.getLast();  // Java 21 getLast()
+        return new Location(s.stationName(), s.lat(), s.lng());
     }
 }
