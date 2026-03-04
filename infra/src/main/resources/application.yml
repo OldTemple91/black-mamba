@@ -1,2 +1,5 @@
 odsay:
   api-key: ${ODSAY_API_KEY:your-api-key-here}
+
+ddareungi:
+  api-key: ${DDAREUNGI_API_KEY:your-ddareungi-api-key-here}
