@@ -8,7 +8,7 @@ import java.util.List;
 public record OdsayRouteResponse(Result result) {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Result(Path path) {}
+    public record Result(List<Path> path) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Path(PathInfo info, List<SubPath> subPath) {}
