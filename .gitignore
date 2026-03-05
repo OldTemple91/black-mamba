@@ -4,3 +4,5 @@ build/
 .idea/
 *.iml
 out/
+frontend/node_modules/
+frontend/dist/
