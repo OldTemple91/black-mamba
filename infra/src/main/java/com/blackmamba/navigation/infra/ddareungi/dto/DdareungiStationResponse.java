@@ -1,7 +1,9 @@
 package com.blackmamba.navigation.infra.ddareungi.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import java.util.List;
+import java.util.Objects;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record DdareungiStationResponse(RentBikeStatus rentBikeStatus) {
@@ -22,20 +24,25 @@ public record DdareungiStationResponse(RentBikeStatus rentBikeStatus) {
             return List.of();
         }
         return rentBikeStatus.row().stream()
-                .map(row -> new DdareungiStation(
-                        row.stationName(),
-                        parseDouble(row.stationLatitude()),
-                        parseDouble(row.stationLongitude()),
-                        parseInt(row.parkingBikeTotCnt())
-                ))
+                .filter(Objects::nonNull)
+                .map(this::toStation)
+                .filter(Objects::nonNull)  // 파싱 실패 row 제외
                 .toList();
     }
 
-    private double parseDouble(String value) {
-        try { return Double.parseDouble(value); } catch (Exception e) { return 0; }
+    private DdareungiStation toStation(Row row) {
+        try {
+            double lat = Double.parseDouble(row.stationLatitude());
+            double lng = Double.parseDouble(row.stationLongitude());
+            int available = parseInt(row.parkingBikeTotCnt());
+            return new DdareungiStation(row.stationName(), lat, lng, available);
+        } catch (NumberFormatException e) {
+            // 좌표 파싱 실패 row는 제외
+            return null;
+        }
     }
 
     private int parseInt(String value) {
-        try { return Integer.parseInt(value); } catch (Exception e) { return 0; }
+        try { return Integer.parseInt(value); } catch (NumberFormatException e) { return 0; }
     }
 }
