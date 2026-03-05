@@ -1,0 +1,16 @@
+server:
+  port: 8080
+
+spring:
+  profiles:
+    active: local
+
+odsay:
+  api-key: ${ODSAY_API_KEY:your-odsay-api-key}
+ddareungi:
+  api-key: ${DDAREUNGI_API_KEY:your-ddareungi-api-key}
+tago:
+  api-key: ${TAGO_API_KEY:your-tago-api-key}
+naver:
+  client-id: ${NAVER_CLIENT_ID:your-naver-client-id}
+  client-secret: ${NAVER_CLIENT_SECRET:your-naver-client-secret}
