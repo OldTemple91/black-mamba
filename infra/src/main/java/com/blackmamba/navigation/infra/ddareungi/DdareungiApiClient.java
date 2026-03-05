@@ -13,19 +13,18 @@ import java.util.List;
 public class DdareungiApiClient {
 
     private static final String BASE_URL = "http://openapi.seoul.go.kr:8088";
-    private static final double EARTH_RADIUS_METERS = 6_371_000;
 
     private final WebClient webClient;
     private final String apiKey;
+    private final DdareungiStationFilter filter;
 
     public DdareungiApiClient(
             WebClient.Builder webClientBuilder,
             @Value("${ddareungi.api-key}") String apiKey
     ) {
         this.apiKey = apiKey;
-        this.webClient = webClientBuilder != null
-                ? webClientBuilder.baseUrl(BASE_URL).build()
-                : WebClient.builder().baseUrl(BASE_URL).build();
+        this.webClient = webClientBuilder.baseUrl(BASE_URL).build();
+        this.filter = new DdareungiStationFilter();
     }
 
     public Mono<List<DdareungiStation>> getNearbyStations(double lat, double lng, int radiusMeters) {
@@ -39,23 +38,6 @@ public class DdareungiApiClient {
                                 ))
                 )
                 .bodyToMono(DdareungiStationResponse.class)
-                .map(response -> filterNearby(response.toStations(), lat, lng, radiusMeters));
-    }
-
-    List<DdareungiStation> filterNearby(List<DdareungiStation> stations,
-                                         double lat, double lng, int radiusMeters) {
-        return stations.stream()
-                .filter(s -> s.availableCount() > 0)
-                .filter(s -> distanceMeters(lat, lng, s.lat(), s.lng()) <= radiusMeters)
-                .toList();
-    }
-
-    private double distanceMeters(double lat1, double lng1, double lat2, double lng2) {
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLng = Math.toRadians(lng2 - lng1);
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-        return EARTH_RADIUS_METERS * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                .map(response -> filter.filterNearby(response.toStations(), lat, lng, radiusMeters));
     }
 }
