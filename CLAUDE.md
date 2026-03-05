@@ -51,14 +51,14 @@ enum MobilityType { DDAREUNGI, KICKBOARD_SHARED, PERSONAL_BIKE, PERSONAL_KICKBOA
 | Task 3 | ✅ | ODsay API Client (`infra/odsay/`) |
 | Task 4 | ✅ | 따릉이 API Client (`infra/ddareungi/`) |
 | Task 5 | ✅ | TAGO 킥보드 API Client (`infra/kickboard/`) |
-| Task 6 | ⬜ | CandidatePointSelector (`application/route/`) |
-| Task 7 | ⬜ | RouteScoreCalculator (`application/route/`) |
-| Task 8 | ⬜ | RouteOptimizationService — 핵심 알고리즘 |
-| Task 9 | ⬜ | REST API Controller (`api/`) |
-| Task 10 | ⬜ | React 프로젝트 셋업 (`frontend/`) |
-| Task 11 | ⬜ | 네이버 지도 연동 + 메인 화면 |
-| Task 12 | ⬜ | 경로 결과 화면 |
-| Task 13 | ⬜ | 백엔드-프론트엔드 통합 확인 |
+| Task 6 | ✅ | CandidatePointSelector (`application/route/`) |
+| Task 7 | ✅ | RouteScoreCalculator (`application/route/`) |
+| Task 8 | ✅ | RouteOptimizationService — 핵심 알고리즘 |
+| Task 9 | ✅ | REST API Controller (`api/`) |
+| Task 10 | ✅ | React 프로젝트 셋업 (`frontend/`) |
+| Task 11 | ✅ | 네이버 지도 연동 + 메인 화면 |
+| Task 12 | ✅ | 경로 결과 화면 (RouteCard + RouteListPage) |
+| Task 13 | ✅ | 백엔드-프론트엔드 통합 확인 완료 |
 
 상세 구현 계획: `docs/plans/2026-03-04-implementation-plan.md`
 
