@@ -1,6 +1,7 @@
 import axios from 'axios'
 
-const BASE_URL = 'http://localhost:8080/api'
+// 개발: Vite 프록시(/api → localhost:8080), 프로덕션: 실제 API 서버
+const BASE_URL = '/api'
 
 export const searchRoutes = async ({ originLat, originLng, destLat, destLng, mobility }) => {
   const { data } = await axios.get(`${BASE_URL}/routes`, {
