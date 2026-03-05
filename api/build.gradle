@@ -2,6 +2,8 @@ apply plugin: 'org.springframework.boot'
 
 dependencies {
     implementation project(':application')
+    implementation project(':domain')
     implementation project(':infra')
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'io.projectreactor:reactor-core'
 }
