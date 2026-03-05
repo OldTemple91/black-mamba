@@ -3,3 +3,6 @@ odsay:
 
 ddareungi:
   api-key: ${DDAREUNGI_API_KEY:your-ddareungi-api-key-here}
+
+tago:
+  api-key: ${TAGO_API_KEY:your-tago-api-key-here}
