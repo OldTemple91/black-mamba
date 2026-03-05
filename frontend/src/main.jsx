@@ -2,7 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import MainPage from './pages/MainPage.jsx'
-import ResultPage from './pages/ResultPage.jsx'
+import RouteListPage from './pages/RouteListPage.jsx'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -10,7 +10,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<MainPage />} />
-        <Route path="/result" element={<ResultPage />} />
+        <Route path="/routes" element={<RouteListPage />} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>
