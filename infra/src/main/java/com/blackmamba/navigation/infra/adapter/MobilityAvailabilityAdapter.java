@@ -5,6 +5,8 @@ import com.blackmamba.navigation.domain.route.MobilityInfo;
 import com.blackmamba.navigation.domain.route.MobilityType;
 import com.blackmamba.navigation.infra.ddareungi.DdareungiApiClient;
 import com.blackmamba.navigation.infra.kickboard.KickboardApiClient;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
@@ -17,11 +19,30 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
 
     private final DdareungiApiClient ddareungiClient;
     private final KickboardApiClient kickboardClient;
+    private final Counter ddareungiFallbackErrorCounter;
+    private final Counter kickboardFallbackErrorCounter;
+    private final Counter kickboardFallbackEmptyCounter;
 
     public MobilityAvailabilityAdapter(DdareungiApiClient ddareungiClient,
-                                       KickboardApiClient kickboardClient) {
+                                       KickboardApiClient kickboardClient,
+                                       MeterRegistry meterRegistry) {
         this.ddareungiClient = ddareungiClient;
         this.kickboardClient = kickboardClient;
+        this.ddareungiFallbackErrorCounter = meterRegistry.counter(
+                "navigation.mobility.fallback.total",
+                "mobility", "ddareungi",
+                "reason", "error"
+        );
+        this.kickboardFallbackErrorCounter = meterRegistry.counter(
+                "navigation.mobility.fallback.total",
+                "mobility", "kickboard_shared",
+                "reason", "error"
+        );
+        this.kickboardFallbackEmptyCounter = meterRegistry.counter(
+                "navigation.mobility.fallback.total",
+                "mobility", "kickboard_shared",
+                "reason", "empty"
+        );
     }
 
     @Override
@@ -47,24 +68,37 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                                 s.availableCount(),
                                 distanceMeters(lat, lng, s.lat(), s.lng())
                         ))
-                );
+                )
+                .onErrorResume(ex -> {
+                    ddareungiFallbackErrorCounter.increment();
+                    return Mono.just(Optional.<MobilityInfo>empty());
+                });
     }
 
     private Mono<Optional<MobilityInfo>> findNearbyKickboard(double lat, double lng) {
         return kickboardClient.getNearbyDevices(lat, lng, SEARCH_RADIUS_METERS)
-                .map(devices -> devices.stream().findFirst()
-                        .map(d -> new MobilityInfo(
-                                MobilityType.KICKBOARD_SHARED,
-                                d.operatorName(),
-                                d.deviceId(),
-                                d.batteryLevel(),
-                                null,
-                                d.lat(),
-                                d.lng(),
-                                1,
-                                distanceMeters(lat, lng, d.lat(), d.lng())
-                        ))
-                );
+                .map(devices -> {
+                    if (devices.isEmpty()) {
+                        kickboardFallbackEmptyCounter.increment();
+                        return Optional.of(syntheticKickboard(lat, lng));
+                    }
+                    return devices.stream().findFirst()
+                            .map(d -> new MobilityInfo(
+                                    MobilityType.KICKBOARD_SHARED,
+                                    d.operatorName(),
+                                    d.deviceId(),
+                                    d.batteryLevel(),
+                                    null,
+                                    d.lat(),
+                                    d.lng(),
+                                    1,
+                                    distanceMeters(lat, lng, d.lat(), d.lng())
+                            ));
+                })
+                .onErrorResume(ex -> {
+                    kickboardFallbackErrorCounter.increment();
+                    return Mono.just(Optional.of(syntheticKickboard(lat, lng)));
+                });
     }
 
     private MobilityInfo personalMobility(double lat, double lng) {
@@ -73,6 +107,20 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                 "개인",
                 null,
                 100,
+                null,
+                lat,
+                lng,
+                1,
+                0
+        );
+    }
+
+    private MobilityInfo syntheticKickboard(double lat, double lng) {
+        return new MobilityInfo(
+                MobilityType.KICKBOARD_SHARED,
+                "공유 킥보드(추정)",
+                null,
+                0,
                 null,
                 lat,
                 lng,
