@@ -48,6 +48,9 @@ public class OdsayRouteClient {
                 )
                 .bodyToMono(OdsayRouteResponse.class)
                 .map(response -> {
+                    if (response.result() == null) {
+                        return List.<Leg>of();
+                    }
                     var paths = response.result().path();
                     if (paths == null || paths.isEmpty()) {
                         return List.<Leg>of();
