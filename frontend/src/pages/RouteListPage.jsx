@@ -33,6 +33,7 @@ export default function RouteListPage() {
   const originName = searchParams.get('origin') || ''
   const destName   = searchParams.get('dest')   || ''
   const mobilityParam = searchParams.get('mobility') || ''
+  const searchMode = searchParams.get('searchMode') || 'SPECIFIC'
 
   useEffect(() => {
     const mobility = mobilityParam.split(',').filter(Boolean)
@@ -44,7 +45,8 @@ export default function RouteListPage() {
       return searchRoutes({
         originLat: origin.lat, originLng: origin.lng,
         destLat:   dest.lat,   destLng:   dest.lng,
-        mobility
+        mobility,
+        searchMode
       })
     }).then(data => {
       setRoutes(data)
