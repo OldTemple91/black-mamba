@@ -15,5 +15,5 @@ tago:
   api-key: ${TAGO_API_KEY:REMOVED-TAGO-KEY}
 
 naver:
-  client-id: ${NAVER_CLIENT_ID:your-naver-client-id}
-  client-secret: ${NAVER_CLIENT_SECRET:your-naver-client-secret}
+  client-id: ${NAVER_CLIENT_ID:05eucwjyg0}
+  client-secret: ${NAVER_CLIENT_SECRET:REMOVED-NAVER-SECRET}
