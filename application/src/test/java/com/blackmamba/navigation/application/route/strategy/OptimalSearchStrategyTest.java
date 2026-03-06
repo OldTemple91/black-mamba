@@ -92,4 +92,48 @@ class OptimalSearchStrategyTest {
         assertThat(routes.get(0).recommended()).isTrue();
         assertThat(routes.stream().filter(Route::recommended)).hasSize(1);
     }
+
+    @Test
+    void ODsay_기본경로가_비어도_추천경로가_0분이_아니다() {
+        when(transitRoutePort.getTransitRoute(any(), any())).thenReturn(Mono.just(List.of()));
+        when(candidatePointSelector.select(any(), any())).thenReturn(List.of());
+        when(candidatePointSelector.selectFirstMile(any(), any(), any())).thenReturn(List.of());
+        when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(Optional.empty()));
+        when(scoreCalculator.calculate(any())).thenReturn(0.5);
+
+        List<Route> routes = strategy.search(origin, destination).block();
+
+        assertThat(routes).isNotEmpty();
+        assertThat(routes.get(0).totalMinutes()).isGreaterThan(0);
+    }
+
+    @Test
+    void PERSONAL_경로는_킥보드_LegType으로_표시된다() {
+        when(candidatePointSelector.select(any(), any())).thenReturn(List.of(candidate));
+        when(candidatePointSelector.selectFirstMile(any(), any(), any())).thenReturn(List.of());
+        when(transitRoutePort.getTransitTimeMinutes(any(), any())).thenReturn(Mono.just(20));
+        when(mobilityTimePort.getMobilityTimeMinutes(any(), any(), any())).thenReturn(Mono.just(8));
+        when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
+                .thenAnswer(invocation -> {
+                    MobilityType type = invocation.getArgument(2);
+                    if (type == MobilityType.PERSONAL) {
+                        return Mono.just(Optional.of(
+                                new MobilityInfo(MobilityType.PERSONAL, "개인", null, 100, null, 37.52, 127.0, 1, 0)
+                        ));
+                    }
+                    return Mono.just(Optional.empty());
+                });
+        when(scoreCalculator.calculate(any())).thenReturn(0.9, 0.5);
+
+        List<Route> routes = strategy.search(origin, destination).block();
+
+        Route personalRoute = routes.stream()
+                .filter(r -> r.legs().stream().anyMatch(l -> "PERSONAL".equals(l.mode())))
+                .findFirst()
+                .orElseThrow();
+        assertThat(personalRoute.legs().stream()
+                .filter(l -> "PERSONAL".equals(l.mode()))
+                .allMatch(l -> l.type() == LegType.KICKBOARD)).isTrue();
+    }
 }
