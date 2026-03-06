@@ -10,7 +10,9 @@ const geocode = async (name) => {
   try {
     const res = await fetch(`/api/geocode?query=${encodeURIComponent(name)}`)
     if (!res.ok) return null
-    return await res.json()  // { lat, lng }
+    const data = await res.json()
+    if (!Number.isFinite(data?.lat) || !Number.isFinite(data?.lng)) return null
+    return data  // { lat, lng }
   } catch {
     return null
   }
@@ -51,7 +53,7 @@ export default function RouteListPage() {
       setError('경로를 불러오지 못했습니다. 백엔드가 실행 중인지 확인하세요.')
       console.error(err)
     }).finally(() => setLoading(false))
-  }, [])
+  }, [originName, destName, mobilityParam, searchMode])
 
   if (loading) return (
     <div className="flex justify-center items-center h-screen">

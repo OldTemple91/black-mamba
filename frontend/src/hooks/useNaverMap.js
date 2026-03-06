@@ -14,7 +14,7 @@ export function useNaverMap(containerId, options = {}) {
     mapRef.current = map
 
     return () => { mapRef.current = null }
-  }, [containerId])
+  }, [containerId, options])
 
   const addMarker = (lat, lng, label = '') => {
     if (!mapRef.current) return null
@@ -27,7 +27,7 @@ export function useNaverMap(containerId, options = {}) {
 
   const drawPolyline = (coords, color = '#0052A4') => {
     if (!mapRef.current) return
-    new window.naver.maps.Polyline({
+    return new window.naver.maps.Polyline({
       path: coords.map(c => new window.naver.maps.LatLng(c.lat, c.lng)),
       strokeColor: color,
       strokeWeight: 4,

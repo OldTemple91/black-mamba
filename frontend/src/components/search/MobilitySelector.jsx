@@ -1,7 +1,7 @@
 const MOBILITY_OPTIONS = [
   { id: 'DDAREUNGI',       label: '🚲 따릉이' },
   { id: 'KICKBOARD_SHARED', label: '🛴 킥보드' },
-  { id: 'PERSONAL',        label: '🚴 개인자전거' },
+  { id: 'PERSONAL',        label: '🛴 개인킥보드' },
 ]
 
 const OPTIMAL_ID = 'OPTIMAL'

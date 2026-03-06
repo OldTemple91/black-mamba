@@ -23,9 +23,10 @@ public class GeocodeController {
         return naverGeocodingClient.geocode(query)
                 .map(opt -> opt
                         .map(latLng -> ResponseEntity.ok(new CoordResponse(latLng[0], latLng[1])))
-                        .orElse(ResponseEntity.notFound().<CoordResponse>build())
-                );
+                        .orElseGet(() -> ResponseEntity.ok(new CoordResponse(null, null)))
+                )
+                .onErrorReturn(ResponseEntity.ok(new CoordResponse(null, null)));
     }
 
-    public record CoordResponse(double lat, double lng) {}
+    public record CoordResponse(Double lat, Double lng) {}
 }
