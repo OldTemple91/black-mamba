@@ -17,3 +17,9 @@ tago:
 naver:
   client-id: ${NAVER_CLIENT_ID:05eucwjyg0}
   client-secret: ${NAVER_CLIENT_SECRET:YfV4X3IX22aKacWrDNNXkMZyjPXcXsimgF0QuQGO}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
