@@ -47,8 +47,18 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     public Mono<List<Route>> search(Location origin, Location destination) {
         return transitRoutePort.getTransitRoute(origin, destination)
                 .flatMap(baseLegs -> {
-                    Route baseRoute = Route.of(baseLegs, RouteType.TRANSIT_ONLY);
-                    int baseMinutes = baseRoute.totalMinutes();
+                    final List<Leg> baseRouteLegs;
+                    final int baseMinutes;
+                    if (baseLegs.isEmpty()) {
+                        baseMinutes = haversineTransitMinutes(origin, destination);
+                        baseRouteLegs = List.of(
+                                new Leg(LegType.TRANSIT, "대중교통", baseMinutes, 0, origin, destination, null, null)
+                        );
+                    } else {
+                        baseMinutes = baseLegs.stream().mapToInt(Leg::durationMinutes).sum();
+                        baseRouteLegs = baseLegs;
+                    }
+                    Route baseRoute = Route.of(baseRouteLegs, RouteType.TRANSIT_ONLY);
 
                     Flux<Route> allPatterns = Flux.fromIterable(ALL_TYPES)
                             .flatMap(type -> {
@@ -169,17 +179,21 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     }
 
     private Leg mobilityLeg(MobilityType type, int minutes, Location from, Location to, MobilityInfo info) {
-        LegType legType = type == MobilityType.KICKBOARD_SHARED ? LegType.KICKBOARD : LegType.BIKE;
+        LegType legType = isKickboardType(type) ? LegType.KICKBOARD : LegType.BIKE;
         return new Leg(legType, type.name(), minutes, 0, from, to, null, info);
     }
 
     private MobilityConfig configFor(MobilityType type) {
-        return type == MobilityType.KICKBOARD_SHARED ? MobilityConfig.kickboard() : MobilityConfig.bike();
+        return isKickboardType(type) ? MobilityConfig.kickboard() : MobilityConfig.bike();
     }
 
     private RouteType routeTypeFor(MobilityType type) {
-        return type == MobilityType.KICKBOARD_SHARED
+        return isKickboardType(type)
                 ? RouteType.TRANSIT_WITH_KICKBOARD : RouteType.TRANSIT_WITH_BIKE;
+    }
+
+    private static boolean isKickboardType(MobilityType type) {
+        return type == MobilityType.KICKBOARD_SHARED || type == MobilityType.PERSONAL;
     }
 
     private List<Route> rank(List<Route> candidates, int baseMinutes) {
@@ -203,5 +217,15 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                 + Math.cos(Math.toRadians(lat1))*Math.cos(Math.toRadians(lat2))
                 * Math.sin(dLng/2)*Math.sin(dLng/2);
         return EARTH_RADIUS_METERS * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    private static int haversineTransitMinutes(Location a, Location b) {
+        double dLat = Math.toRadians(b.lat() - a.lat());
+        double dLng = Math.toRadians(b.lng() - a.lng());
+        double h = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(a.lat())) * Math.cos(Math.toRadians(b.lat()))
+                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        double distKm = 6371.0 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+        return Math.max((int) Math.ceil(distKm * 1.4 / 25.0 * 60), 5);
     }
 }
