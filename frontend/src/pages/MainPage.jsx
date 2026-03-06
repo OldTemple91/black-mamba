@@ -7,10 +7,14 @@ export default function MainPage() {
   const [origin, setOrigin] = useState('')
   const [destination, setDestination] = useState('')
   const [mobility, setMobility] = useState([])
+  const [searchMode, setSearchMode] = useState('SPECIFIC')
   const navigate = useNavigate()
 
   const handleSearch = () => {
-    navigate(`/routes?origin=${origin}&dest=${destination}&mobility=${mobility.join(',')}`)
+    navigate(
+      `/routes?origin=${origin}&dest=${destination}` +
+      `&mobility=${mobility.join(',')}&searchMode=${searchMode}`
+    )
   }
 
   return (
@@ -32,7 +36,12 @@ export default function MainPage() {
             placeholder="목적지를 입력하세요"
             className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
-          <MobilitySelector selected={mobility} onChange={setMobility} />
+          <MobilitySelector
+            selected={mobility}
+            onChange={setMobility}
+            searchMode={searchMode}
+            onSearchModeChange={setSearchMode}
+          />
           <button
             onClick={handleSearch}
             className="w-full bg-blue-500 text-white py-2 rounded-lg font-medium hover:bg-blue-600 transition"
