@@ -1,8 +1,8 @@
 odsay:
-  api-key: ${ODSAY_API_KEY:your-api-key-here}
+  api-key: ${ODSAY_API_KEY}
 
 ddareungi:
-  api-key: ${DDAREUNGI_API_KEY:your-ddareungi-api-key-here}
+  api-key: ${DDAREUNGI_API_KEY}
 
 tago:
-  api-key: ${TAGO_API_KEY:your-tago-api-key-here}
+  api-key: ${TAGO_API_KEY}

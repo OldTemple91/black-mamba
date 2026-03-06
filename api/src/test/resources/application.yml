@@ -1,0 +1,12 @@
+odsay:
+  api-key: test-odsay-key
+
+ddareungi:
+  api-key: test-ddareungi-key
+
+tago:
+  api-key: test-tago-key
+
+naver:
+  client-id: test-naver-client-id
+  client-secret: test-naver-client-secret
