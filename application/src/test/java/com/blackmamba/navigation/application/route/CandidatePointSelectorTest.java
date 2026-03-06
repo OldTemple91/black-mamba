@@ -45,9 +45,40 @@ class CandidatePointSelectorTest {
         assertThat(candidates).containsOnly(nearStop);
     }
 
+    @Test
+    void 퍼스트마일_출발지_근처_0_30퍼센트_정류장을_반환한다() {
+        Location origin = new Location("출발", 37.5, 126.9);
+
+        // start=(37.5, 126.9), end=(37.59, 126.9) → 10개 보간 → latStep=0.01
+        // 0~30% = 앞 3개: 37.5(~0m), 37.51(~1.1km), 37.52(~2.2km) → 모두 5000m 이내
+        Leg leg = new Leg(LegType.TRANSIT, "지하철", 30, 10000,
+                new Location("시작", 37.5, 126.9),
+                new Location("끝",   37.59, 126.9),
+                new TransitInfo("지하철", "2호선", 10), null);
+
+        MobilityConfig config = MobilityConfig.kickboard(); // maxRange=5000m
+
+        List<Location> candidates = selector.selectFirstMile(origin, List.of(leg), config);
+
+        assertThat(candidates).isNotEmpty();
+        candidates.forEach(c -> {
+            double dist = haversineMeters(origin.lat(), origin.lng(), c.lat(), c.lng());
+            assertThat(dist).isLessThanOrEqualTo(5000.0);
+        });
+    }
+
     // -----------------------------------------------------------------
     // helpers
     // -----------------------------------------------------------------
+
+    private double haversineMeters(double lat1, double lng1, double lat2, double lng2) {
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLng = Math.toRadians(lng2 - lng1);
+        double a = Math.sin(dLat/2)*Math.sin(dLat/2)
+                 + Math.cos(Math.toRadians(lat1))*Math.cos(Math.toRadians(lat2))
+                 * Math.sin(dLng/2)*Math.sin(dLng/2);
+        return 6_371_000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
 
     private List<Leg> createLegsWithStops(int count) {
         Location start = new Location("출발", 37.5000, 127.0000);

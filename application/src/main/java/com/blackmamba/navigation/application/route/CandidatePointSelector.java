@@ -44,6 +44,23 @@ public class CandidatePointSelector {
     }
 
     /**
+     * 퍼스트마일용: 경로의 첫 0~30% 구간 정류장 중 출발지에서 이동수단 범위 이내인 것 반환.
+     */
+    public List<Location> selectFirstMile(Location origin, List<Leg> legs, MobilityConfig config) {
+        List<Location> allStops = extractTransitStops(legs);
+        if (allStops.isEmpty()) return List.of();
+
+        int to = Math.max(1, (int) (allStops.size() * 0.3));
+        List<Location> firstSegment = allStops.subList(0, Math.min(to, allStops.size()));
+
+        return firstSegment.stream()
+                .filter(stop -> distanceMeters(
+                        origin.lat(), origin.lng(),
+                        stop.lat(), stop.lng()) <= config.maxRangeMeters())
+                .toList();
+    }
+
+    /**
      * TRANSIT Leg에서 정류장 목록을 추출.
      * transitInfo.stationCount()를 이용해 start→end 사이를 선형 보간하여 중간 정류장 좌표를 생성.
      * transitInfo가 없으면 start/end 2점만 사용.
