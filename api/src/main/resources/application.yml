@@ -6,17 +6,17 @@ spring:
     active: local
 
 odsay:
-  api-key: ${ODSAY_API_KEY:REMOVED-ODSAY-KEY}
+  api-key: ${ODSAY_API_KEY}
 
 ddareungi:
-  api-key: ${DDAREUNGI_API_KEY:REMOVED-DDAREUNGI-KEY}
+  api-key: ${DDAREUNGI_API_KEY}
 
 tago:
-  api-key: ${TAGO_API_KEY:REMOVED-TAGO-KEY}
+  api-key: ${TAGO_API_KEY}
 
 naver:
-  client-id: ${NAVER_CLIENT_ID:05eucwjyg0}
-  client-secret: ${NAVER_CLIENT_SECRET:REMOVED-NAVER-SECRET}
+  client-id: ${NAVER_CLIENT_ID}
+  client-secret: ${NAVER_CLIENT_SECRET}
 
 management:
   endpoints:
