@@ -4,20 +4,16 @@ import { searchRoutes } from '../api/routeApi'
 import RouteCard from '../components/route/RouteCard'
 import NaverMap from '../components/map/NaverMap'
 
-// 장소명 → 좌표 변환 (네이버 geocoder 사용, 없으면 서울 시청 기본값)
-const geocode = (name) => {
-  return new Promise(resolve => {
-    if (!window.naver?.maps?.Service) {
-      resolve(null)
-      return
-    }
-    window.naver.maps.Service.geocode({ query: name }, (status, response) => {
-      if (status !== window.naver.maps.Service.Status.OK) { resolve(null); return }
-      const item = response.v2?.addresses?.[0]
-      if (!item) { resolve(null); return }
-      resolve({ lat: parseFloat(item.y), lng: parseFloat(item.x) })
-    })
-  })
+// 장소명 → 좌표 변환 (백엔드 NCP Geocoding REST API 호출)
+const geocode = async (name) => {
+  if (!name) return null
+  try {
+    const res = await fetch(`/api/geocode?query=${encodeURIComponent(name)}`)
+    if (!res.ok) return null
+    return await res.json()  // { lat, lng }
+  } catch {
+    return null
+  }
 }
 
 const SEOUL_CITY_HALL = { lat: 37.5663, lng: 126.9779 }
