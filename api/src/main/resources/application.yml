@@ -6,11 +6,14 @@ spring:
     active: local
 
 odsay:
-  api-key: ${ODSAY_API_KEY:your-odsay-api-key}
+  api-key: ${ODSAY_API_KEY:tCAnHE5tsxJ7K2+YyTE3BIho5BvgJUcXydeYStRsuKQ}
+
 ddareungi:
-  api-key: ${DDAREUNGI_API_KEY:your-ddareungi-api-key}
+  api-key: ${DDAREUNGI_API_KEY:4d637050676a696e3535524a664b68}
+
 tago:
-  api-key: ${TAGO_API_KEY:your-tago-api-key}
+  api-key: ${TAGO_API_KEY:f840be3c2c60867cdd1405a999e30d9b1ae9ce68cc2b70ddee80aaf899fce106}
+
 naver:
   client-id: ${NAVER_CLIENT_ID:your-naver-client-id}
   client-secret: ${NAVER_CLIENT_SECRET:your-naver-client-secret}
