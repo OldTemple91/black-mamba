@@ -4,7 +4,7 @@ export function useNaverMap(containerId, options = {}) {
   const mapRef = useRef(null)
 
   useEffect(() => {
-    if (!window.naver) return
+    if (!window.naver?.maps) return  // 인증 실패 시 maps가 null일 수 있음
 
     const map = new window.naver.maps.Map(containerId, {
       center: new window.naver.maps.LatLng(37.5547, 126.9706),
