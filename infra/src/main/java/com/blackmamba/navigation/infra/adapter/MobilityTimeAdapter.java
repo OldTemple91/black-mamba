@@ -3,44 +3,58 @@ package com.blackmamba.navigation.infra.adapter;
 import com.blackmamba.navigation.application.route.port.MobilityTimePort;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.MobilityType;
+import com.blackmamba.navigation.infra.tmap.TmapPedestrianClient;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 /**
  * 이동수단 소요 시간 계산 어댑터.
- * 실제 자전거/킥보드 경로 API 대신 Haversine 직선거리 ÷ 평균속도로 추정.
- * 직선거리는 실제 경로보다 짧으므로 1.3 우회계수를 적용.
+ * TMAP 보행자 경로 API의 실제 도로 거리(m)를 이동수단 속도로 나눠 시간을 추정.
+ * TMAP 실패 시 Haversine 직선거리 × 1.3 우회계수로 fallback.
  */
 @Component
 public class MobilityTimeAdapter implements MobilityTimePort {
 
     // 평균속도 (km/h)
-    private static final double DDAREUNGI_KMH       = 15.0;
+    private static final double DDAREUNGI_KMH        = 15.0;
     private static final double KICKBOARD_SHARED_KMH = 18.0;
     private static final double PERSONAL_KMH         = 20.0;
 
-    // 직선→실제 경로 우회 계수
+    // haversine fallback 우회 계수
     private static final double DETOUR_FACTOR = 1.3;
+
+    private final TmapPedestrianClient tmapClient;
+
+    public MobilityTimeAdapter(TmapPedestrianClient tmapClient) {
+        this.tmapClient = tmapClient;
+    }
 
     @Override
     public Mono<Integer> getMobilityTimeMinutes(Location origin, Location destination, MobilityType type) {
-        double distKm = haversineKm(origin.lat(), origin.lng(), destination.lat(), destination.lng());
-        double routeKm = distKm * DETOUR_FACTOR;
-        double speedKmh = switch (type) {
-            case DDAREUNGI       -> DDAREUNGI_KMH;
-            case KICKBOARD_SHARED -> KICKBOARD_SHARED_KMH;
-            case PERSONAL        -> PERSONAL_KMH;
-        };
-        int minutes = (int) Math.ceil(routeKm / speedKmh * 60);
-        return Mono.just(Math.max(minutes, 1));
+        double speedKmh = speedKmh(type);
+        return tmapClient.getRoadDistanceMeters(origin, destination)
+                .map(opt -> {
+                    double distKm = opt.isPresent()
+                            ? opt.get() / 1000.0
+                            : haversineKm(origin, destination) * DETOUR_FACTOR;
+                    return Math.max(1, (int) Math.ceil(distKm / speedKmh * 60));
+                });
     }
 
-    private double haversineKm(double lat1, double lng1, double lat2, double lng2) {
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLng = Math.toRadians(lng2 - lng1);
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-        return 6371.0 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    private double speedKmh(MobilityType type) {
+        return switch (type) {
+            case DDAREUNGI        -> DDAREUNGI_KMH;
+            case KICKBOARD_SHARED -> KICKBOARD_SHARED_KMH;
+            case PERSONAL         -> PERSONAL_KMH;
+        };
+    }
+
+    private double haversineKm(Location a, Location b) {
+        double dLat = Math.toRadians(b.lat() - a.lat());
+        double dLng = Math.toRadians(b.lng() - a.lng());
+        double h    = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                    + Math.cos(Math.toRadians(a.lat())) * Math.cos(Math.toRadians(b.lat()))
+                    * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        return 6371.0 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
     }
 }

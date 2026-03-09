@@ -44,7 +44,7 @@ class OdsayRouteClientTest {
         OdsayRouteResponse.Path path = new OdsayRouteResponse.Path(
                 new OdsayRouteResponse.PathInfo(20, 1, 1250),
                 List.of(new OdsayRouteResponse.SubPath(2, 20, 4200, 2,
-                        List.of(new OdsayRouteResponse.Lane("간선 140", "#0052A4")),
+                        List.of(new OdsayRouteResponse.Lane("간선 140", "#0052A4", null)),
                         new OdsayRouteResponse.PassStopList(List.of(
                                 new OdsayRouteResponse.Station("서울역", 126.9706, 37.5547),
                                 new OdsayRouteResponse.Station("반포역", 127.0050, 37.5040)
@@ -68,7 +68,7 @@ class OdsayRouteClientTest {
         OdsayRouteResponse.Path path = new OdsayRouteResponse.Path(
                 new OdsayRouteResponse.PathInfo(30, 1, 1250),
                 List.of(new OdsayRouteResponse.SubPath(1, 25, 10000, 4,
-                        List.of(new OdsayRouteResponse.Lane("2호선", "#00A84D")),
+                        List.of(new OdsayRouteResponse.Lane("2호선", "#00A84D", null)),
                         new OdsayRouteResponse.PassStopList(List.of(
                                 new OdsayRouteResponse.Station("강남역", 127.0276, 37.4979),
                                 new OdsayRouteResponse.Station("역삼역", 127.0360, 37.5007),
@@ -88,7 +88,7 @@ class OdsayRouteClientTest {
                 new OdsayRouteResponse.PathInfo(30, 2, 1500),
                 List.of(
                         new OdsayRouteResponse.SubPath(1, 20, 4200, 2,
-                                List.of(new OdsayRouteResponse.Lane("간선 140", "#0052A4")),
+                                List.of(new OdsayRouteResponse.Lane("간선 140", "#0052A4", null)),
                                 new OdsayRouteResponse.PassStopList(List.of(
                                         new OdsayRouteResponse.Station("서울역", 126.9706, 37.5547),
                                         new OdsayRouteResponse.Station("반포역", 127.0050, 37.5040)
