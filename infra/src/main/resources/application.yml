@@ -6,3 +6,6 @@ ddareungi:
 
 tago:
   api-key: ${TAGO_API_KEY}
+
+tmap:
+  app-key: ${TMAP_APP_KEY}
