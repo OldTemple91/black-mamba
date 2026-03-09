@@ -54,7 +54,7 @@ class CandidatePointSelectorTest {
         Leg leg = new Leg(LegType.TRANSIT, "지하철", 30, 10000,
                 new Location("시작", 37.5, 126.9),
                 new Location("끝",   37.59, 126.9),
-                new TransitInfo("지하철", "2호선", 10), null);
+                TransitInfo.of("지하철", "2호선", 10), null);
 
         MobilityConfig config = MobilityConfig.kickboard(); // maxRange=5000m
 
@@ -83,7 +83,7 @@ class CandidatePointSelectorTest {
     private List<Leg> createLegsWithStops(int count) {
         Location start = new Location("출발", 37.5000, 127.0000);
         Location end   = new Location("도착", 37.5090, 127.0000);
-        TransitInfo transitInfo = new TransitInfo("140", "#0052A4", count);
+        TransitInfo transitInfo = TransitInfo.of("140", "#0052A4", count);
         Leg leg = new Leg(LegType.TRANSIT, "BUS", 20, 5000, start, end, transitInfo, null);
         return List.of(leg);
     }
