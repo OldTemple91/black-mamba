@@ -6,18 +6,29 @@ const MOBILITY_EMOJI = {
 }
 
 const ROUTE_TYPE_LABEL = {
-  TRANSIT_ONLY:            '대중교통',
-  TRANSIT_WITH_BIKE:       '대중교통 + 자전거',
-  TRANSIT_WITH_KICKBOARD:  '대중교통 + 킥보드',
-  MOBILITY_FIRST_TRANSIT:  '이동수단 → 대중교통',
+  TRANSIT_ONLY:              '대중교통',
+  TRANSIT_WITH_BIKE:         '대중교통 + 자전거',
+  TRANSIT_WITH_KICKBOARD:    '대중교통 + 킥보드',
+  MOBILITY_FIRST_TRANSIT:    '이동수단 → 대중교통',
   MOBILITY_TRANSIT_MOBILITY: '이동수단 + 대중교통 + 이동수단',
-  MOBILITY_ONLY:           '직접 이동',
+}
+
+const MOBILITY_ONLY_LABEL = {
+  BIKE:      '자전거로만',
+  KICKBOARD: '킥보드로만',
+}
+
+function getMobilityOnlyLabel(legs) {
+  const leg = legs.find(l => l.type === 'BIKE' || l.type === 'KICKBOARD')
+  return (leg && MOBILITY_ONLY_LABEL[leg.type]) ?? '직접 이동'
 }
 
 export default function RouteCard({ route, selected, onClick }) {
   const [expanded, setExpanded] = useState(false)
 
-  const routeLabel = ROUTE_TYPE_LABEL[route.type] ?? route.type
+  const routeLabel = route.type === 'MOBILITY_ONLY'
+    ? getMobilityOnlyLabel(route.legs)
+    : (ROUTE_TYPE_LABEL[route.type] ?? route.type)
 
   return (
     <div
@@ -52,7 +63,7 @@ export default function RouteCard({ route, selected, onClick }) {
       {/* 절약 시간 */}
       {route.comparison?.savedMinutes > 0 && (
         <p className="text-xs text-green-600 mt-1">
-          🔥 기존보다 {route.comparison.savedMinutes}분 빠름
+          🔥 대중교통만 이용시보다 {route.comparison.savedMinutes}분 빠름
         </p>
       )}
 
