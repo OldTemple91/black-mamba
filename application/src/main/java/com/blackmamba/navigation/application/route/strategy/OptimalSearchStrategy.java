@@ -11,6 +11,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.Optional;
 
 /**
  * 모든수단 최적탐색 전략.
@@ -27,7 +28,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     private static final Logger log = LoggerFactory.getLogger(OptimalSearchStrategy.class);
     private static final double EARTH_RADIUS_METERS = 6_371_000;
     private static final List<MobilityType> ALL_TYPES =
-            List.of(MobilityType.DDAREUNGI, MobilityType.KICKBOARD_SHARED, MobilityType.PERSONAL);
+            List.of(MobilityType.DDAREUNGI, MobilityType.KICKBOARD_SHARED);
 
     private final TransitRoutePort transitRoutePort;
     private final MobilityTimePort mobilityTimePort;
@@ -93,42 +94,46 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     // 패턴 B: 이동수단으로 첫 정류장까지 → 대중교통으로 목적지
     private Flux<Route> patternB(Location origin, Location destination,
                                   List<Leg> baseLegs, MobilityType type, MobilityConfig config) {
-        List<Location> firstMile = candidatePointSelector.selectFirstMile(origin, baseLegs, config);
+        List<Location> firstMile = candidatePointSelector.selectFirstMile(origin, baseLegs, config)
+                .stream().limit(3).toList();
+        int baseMinutes = baseLegs.stream().mapToInt(Leg::durationMinutes).sum();
         return Flux.fromIterable(firstMile)
                 .flatMap(transitStart ->
                         mobilityAvailabilityPort.findNearbyMobility(origin.lat(), origin.lng(), type)
                                 .filter(Optional::isPresent)
                                 .flatMap(avail -> {
                                     MobilityInfo info = avail.get();
-                                    Mono<Integer> mobTime  = mobilityTimePort.getMobilityTimeMinutes(origin, transitStart, type);
-                                    Mono<Integer> tranTime = transitRoutePort.getTransitTimeMinutes(transitStart, destination);
-                                    return Mono.zip(mobTime, tranTime)
-                                            .map(t -> buildRoute(
+                                    // transitStart → destination: 전체 기준 나머지 구간 비율로 추정 (ODsay 추가 호출 없음)
+                                    int tranTime = proportionalTransitMinutes(transitStart, destination, origin, destination, baseMinutes);
+                                    return mobilityTimePort.getMobilityTimeMinutes(origin, transitStart, type)
+                                            .map(mobTime -> buildRoute(
                                                     List.of(
-                                                            mobilityLeg(type, t.getT1(), origin, transitStart, info),
-                                                            transitLeg(t.getT2(), transitStart, destination, baseLegs)
+                                                            mobilityLeg(type, mobTime, origin, transitStart, info),
+                                                            transitLeg(tranTime, transitStart, destination, baseLegs)
                                                     ), RouteType.MOBILITY_FIRST_TRANSIT));
                                 })
                 );
     }
 
-    // 패턴 C: 대중교통으로 환승점까지 → 이동수단으로 목적지 (기존 알고리즘과 동일)
+    // 패턴 C: 대중교통으로 환승점까지 → 이동수단으로 목적지
     private Flux<Route> patternC(Location origin, Location destination,
                                   List<Leg> baseLegs, MobilityType type, MobilityConfig config) {
-        List<Location> lastMile = candidatePointSelector.select(baseLegs, config);
+        List<Location> lastMile = candidatePointSelector.select(baseLegs, config)
+                .stream().limit(3).toList();
+        int baseMinutes = baseLegs.stream().mapToInt(Leg::durationMinutes).sum();
         return Flux.fromIterable(lastMile)
                 .flatMap(switchPoint ->
                         mobilityAvailabilityPort.findNearbyMobility(switchPoint.lat(), switchPoint.lng(), type)
                                 .filter(Optional::isPresent)
                                 .flatMap(avail -> {
                                     MobilityInfo info = avail.get();
-                                    Mono<Integer> tranTime = transitRoutePort.getTransitTimeMinutes(origin, switchPoint);
-                                    Mono<Integer> mobTime  = mobilityTimePort.getMobilityTimeMinutes(switchPoint, destination, type);
-                                    return Mono.zip(tranTime, mobTime)
-                                            .map(t -> buildRoute(
+                                    // origin → switchPoint: 전체 기준 비율로 추정 (ODsay 추가 호출 없음)
+                                    int tranTime = proportionalTransitMinutes(origin, switchPoint, origin, destination, baseMinutes);
+                                    return mobilityTimePort.getMobilityTimeMinutes(switchPoint, destination, type)
+                                            .map(mobTime -> buildRoute(
                                                     List.of(
-                                                            transitLeg(t.getT1(), origin, switchPoint, baseLegs),
-                                                            mobilityLeg(type, t.getT2(), switchPoint, destination, info)
+                                                            transitLeg(tranTime, origin, switchPoint, baseLegs),
+                                                            mobilityLeg(type, mobTime, switchPoint, destination, info)
                                                     ), routeTypeFor(type)));
                                 })
                 );
@@ -247,17 +252,44 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     }
 
     private List<Route> rank(List<Route> candidates, int baseMinutes) {
-        List<Route> scored = candidates.stream()
+        // TRANSIT_ONLY는 항상 마지막에 고정 노출 — 점수와 무관하게 분리
+        Optional<Route> transitOnly = candidates.stream()
+                .filter(r -> r.type() == RouteType.TRANSIT_ONLY)
+                .findFirst();
+
+        List<Route> mixed = candidates.stream()
+                .filter(r -> r.type() != RouteType.TRANSIT_ONLY)
                 .map(r -> r.withScore(scoreCalculator.calculate(r), false))
                 .sorted(Comparator.comparingDouble(Route::score).reversed())
-                .limit(5).toList();
+                .limit(4)  // 혼합 최대 4개 + 대중교통 1개 = 최대 5개
+                .toList();
+
         List<Route> result = new ArrayList<>();
-        for (int i = 0; i < scored.size(); i++) {
-            int saved = Math.max(baseMinutes - scored.get(i).totalMinutes(), 0);
-            Route r = scored.get(i).withComparison(new Comparison(baseMinutes, saved));
+        for (int i = 0; i < mixed.size(); i++) {
+            int saved = Math.max(baseMinutes - mixed.get(i).totalMinutes(), 0);
+            Route r = mixed.get(i).withComparison(new Comparison(baseMinutes, saved));
             result.add(i == 0 ? r.withScore(r.score(), true) : r);
         }
+
+        // 대중교통 단독 옵션 항상 마지막에 추가
+        transitOnly.ifPresent(r ->
+                result.add(r.withComparison(new Comparison(baseMinutes, 0)))
+        );
+
         return result;
+    }
+
+    /**
+     * 출발-도착 간 전체 baseMinutes에서 from→to 구간 비율을 추정.
+     * ODsay 추가 호출 없이 패턴 B/C의 부분 대중교통 시간을 계산한다.
+     */
+    private int proportionalTransitMinutes(Location from, Location to,
+                                           Location origin, Location destination, int baseMinutes) {
+        double totalDist = haversineMeters(origin.lat(), origin.lng(), destination.lat(), destination.lng());
+        if (totalDist == 0) return baseMinutes;
+        double partDist = haversineMeters(from.lat(), from.lng(), to.lat(), to.lng());
+        double ratio = Math.min(1.0, partDist / totalDist);
+        return Math.max(1, (int) Math.round(ratio * baseMinutes));
     }
 
     private double haversineMeters(double lat1, double lng1, double lat2, double lng2) {

@@ -41,7 +41,6 @@ class OptimalSearchStrategyTest {
         baseLeg = new Leg(LegType.TRANSIT, "BUS", 40, 10000, origin, destination, null, null);
         when(transitRoutePort.getTransitRoute(any(), any()))
                 .thenReturn(Mono.just(List.of(baseLeg)));
-        when(scoreCalculator.calculate(any())).thenReturn(0.5);
     }
 
     @Test
@@ -77,9 +76,9 @@ class OptimalSearchStrategyTest {
 
     @Test
     void 최적_경로_1위에는_추천_표시가_붙는다() {
+        // Pattern C (last-mile): select 가 candidate 반환, selectFirstMile 은 빈 리스트 → Pattern D 미실행
         when(candidatePointSelector.select(any(), any())).thenReturn(List.of(candidate));
         when(candidatePointSelector.selectFirstMile(any(), any(), any())).thenReturn(List.of());
-        when(transitRoutePort.getTransitTimeMinutes(any(), any())).thenReturn(Mono.just(20));
         when(mobilityTimePort.getMobilityTimeMinutes(any(), any(), any())).thenReturn(Mono.just(8));
         when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.of(
@@ -100,40 +99,10 @@ class OptimalSearchStrategyTest {
         when(candidatePointSelector.selectFirstMile(any(), any(), any())).thenReturn(List.of());
         when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.empty()));
-        when(scoreCalculator.calculate(any())).thenReturn(0.5);
 
         List<Route> routes = strategy.search(origin, destination).block();
 
         assertThat(routes).isNotEmpty();
         assertThat(routes.get(0).totalMinutes()).isGreaterThan(0);
-    }
-
-    @Test
-    void PERSONAL_경로는_킥보드_LegType으로_표시된다() {
-        when(candidatePointSelector.select(any(), any())).thenReturn(List.of(candidate));
-        when(candidatePointSelector.selectFirstMile(any(), any(), any())).thenReturn(List.of());
-        when(transitRoutePort.getTransitTimeMinutes(any(), any())).thenReturn(Mono.just(20));
-        when(mobilityTimePort.getMobilityTimeMinutes(any(), any(), any())).thenReturn(Mono.just(8));
-        when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
-                .thenAnswer(invocation -> {
-                    MobilityType type = invocation.getArgument(2);
-                    if (type == MobilityType.PERSONAL) {
-                        return Mono.just(Optional.of(
-                                new MobilityInfo(MobilityType.PERSONAL, "개인", null, 100, null, 37.52, 127.0, 1, 0)
-                        ));
-                    }
-                    return Mono.just(Optional.empty());
-                });
-        when(scoreCalculator.calculate(any())).thenReturn(0.9, 0.5);
-
-        List<Route> routes = strategy.search(origin, destination).block();
-
-        Route personalRoute = routes.stream()
-                .filter(r -> r.legs().stream().anyMatch(l -> "PERSONAL".equals(l.mode())))
-                .findFirst()
-                .orElseThrow();
-        assertThat(personalRoute.legs().stream()
-                .filter(l -> "PERSONAL".equals(l.mode()))
-                .allMatch(l -> l.type() == LegType.KICKBOARD)).isTrue();
     }
 }
