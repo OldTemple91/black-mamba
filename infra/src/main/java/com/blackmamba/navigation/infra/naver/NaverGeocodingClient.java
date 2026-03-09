@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -57,4 +58,38 @@ public class NaverGeocodingClient {
                 })
                 .onErrorReturn(Optional.empty());
     }
+
+    /**
+     * 장소명 연관검색어 (NCP Geocoding API 결과를 SuggestItem 목록으로 변환)
+     * 최대 5개 반환
+     */
+    public Mono<List<SuggestItem>> suggest(String query) {
+        return webClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/map-geocode/v2/geocode")
+                        .queryParam("query", query)
+                        .queryParam("count", 5)
+                        .build())
+                .retrieve()
+                .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(),
+                        response -> Mono.error(new RuntimeException("Geocode suggest 오류")))
+                .bodyToMono(NaverGeocodingResponse.class)
+                .map(response -> {
+                    if (!"OK".equals(response.status())
+                            || response.addresses() == null
+                            || response.addresses().isEmpty()) {
+                        return List.<SuggestItem>of();
+                    }
+                    return response.addresses().stream()
+                            .map(addr -> {
+                                String name = (addr.roadAddress() != null && !addr.roadAddress().isBlank())
+                                        ? addr.roadAddress() : addr.jibunAddress();
+                                return new SuggestItem(name != null ? name : query, addr.lat(), addr.lng());
+                            })
+                            .toList();
+                })
+                .onErrorReturn(List.of());
+    }
+
+    public record SuggestItem(String name, double lat, double lng) {}
 }

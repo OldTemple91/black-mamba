@@ -13,6 +13,8 @@ public record NaverGeocodingResponse(
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Address(
             @JsonProperty("x") double lng,
-            @JsonProperty("y") double lat
+            @JsonProperty("y") double lat,
+            String roadAddress,
+            String jibunAddress
     ) {}
 }
