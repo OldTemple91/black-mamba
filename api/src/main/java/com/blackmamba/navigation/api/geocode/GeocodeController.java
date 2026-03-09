@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/geocode")
 public class GeocodeController {
@@ -26,6 +28,18 @@ public class GeocodeController {
                         .orElseGet(() -> ResponseEntity.ok(new CoordResponse(null, null)))
                 )
                 .onErrorReturn(ResponseEntity.ok(new CoordResponse(null, null)));
+    }
+
+    /**
+     * 장소명 연관검색어 — GET /api/geocode/suggest?query=강남
+     * 최소 2글자 이상일 때만 검색 (짧은 쿼리는 빈 배열 반환)
+     */
+    @GetMapping("/suggest")
+    public Mono<List<NaverGeocodingClient.SuggestItem>> suggest(@RequestParam String query) {
+        if (query == null || query.isBlank() || query.length() < 2) {
+            return Mono.just(List.of());
+        }
+        return naverGeocodingClient.suggest(query);
     }
 
     public record CoordResponse(Double lat, Double lng) {}
