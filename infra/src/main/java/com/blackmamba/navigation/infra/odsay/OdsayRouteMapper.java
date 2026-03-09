@@ -30,37 +30,48 @@ public class OdsayRouteMapper {
             default -> "WALK";
         };
 
-        Location start = extractStart(subPath);
-        Location end = extractEnd(subPath);
+        List<OdsayRouteResponse.Station> stations = subPath.stations();
+        Location start = extractStart(stations);
+        Location end   = extractEnd(stations);
 
         TransitInfo transitInfo = null;
-        if (legType == LegType.TRANSIT && subPath.lane() != null) {
-            transitInfo = new TransitInfo(
-                    subPath.lane().name(),
-                    subPath.lane().busColor(),
-                    subPath.passStopList().size()
-            );
+        if (legType == LegType.TRANSIT) {
+            OdsayRouteResponse.Lane lane = subPath.firstLane();
+            // stationCount: ODsay 직접 필드 우선, 없으면 passStopList 크기
+            int stationCount = subPath.stationCount() > 0
+                    ? subPath.stationCount()
+                    : stations.size();
+            // 경유 정류장 이름 목록 (첫 역·끝 역 포함)
+            List<String> passThroughStations = stations.stream()
+                    .map(OdsayRouteResponse.Station::stationName)
+                    .toList();
+
+            if (lane != null) {
+                transitInfo = new TransitInfo(
+                        lane.name(),
+                        lane.busColor(),
+                        stationCount,
+                        passThroughStations
+                );
+            } else if (stationCount > 0) {
+                // lane 정보 없어도 정거장 수와 경유 정보는 유지
+                transitInfo = new TransitInfo(null, null, stationCount, passThroughStations);
+            }
         }
 
         return new Leg(legType, mode, subPath.sectionTime(),
                 subPath.distance(), start, end, transitInfo, null);
     }
 
-    private Location extractStart(OdsayRouteResponse.SubPath subPath) {
-        List<OdsayRouteResponse.Station> stations = subPath.passStopList();
-        if (stations == null || stations.isEmpty()) {
-            return null;  // 도보 구간은 별도 좌표 없음
-        }
+    private Location extractStart(List<OdsayRouteResponse.Station> stations) {
+        if (stations == null || stations.isEmpty()) return null;
         OdsayRouteResponse.Station s = stations.get(0);
         return new Location(s.stationName(), s.lat(), s.lng());
     }
 
-    private Location extractEnd(OdsayRouteResponse.SubPath subPath) {
-        List<OdsayRouteResponse.Station> stations = subPath.passStopList();
-        if (stations == null || stations.isEmpty()) {
-            return null;  // 도보 구간은 별도 좌표 없음
-        }
-        OdsayRouteResponse.Station s = stations.getLast();  // Java 21 getLast()
+    private Location extractEnd(List<OdsayRouteResponse.Station> stations) {
+        if (stations == null || stations.isEmpty()) return null;
+        OdsayRouteResponse.Station s = stations.getLast();
         return new Location(s.stationName(), s.lat(), s.lng());
     }
 }
