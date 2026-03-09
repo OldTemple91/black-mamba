@@ -4,15 +4,35 @@ import { searchRoutes } from '../api/routeApi'
 import RouteCard from '../components/route/RouteCard'
 import NaverMap from '../components/map/NaverMap'
 
-// 장소명 → 좌표 변환 (백엔드 NCP Geocoding REST API 호출)
+// 장소명 → 좌표 변환
+// 우선순위: 1) "lat,lng" 좌표 문자열 직접 파싱  2) 네이버 지역 검색 API (POI 키워드)  3) 백엔드 NCP 지오코딩 폴백
 const geocode = async (name) => {
   if (!name) return null
+
+  // 1) 좌표 문자열 형식: "37.5547,126.9706" (지도 클릭 or 자동완성 좌표)
+  const coordMatch = name.match(/^(-?\d+\.?\d*),(-?\d+\.?\d*)$/)
+  if (coordMatch) {
+    const lat = parseFloat(coordMatch[1])
+    const lng = parseFloat(coordMatch[2])
+    if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng }
+  }
+
+  // 2) 네이버 지역 검색 API — POI 키워드 지원 ("강남역", "홍대입구" 등)
+  try {
+    const res = await fetch(`/api/places?query=${encodeURIComponent(name)}`)
+    if (res.ok) {
+      const places = await res.json()
+      if (places.length > 0) return { lat: places[0].lat, lng: places[0].lng }
+    }
+  } catch { /* 무시, 다음 폴백으로 */ }
+
+  // 3) 백엔드 NCP Geocoding API 폴백 (도로명·지번 주소)
   try {
     const res = await fetch(`/api/geocode?query=${encodeURIComponent(name)}`)
     if (!res.ok) return null
     const data = await res.json()
     if (!Number.isFinite(data?.lat) || !Number.isFinite(data?.lng)) return null
-    return data  // { lat, lng }
+    return data
   } catch {
     return null
   }

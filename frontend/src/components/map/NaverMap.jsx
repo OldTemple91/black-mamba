@@ -1,10 +1,27 @@
 import { useEffect, useRef } from 'react'
 import { useNaverMap } from '../../hooks/useNaverMap'
 
-export default function NaverMap({ selectedRoute }) {
-  const { mapRef, addMarker, drawPolyline } = useNaverMap('naver-map')
+/**
+ * @param {object}   props
+ * @param {object}   [props.selectedRoute]   - 선택된 경로 (폴리라인/마커 표시)
+ * @param {Function} [props.onMapClick]      - 지도 클릭 시 { lat, lng } 전달
+ * @param {'origin'|'destination'|null} [props.mapMode] - 클릭 모드 표시용
+ */
+export default function NaverMap({ selectedRoute, onMapClick, mapMode }) {
+  const { mapRef, addMarker, drawPolyline, setClickHandler } = useNaverMap('naver-map')
   const overlaysRef = useRef([])
 
+  // 클릭 핸들러 등록/해제
+  useEffect(() => {
+    if (mapMode && onMapClick) {
+      setClickHandler(onMapClick)
+    } else {
+      setClickHandler(null)
+    }
+    return () => setClickHandler(null)
+  }, [mapMode, onMapClick, setClickHandler])
+
+  // 선택된 경로 시각화
   useEffect(() => {
     if (!mapRef.current || !selectedRoute) return
 
@@ -52,7 +69,25 @@ export default function NaverMap({ selectedRoute }) {
     }
   }, [selectedRoute, mapRef, addMarker, drawPolyline])
 
+  const modeLabel = mapMode === 'origin'
+    ? '📍 출발지를 클릭하세요'
+    : mapMode === 'destination'
+      ? '📍 목적지를 클릭하세요'
+      : null
+
   return (
-    <div id="naver-map" className="w-full h-96 rounded-lg shadow" />
+    <div className="relative">
+      <div
+        id="naver-map"
+        className={`w-full h-96 rounded-lg shadow transition-all ${mapMode ? 'cursor-crosshair ring-2 ring-blue-400' : ''}`}
+      />
+      {modeLabel && (
+        <div className="absolute inset-x-0 top-3 flex justify-center pointer-events-none">
+          <span className="bg-blue-500 text-white text-sm px-4 py-1.5 rounded-full shadow-lg">
+            {modeLabel}
+          </span>
+        </div>
+      )}
+    </div>
   )
 }
