@@ -13,7 +13,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Component
 public class OdsayRouteClient {
@@ -21,12 +23,15 @@ public class OdsayRouteClient {
     private static final String BASE_URL = "https://api.odsay.com/v1/api";
     private static final Logger log = LoggerFactory.getLogger(OdsayRouteClient.class);
 
+    private static final long RATE_INTERVAL_MS = 200L; // max 5 req/sec
+
     private final WebClient webClient;
     private final OdsayRouteMapper mapper;
     private final ObjectMapper objectMapper;
     private final String apiKey;
     private final Counter transitRouteErrorFallbackCounter;
     private final Counter transitTimeEstimateFallbackCounter;
+    private final AtomicLong nextPermitMs = new AtomicLong(0);
 
     public OdsayRouteClient(
             WebClient.Builder webClientBuilder,
@@ -51,8 +56,24 @@ public class OdsayRouteClient {
         );
     }
 
+    /**
+     * ODsay 무료 요금제 rate limit 대응.
+     * 동시 다발 요청 시 호출 간격을 RATE_INTERVAL_MS 이상으로 보장한다.
+     */
+    private Mono<Void> rateLimit() {
+        return Mono.defer(() -> {
+            long now = System.currentTimeMillis();
+            long scheduled = nextPermitMs.accumulateAndGet(now,
+                    (prev, cur) -> Math.max(prev, cur) + RATE_INTERVAL_MS);
+            long delayMs = scheduled - RATE_INTERVAL_MS - now;
+            return delayMs > 0
+                    ? Mono.delay(Duration.ofMillis(delayMs)).then()
+                    : Mono.empty();
+        });
+    }
+
     public Mono<List<Leg>> getTransitRoute(Location origin, Location destination) {
-        return webClient.get()
+        return rateLimit().then(webClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/searchPubTransPathT")
                         .queryParam("apiKey", "{apiKey}")
@@ -103,7 +124,7 @@ public class OdsayRouteClient {
                     transitRouteErrorFallbackCounter.increment();
                     log.warn("[ODsay] 호출 실패 → 빈 리스트 반환. 원인: {}", ex.getMessage());
                     return Mono.just(List.of());
-                });
+                }));
     }
 
     public Mono<Integer> getTransitTimeMinutes(Location origin, Location destination) {

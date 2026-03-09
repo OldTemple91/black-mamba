@@ -48,7 +48,7 @@ public class OdsayRouteMapper {
 
             if (lane != null) {
                 transitInfo = new TransitInfo(
-                        lane.name(),
+                        lane.lineName(),   // 지하철: name, 버스: busNo+"번"
                         lane.busColor(),
                         stationCount,
                         passThroughStations
