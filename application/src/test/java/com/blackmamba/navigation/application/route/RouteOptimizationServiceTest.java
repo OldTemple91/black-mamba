@@ -51,8 +51,6 @@ class RouteOptimizationServiceTest {
         when(candidatePointSelector.selectFirstMile(any(), any(), any())).thenReturn(List.of());
         when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.empty()));
-        when(scoreCalculator.calculate(any())).thenReturn(0.5);
-
         List<Route> routes = service.findRoutes(origin, dest, List.of(), SearchMode.OPTIMAL).block();
 
         assertThat(routes).isNotEmpty();
