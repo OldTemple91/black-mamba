@@ -10,6 +10,7 @@ import reactor.core.publisher.Mono;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 사용자가 선택한 이동수단으로 라스트마일(패턴 C)만 탐색하는 전략.
@@ -78,12 +79,13 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                         return buildDirectRoute(origin, destination, type).flux();
                     }
                     return Flux.fromIterable(candidates)
-                            .flatMap(candidate -> buildRoute(origin, candidate, destination, type));
+                            .flatMap(candidate -> buildRoute(origin, candidate, destination, type, baseLegs));
                 });
     }
 
     private Mono<Route> buildRoute(Location origin, Location switchPoint,
-                                    Location destination, MobilityType type) {
+                                    Location destination, MobilityType type,
+                                    List<Leg> baseLegs) {
         Mono<Integer> transitTime  = transitRoutePort.getTransitTimeMinutes(origin, switchPoint);
         Mono<Integer> mobilityTime = mobilityTimePort.getMobilityTimeMinutes(switchPoint, destination, type);
         Mono<java.util.Optional<MobilityInfo>> avail =
@@ -97,11 +99,38 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                     RouteType routeType = isKickboardType(type)
                             ? RouteType.TRANSIT_WITH_KICKBOARD : RouteType.TRANSIT_WITH_BIKE;
                     List<Leg> legs = List.of(
-                            new Leg(LegType.TRANSIT, "BUS", t.getT1(), 0, origin, switchPoint, null, null),
+                            buildTransitLeg(t.getT1(), origin, switchPoint, baseLegs),
                             new Leg(legType, type.name(), t.getT2(), 0, switchPoint, destination, null, info)
                     );
                     return Route.of(legs, routeType);
                 });
+    }
+
+    /** baseLegs에서 노선 정보를 추출해 TransitInfo가 채워진 Leg 생성 */
+    private Leg buildTransitLeg(int minutes, Location from, Location to, List<Leg> baseLegs) {
+        List<Leg> transitLegs = baseLegs.stream()
+                .filter(l -> l.type() == LegType.TRANSIT && l.transitInfo() != null)
+                .toList();
+        if (transitLegs.isEmpty()) {
+            return new Leg(LegType.TRANSIT, "대중교통", minutes, 0, from, to, null, null);
+        }
+        String lineName = transitLegs.stream()
+                .map(l -> l.transitInfo().lineName())
+                .filter(n -> n != null && !n.isBlank())
+                .distinct().limit(3)
+                .collect(Collectors.joining(", "));
+        String lineColor = transitLegs.stream()
+                .map(l -> l.transitInfo().lineColor())
+                .filter(c -> c != null && !c.isBlank())
+                .findFirst().orElse(null);
+        int totalBaseMinutes = baseLegs.stream().mapToInt(Leg::durationMinutes).sum();
+        int totalStations = transitLegs.stream().mapToInt(l -> l.transitInfo().stationCount()).sum();
+        int approxStations = totalBaseMinutes > 0
+                ? Math.max(2, (int) Math.round((double) minutes / totalBaseMinutes * totalStations))
+                : Math.max(2, totalStations / 2);
+        TransitInfo transitInfo = lineName.isBlank() ? null
+                : TransitInfo.of(lineName, lineColor, approxStations);
+        return new Leg(LegType.TRANSIT, "대중교통", minutes, 0, from, to, transitInfo, null);
     }
 
     /** ODsay 없이 출발지→목적지 직접 이동수단 경로 */

@@ -4,10 +4,13 @@ import com.blackmamba.navigation.application.route.*;
 import com.blackmamba.navigation.application.route.port.*;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 모든수단 최적탐색 전략.
@@ -21,6 +24,7 @@ import java.util.*;
  */
 public class OptimalSearchStrategy implements RouteSearchStrategy {
 
+    private static final Logger log = LoggerFactory.getLogger(OptimalSearchStrategy.class);
     private static final double EARTH_RADIUS_METERS = 6_371_000;
     private static final List<MobilityType> ALL_TYPES =
             List.of(MobilityType.DDAREUNGI, MobilityType.KICKBOARD_SHARED, MobilityType.PERSONAL);
@@ -54,10 +58,18 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                         baseRouteLegs = List.of(
                                 new Leg(LegType.TRANSIT, "대중교통", baseMinutes, 0, origin, destination, null, null)
                         );
+                        log.warn("[OPTIMAL] baseLegs 비어있음 → haversine 추정 {}분 사용", baseMinutes);
                     } else {
                         baseMinutes = baseLegs.stream().mapToInt(Leg::durationMinutes).sum();
                         baseRouteLegs = baseLegs;
+                        log.info("[OPTIMAL] baseLegs={}개 totalMin={}", baseLegs.size(), baseMinutes);
                     }
+
+                    // 후보 지점 진단
+                    MobilityConfig diagConfig = MobilityConfig.kickboard();
+                    List<Location> diagCandidates = candidatePointSelector.select(baseLegs, diagConfig);
+                    log.info("[OPTIMAL] lastMile 후보={}개 (kickboard 기준)", diagCandidates.size());
+
                     Route baseRoute = Route.of(baseRouteLegs, RouteType.TRANSIT_ONLY);
 
                     Flux<Route> allPatterns = Flux.fromIterable(ALL_TYPES)
@@ -94,7 +106,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                                             .map(t -> buildRoute(
                                                     List.of(
                                                             mobilityLeg(type, t.getT1(), origin, transitStart, info),
-                                                            transitLeg(t.getT2(), transitStart, destination)
+                                                            transitLeg(t.getT2(), transitStart, destination, baseLegs)
                                                     ), RouteType.MOBILITY_FIRST_TRANSIT));
                                 })
                 );
@@ -115,7 +127,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                                     return Mono.zip(tranTime, mobTime)
                                             .map(t -> buildRoute(
                                                     List.of(
-                                                            transitLeg(t.getT1(), origin, switchPoint),
+                                                            transitLeg(t.getT1(), origin, switchPoint, baseLegs),
                                                             mobilityLeg(type, t.getT2(), switchPoint, destination, info)
                                                     ), routeTypeFor(type)));
                                 })
@@ -143,7 +155,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                             .map(t -> buildRoute(
                                     List.of(
                                             mobilityLeg(type, t.getT1(), origin, transitStart, info),
-                                            transitLeg(t.getT2(), transitStart, transitEnd),
+                                            transitLeg(t.getT2(), transitStart, transitEnd, baseLegs),
                                             mobilityLeg(type, t.getT3(), transitEnd, destination, info)
                                     ), RouteType.MOBILITY_TRANSIT_MOBILITY))
                             .flux();
@@ -174,8 +186,46 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
         return Route.of(legs, type);
     }
 
-    private Leg transitLeg(int minutes, Location from, Location to) {
-        return new Leg(LegType.TRANSIT, "대중교통", minutes, 0, from, to, null, null);
+    /**
+     * 혼합 경로의 대중교통 구간 Leg 생성.
+     * baseLegs에서 노선명·색상을 추출해 TransitInfo를 채운다.
+     * baseLegs가 비어있거나 TRANSIT 정보가 없으면 transitInfo=null.
+     */
+    private Leg transitLeg(int minutes, Location from, Location to, List<Leg> baseLegs) {
+        List<Leg> transitLegs = baseLegs.stream()
+                .filter(l -> l.type() == LegType.TRANSIT && l.transitInfo() != null)
+                .toList();
+
+        if (transitLegs.isEmpty()) {
+            return new Leg(LegType.TRANSIT, "대중교통", minutes, 0, from, to, null, null);
+        }
+
+        // 노선명: 최대 3개 중복 제거 후 합산 (예: "2호선, 64번")
+        String lineName = transitLegs.stream()
+                .map(l -> l.transitInfo().lineName())
+                .filter(n -> n != null && !n.isBlank())
+                .distinct()
+                .limit(3)
+                .collect(Collectors.joining(", "));
+
+        // 노선 색상: 첫 번째 TRANSIT leg 색상 사용
+        String lineColor = transitLegs.stream()
+                .map(l -> l.transitInfo().lineColor())
+                .filter(c -> c != null && !c.isBlank())
+                .findFirst()
+                .orElse(null);
+
+        // 정거장 수: 전체 기준 소요시간 비율로 근사
+        int totalBaseMinutes = baseLegs.stream().mapToInt(Leg::durationMinutes).sum();
+        int totalStations = transitLegs.stream().mapToInt(l -> l.transitInfo().stationCount()).sum();
+        int approxStations = totalBaseMinutes > 0
+                ? Math.max(2, (int) Math.round((double) minutes / totalBaseMinutes * totalStations))
+                : Math.max(2, totalStations / 2);
+
+        TransitInfo transitInfo = lineName.isBlank() ? null
+                : TransitInfo.of(lineName, lineColor, approxStations);
+
+        return new Leg(LegType.TRANSIT, "대중교통", minutes, 0, from, to, transitInfo, null);
     }
 
     private Leg mobilityLeg(MobilityType type, int minutes, Location from, Location to, MobilityInfo info) {
