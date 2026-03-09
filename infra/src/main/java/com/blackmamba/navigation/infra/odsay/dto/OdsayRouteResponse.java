@@ -16,21 +16,43 @@ public record OdsayRouteResponse(Result result) {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record PathInfo(int totalTime, int transitCount, int payment) {}
 
-    // trafficType: 1=지하철, 2=버스, 3=도보
+    /**
+     * trafficType: 1=지하철, 2=버스, 3=도보
+     *
+     * ODsay 실제 JSON 구조:
+     *   lane        : [{name, busColor}]  — 배열 형태
+     *   passStopList: {"stations": [...]} — 중첩 객체 형태
+     *   stationCount: int                 — subPath 레벨 직접 제공
+     */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record SubPath(
             int trafficType,
             int sectionTime,
             int distance,
-            Lane lane,
-            List<Station> passStopList
-    ) {}
+            int stationCount,
+            List<Lane> lane,
+            PassStopList passStopList
+    ) {
+        /** 편의 메서드: 첫 번째 Lane 반환 (없으면 null) */
+        public Lane firstLane() {
+            return (lane != null && !lane.isEmpty()) ? lane.get(0) : null;
+        }
+
+        /** null-safe 정거장 목록 */
+        public List<Station> stations() {
+            if (passStopList == null || passStopList.stations() == null) return List.of();
+            return passStopList.stations();
+        }
+    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Lane(String name, String busColor) {}
 
+    /** ODsay passStopList 중첩 래퍼: {"stations": [...]} */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record PassStopList(List<Station> stations) {}
+
     // ODsay API: x = 경도(lng), y = 위도(lat)
-    // 생성자 파라미터 순서: (stationName, lng, lat) — x/y JSON 매핑 주의
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Station(
             String stationName,
