@@ -46,7 +46,17 @@ public record OdsayRouteResponse(Result result) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Lane(String name, String busColor) {}
+    public record Lane(String name, String busColor, String busNo) {
+        /**
+         * 지하철: name ("수도권 2호선")
+         * 버스:   busNo ("64") → "64번" 으로 변환
+         */
+        public String lineName() {
+            if (name != null && !name.isBlank()) return name;
+            if (busNo != null && !busNo.isBlank()) return busNo + "번";
+            return null;
+        }
+    }
 
     /** ODsay passStopList 중첩 래퍼: {"stations": [...]} */
     @JsonIgnoreProperties(ignoreUnknown = true)
