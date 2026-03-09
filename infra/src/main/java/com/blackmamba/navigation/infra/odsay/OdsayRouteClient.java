@@ -3,6 +3,7 @@ package com.blackmamba.navigation.infra.odsay;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Leg;
 import com.blackmamba.navigation.infra.odsay.dto.OdsayRouteResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -22,6 +23,7 @@ public class OdsayRouteClient {
 
     private final WebClient webClient;
     private final OdsayRouteMapper mapper;
+    private final ObjectMapper objectMapper;
     private final String apiKey;
     private final Counter transitRouteErrorFallbackCounter;
     private final Counter transitTimeEstimateFallbackCounter;
@@ -29,10 +31,12 @@ public class OdsayRouteClient {
     public OdsayRouteClient(
             WebClient.Builder webClientBuilder,
             OdsayRouteMapper mapper,
+            ObjectMapper objectMapper,
             @Value("${odsay.api-key}") String apiKey,
             MeterRegistry meterRegistry
     ) {
         this.mapper = mapper;
+        this.objectMapper = objectMapper;
         this.apiKey = apiKey;
         this.webClient = webClientBuilder.baseUrl(BASE_URL).build();
         this.transitRouteErrorFallbackCounter = meterRegistry.counter(
@@ -51,33 +55,53 @@ public class OdsayRouteClient {
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/searchPubTransPathT")
-                        .queryParam("apiKey", apiKey)
+                        .queryParam("apiKey", "{apiKey}")
                         .queryParam("SX", origin.lng())
                         .queryParam("SY", origin.lat())
                         .queryParam("EX", destination.lng())
                         .queryParam("EY", destination.lat())
-                        .build())
+                        .build(apiKey))
                 .retrieve()
                 .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(),
                         response -> response.bodyToMono(String.class)
-                                .flatMap(body -> Mono.error(
-                                        new RuntimeException("ODsay API 오류: " + response.statusCode() + " " + body)
-                                ))
+                                .flatMap(body -> {
+                                    log.error("[ODsay] HTTP 오류 {} — body: {}", response.statusCode(), body);
+                                    return Mono.error(new RuntimeException("ODsay API 오류: " + response.statusCode() + " " + body));
+                                })
                 )
-                .bodyToMono(OdsayRouteResponse.class)
-                .map(response -> {
-                    if (response.result() == null) {
-                        return List.<Leg>of();
+                // ① raw JSON 문자열로 먼저 받아서 로그 찍기 (진단용)
+                .bodyToMono(String.class)
+                .flatMap(rawJson -> {
+                    log.info("[ODsay] raw 응답 (첫 500자): {}", rawJson.length() > 500 ? rawJson.substring(0, 500) : rawJson);
+                    try {
+                        OdsayRouteResponse response = objectMapper.readValue(rawJson, OdsayRouteResponse.class);
+                        if (response.result() == null) {
+                            log.warn("[ODsay] result=null — API 키 오류 또는 경로 없음. raw={}", rawJson);
+                            return Mono.just(List.<Leg>of());
+                        }
+                        var paths = response.result().path();
+                        if (paths == null || paths.isEmpty()) {
+                            log.warn("[ODsay] 경로(path) 배열 비어있음");
+                            return Mono.just(List.<Leg>of());
+                        }
+                        List<Leg> legs = mapper.toLegs(paths.get(0));
+                        log.info("[ODsay] 파싱 성공 — leg {}개: {}", legs.size(),
+                                legs.stream().map(l ->
+                                        l.type() + "(transitInfo=" + (l.transitInfo() != null
+                                                ? l.transitInfo().lineName() + "/" + l.transitInfo().stationCount() + "역"
+                                                : "null")
+                                        + " start=" + (l.start() != null ? l.start().name() : "null") + ")"
+                                ).toList());
+                        return Mono.just(legs);
+                    } catch (Exception ex) {
+                        log.error("[ODsay] JSON 파싱 실패: {} — raw={}", ex.getMessage(), rawJson);
+                        transitRouteErrorFallbackCounter.increment();
+                        return Mono.just(List.<Leg>of());
                     }
-                    var paths = response.result().path();
-                    if (paths == null || paths.isEmpty()) {
-                        return List.<Leg>of();
-                    }
-                    return mapper.toLegs(paths.get(0));
                 })
                 .onErrorResume(ex -> {
                     transitRouteErrorFallbackCounter.increment();
-                    log.warn("ODsay transit route fallback: {}", ex.getMessage());
+                    log.warn("[ODsay] 호출 실패 → 빈 리스트 반환. 원인: {}", ex.getMessage());
                     return Mono.just(List.of());
                 });
     }
