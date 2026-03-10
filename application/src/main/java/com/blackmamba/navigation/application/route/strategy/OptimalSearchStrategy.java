@@ -227,8 +227,14 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                 ? Math.max(2, (int) Math.round((double) minutes / totalBaseMinutes * totalStations))
                 : Math.max(2, totalStations / 2);
 
+        // 경유 정류장: base 경로의 passThroughStations 합산 (근사 표시용)
+        List<String> passThroughStations = transitLegs.stream()
+                .filter(l -> l.transitInfo().passThroughStations() != null)
+                .flatMap(l -> l.transitInfo().passThroughStations().stream())
+                .toList();
+
         TransitInfo transitInfo = lineName.isBlank() ? null
-                : TransitInfo.of(lineName, lineColor, approxStations);
+                : new TransitInfo(lineName, lineColor, approxStations, passThroughStations);
 
         return new Leg(LegType.TRANSIT, "대중교통", minutes, 0, from, to, transitInfo, null);
     }
