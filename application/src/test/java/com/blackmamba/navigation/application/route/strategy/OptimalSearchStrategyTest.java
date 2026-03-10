@@ -38,7 +38,7 @@ class OptimalSearchStrategyTest {
         strategy = new OptimalSearchStrategy(
                 transitRoutePort, mobilityTimePort,
                 mobilityAvailabilityPort, candidatePointSelector, scoreCalculator);
-        baseLeg = new Leg(LegType.TRANSIT, "BUS", 40, 10000, origin, destination, null, null);
+        baseLeg = new Leg(LegType.TRANSIT, "BUS", 40, 10000, origin, destination, null, null, null);
         when(transitRoutePort.getTransitRoute(any(), any()))
                 .thenReturn(Mono.just(List.of(baseLeg)));
     }
@@ -65,8 +65,8 @@ class OptimalSearchStrategyTest {
                 .thenReturn(Mono.just(Optional.of(
                         new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
                                 null, 100, "서울역", 37.5547, 126.9706, 5, 0))));
-        when(mobilityTimePort.getMobilityTimeMinutes(any(), any(), any()))
-                .thenReturn(Mono.just(30));
+        when(mobilityTimePort.getMobilityRoute(any(), any(), any()))
+                .thenReturn(Mono.just(MobilityRouteResult.timeOnly(30)));
         when(scoreCalculator.calculate(any())).thenReturn(0.6, 0.5);
 
         List<Route> routes = strategy.search(origin, destination).block();
@@ -79,7 +79,8 @@ class OptimalSearchStrategyTest {
         // Pattern C (last-mile): select 가 candidate 반환, selectFirstMile 은 빈 리스트 → Pattern D 미실행
         when(candidatePointSelector.select(any(), any())).thenReturn(List.of(candidate));
         when(candidatePointSelector.selectFirstMile(any(), any(), any())).thenReturn(List.of());
-        when(mobilityTimePort.getMobilityTimeMinutes(any(), any(), any())).thenReturn(Mono.just(8));
+        when(mobilityTimePort.getMobilityRoute(any(), any(), any()))
+                .thenReturn(Mono.just(MobilityRouteResult.timeOnly(8)));
         when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.of(
                         new MobilityInfo(MobilityType.KICKBOARD_SHARED, "씽씽",

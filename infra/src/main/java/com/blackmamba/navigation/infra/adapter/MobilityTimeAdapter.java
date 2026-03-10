@@ -2,26 +2,27 @@ package com.blackmamba.navigation.infra.adapter;
 
 import com.blackmamba.navigation.application.route.port.MobilityTimePort;
 import com.blackmamba.navigation.domain.location.Location;
+import com.blackmamba.navigation.domain.route.MobilityRouteResult;
 import com.blackmamba.navigation.domain.route.MobilityType;
 import com.blackmamba.navigation.infra.tmap.TmapPedestrianClient;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+
 /**
- * 이동수단 소요 시간 계산 어댑터.
- * TMAP 보행자 경로 API의 실제 도로 거리(m)를 이동수단 속도로 나눠 시간을 추정.
- * TMAP 실패 시 Haversine 직선거리 × 1.3 우회계수로 fallback.
+ * 이동수단 경로 어댑터.
+ * TMAP 보행자 API의 실제 도로 거리(m)로 소요 시간을 추정하고,
+ * GeoJSON 경로 좌표를 함께 반환해 지도에 실제 도로 경로를 그릴 수 있게 한다.
+ * TMAP 실패 시 Haversine 직선거리 × 1.3 우회계수로 fallback (좌표는 빈 리스트).
  */
 @Component
 public class MobilityTimeAdapter implements MobilityTimePort {
 
-    // 평균속도 (km/h)
     private static final double DDAREUNGI_KMH        = 15.0;
     private static final double KICKBOARD_SHARED_KMH = 18.0;
     private static final double PERSONAL_KMH         = 20.0;
-
-    // haversine fallback 우회 계수
-    private static final double DETOUR_FACTOR = 1.3;
+    private static final double DETOUR_FACTOR        = 1.3;
 
     private final TmapPedestrianClient tmapClient;
 
@@ -30,14 +31,20 @@ public class MobilityTimeAdapter implements MobilityTimePort {
     }
 
     @Override
-    public Mono<Integer> getMobilityTimeMinutes(Location origin, Location destination, MobilityType type) {
+    public Mono<MobilityRouteResult> getMobilityRoute(Location origin, Location destination, MobilityType type) {
         double speedKmh = speedKmh(type);
-        return tmapClient.getRoadDistanceMeters(origin, destination)
+        return tmapClient.getRoute(origin, destination)
                 .map(opt -> {
-                    double distKm = opt.isPresent()
-                            ? opt.get() / 1000.0
-                            : haversineKm(origin, destination) * DETOUR_FACTOR;
-                    return Math.max(1, (int) Math.ceil(distKm / speedKmh * 60));
+                    if (opt.isPresent()) {
+                        TmapPedestrianClient.TmapRouteData data = opt.get();
+                        double distKm = data.distanceMeters() / 1000.0;
+                        int minutes = Math.max(1, (int) Math.ceil(distKm / speedKmh * 60));
+                        return new MobilityRouteResult(minutes, data.coordinates());
+                    }
+                    // haversine fallback: 좌표 없이 시간만 반환
+                    double distKm = haversineKm(origin, destination) * DETOUR_FACTOR;
+                    int minutes = Math.max(1, (int) Math.ceil(distKm / speedKmh * 60));
+                    return MobilityRouteResult.timeOnly(minutes);
                 });
     }
 

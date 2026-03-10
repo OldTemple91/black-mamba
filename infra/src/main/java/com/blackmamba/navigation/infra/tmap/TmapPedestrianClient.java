@@ -12,12 +12,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 /**
  * TMAP 보행자 경로 API 클라이언트.
- * 실제 도로 거리(m)를 반환해 자전거/킥보드 이동 시간 추정 정확도를 높인다.
+ * 실제 도로 거리(m)와 경로 좌표(GeoJSON LineString)를 함께 반환.
  * 실패 시 Optional.empty() 반환 → MobilityTimeAdapter에서 haversine fallback.
  */
 @Component
@@ -42,10 +43,11 @@ public class TmapPedestrianClient {
     }
 
     /**
-     * 두 지점 간 보행자 경로의 실제 도로 거리(m) 반환.
-     * API 실패 또는 경로 없을 경우 Optional.empty() 반환.
+     * 두 지점 간 보행자 경로 조회.
+     * 성공 시 (도로 거리m, 실제 경로 좌표)를 담은 Optional 반환.
+     * 실패 또는 경로 없으면 Optional.empty().
      */
-    public Mono<Optional<Integer>> getRoadDistanceMeters(Location origin, Location destination) {
+    public Mono<Optional<TmapRouteData>> getRoute(Location origin, Location destination) {
         Map<String, Object> body = Map.of(
                 "startX", String.valueOf(origin.lng()),
                 "startY", String.valueOf(origin.lat()),
@@ -65,13 +67,14 @@ public class TmapPedestrianClient {
                 .map(response -> {
                     int dist = response.totalDistanceMeters();
                     if (dist > 0) {
-                        log.debug("[TMAP] 도로 거리 {}m ({} → {})",
-                                dist, origin.name(), destination.name());
-                        return Optional.of(dist);
+                        List<Location> coords = response.routeCoordinates();
+                        log.debug("[TMAP] 도로 거리 {}m, 좌표 {}개 ({} → {})",
+                                dist, coords.size(), origin.name(), destination.name());
+                        return Optional.of(new TmapRouteData(dist, coords));
                     }
                     log.warn("[TMAP] 거리 0 반환 — 경로 없음 ({} → {})",
                             origin.name(), destination.name());
-                    return Optional.<Integer>empty();
+                    return Optional.<TmapRouteData>empty();
                 })
                 .onErrorResume(ex -> {
                     fallbackCounter.increment();
@@ -79,4 +82,6 @@ public class TmapPedestrianClient {
                     return Mono.just(Optional.empty());
                 });
     }
+
+    public record TmapRouteData(int distanceMeters, List<Location> coordinates) {}
 }

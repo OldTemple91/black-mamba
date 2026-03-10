@@ -30,7 +30,7 @@ class SpecificMobilityStrategyTest {
     void 이동수단_없으면_대중교통만_반환한다() {
         Location origin = new Location("서울역", 37.5547, 126.9706);
         Location dest   = new Location("강남역", 37.4979, 127.0276);
-        Leg leg = new Leg(LegType.TRANSIT, "BUS", 45, 10000, origin, dest, null, null);
+        Leg leg = new Leg(LegType.TRANSIT, "BUS", 45, 10000, origin, dest, null, null, null);
 
         when(transitRoutePort.getTransitRoute(any(), any()))
                 .thenReturn(Mono.just(List.of(leg)));
@@ -52,12 +52,13 @@ class SpecificMobilityStrategyTest {
         Location origin    = new Location("서울역", 37.5547, 126.9706);
         Location dest      = new Location("강남역", 37.4979, 127.0276);
         Location candidate = new Location("중간역", 37.5200, 127.0000);
-        Leg leg = new Leg(LegType.TRANSIT, "BUS", 45, 10000, origin, dest, null, null);
+        Leg leg = new Leg(LegType.TRANSIT, "BUS", 45, 10000, origin, dest, null, null, null);
 
         when(transitRoutePort.getTransitRoute(any(), any()))
                 .thenReturn(Mono.just(List.of(leg)));
         when(transitRoutePort.getTransitTimeMinutes(any(), any())).thenReturn(Mono.just(18));
-        when(mobilityTimePort.getMobilityTimeMinutes(any(), any(), any())).thenReturn(Mono.just(9));
+        when(mobilityTimePort.getMobilityRoute(any(), any(), any()))
+                .thenReturn(Mono.just(MobilityRouteResult.timeOnly(9)));
         when(mobilityAvailabilityPort.findNearbyMobility(any(Double.class), any(Double.class), any()))
                 .thenReturn(Mono.just(Optional.of(
                         new MobilityInfo(MobilityType.KICKBOARD_SHARED, "씽씽",

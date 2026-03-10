@@ -57,7 +57,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                     if (baseLegs.isEmpty()) {
                         baseMinutes = haversineTransitMinutes(origin, destination);
                         baseRouteLegs = List.of(
-                                new Leg(LegType.TRANSIT, "대중교통", baseMinutes, 0, origin, destination, null, null)
+                                new Leg(LegType.TRANSIT, "대중교통", baseMinutes, 0, origin, destination, null, null, null)
                         );
                         log.warn("[OPTIMAL] baseLegs 비어있음 → haversine 추정 {}분 사용", baseMinutes);
                     } else {
@@ -105,10 +105,10 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                                     MobilityInfo info = avail.get();
                                     // transitStart → destination: 전체 기준 나머지 구간 비율로 추정 (ODsay 추가 호출 없음)
                                     int tranTime = proportionalTransitMinutes(transitStart, destination, origin, destination, baseMinutes);
-                                    return mobilityTimePort.getMobilityTimeMinutes(origin, transitStart, type)
-                                            .map(mobTime -> buildRoute(
+                                    return mobilityTimePort.getMobilityRoute(origin, transitStart, type)
+                                            .map(result -> buildRoute(
                                                     List.of(
-                                                            mobilityLeg(type, mobTime, origin, transitStart, info),
+                                                            mobilityLeg(type, result, origin, transitStart, info),
                                                             transitLeg(tranTime, transitStart, destination, baseLegs)
                                                     ), RouteType.MOBILITY_FIRST_TRANSIT));
                                 })
@@ -129,11 +129,11 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                                     MobilityInfo info = avail.get();
                                     // origin → switchPoint: 전체 기준 비율로 추정 (ODsay 추가 호출 없음)
                                     int tranTime = proportionalTransitMinutes(origin, switchPoint, origin, destination, baseMinutes);
-                                    return mobilityTimePort.getMobilityTimeMinutes(switchPoint, destination, type)
-                                            .map(mobTime -> buildRoute(
+                                    return mobilityTimePort.getMobilityRoute(switchPoint, destination, type)
+                                            .map(result -> buildRoute(
                                                     List.of(
                                                             transitLeg(tranTime, origin, switchPoint, baseLegs),
-                                                            mobilityLeg(type, mobTime, switchPoint, destination, info)
+                                                            mobilityLeg(type, result, switchPoint, destination, info)
                                                     ), routeTypeFor(type)));
                                 })
                 );
@@ -153,9 +153,9 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                 .filter(Optional::isPresent)
                 .flatMapMany(avail -> {
                     MobilityInfo info = avail.get();
-                    Mono<Integer> mob1  = mobilityTimePort.getMobilityTimeMinutes(origin, transitStart, type);
-                    Mono<Integer> tran  = transitRoutePort.getTransitTimeMinutes(transitStart, transitEnd);
-                    Mono<Integer> mob2  = mobilityTimePort.getMobilityTimeMinutes(transitEnd, destination, type);
+                    Mono<MobilityRouteResult> mob1  = mobilityTimePort.getMobilityRoute(origin, transitStart, type);
+                    Mono<Integer>             tran  = transitRoutePort.getTransitTimeMinutes(transitStart, transitEnd);
+                    Mono<MobilityRouteResult> mob2  = mobilityTimePort.getMobilityRoute(transitEnd, destination, type);
                     return Mono.zip(mob1, tran, mob2)
                             .map(t -> buildRoute(
                                     List.of(
@@ -177,9 +177,9 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                 .filter(Optional::isPresent)
                 .flatMapMany(avail -> {
                     MobilityInfo info = avail.get();
-                    return mobilityTimePort.getMobilityTimeMinutes(origin, destination, type)
-                            .map(t -> buildRoute(
-                                    List.of(mobilityLeg(type, t, origin, destination, info)),
+                    return mobilityTimePort.getMobilityRoute(origin, destination, type)
+                            .map(result -> buildRoute(
+                                    List.of(mobilityLeg(type, result, origin, destination, info)),
                                     RouteType.MOBILITY_ONLY))
                             .flux();
                 });
@@ -202,7 +202,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                 .toList();
 
         if (transitLegs.isEmpty()) {
-            return new Leg(LegType.TRANSIT, "대중교통", minutes, 0, from, to, null, null);
+            return new Leg(LegType.TRANSIT, "대중교통", minutes, 0, from, to, null, null, null);
         }
 
         // 노선명: 최대 3개 중복 제거 후 합산 (예: "2호선, 64번")
@@ -236,12 +236,12 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
         TransitInfo transitInfo = lineName.isBlank() ? null
                 : new TransitInfo(lineName, lineColor, approxStations, passThroughStations);
 
-        return new Leg(LegType.TRANSIT, "대중교통", minutes, 0, from, to, transitInfo, null);
+        return new Leg(LegType.TRANSIT, "대중교통", minutes, 0, from, to, transitInfo, null, null);
     }
 
-    private Leg mobilityLeg(MobilityType type, int minutes, Location from, Location to, MobilityInfo info) {
+    private Leg mobilityLeg(MobilityType type, MobilityRouteResult result, Location from, Location to, MobilityInfo info) {
         LegType legType = isKickboardType(type) ? LegType.KICKBOARD : LegType.BIKE;
-        return new Leg(legType, type.name(), minutes, 0, from, to, null, info);
+        return new Leg(legType, type.name(), result.durationMinutes(), 0, from, to, null, info, result.routeCoordinates());
     }
 
     private MobilityConfig configFor(MobilityType type) {

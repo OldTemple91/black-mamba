@@ -60,7 +60,7 @@ public class OdsayRouteMapper {
         }
 
         return new Leg(legType, mode, subPath.sectionTime(),
-                subPath.distance(), start, end, transitInfo, null);
+                subPath.distance(), start, end, transitInfo, null, null);
     }
 
     private Location extractStart(List<OdsayRouteResponse.Station> stations) {
