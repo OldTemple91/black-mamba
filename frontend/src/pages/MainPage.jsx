@@ -63,7 +63,6 @@ export default function MainPage() {
 
   // 연관검색어 항목 선택
   const selectSuggestion = (item, field) => {
-    const coord = `${item.lat.toFixed(6)},${item.lng.toFixed(6)}`
     if (field === 'origin') {
       setOrigin(item.name)
       setOriginCoord({ lat: item.lat, lng: item.lng })
