@@ -26,7 +26,7 @@ class CandidatePointSelectorTest {
     void TRANSIT_구간이_없으면_빈_리스트를_반환한다() {
         Location a = new Location("A", 37.5, 127.0);
         Location b = new Location("B", 37.4, 127.1);
-        Leg walkLeg = new Leg(LegType.WALK, "WALK", 5, 400, a, b, null, null);
+        Leg walkLeg = new Leg(LegType.WALK, "WALK", 5, 400, a, b, null, null, null);
 
         List<Location> candidates = selector.select(List.of(walkLeg), mobilityConfig());
 
@@ -54,7 +54,7 @@ class CandidatePointSelectorTest {
         Leg leg = new Leg(LegType.TRANSIT, "지하철", 30, 10000,
                 new Location("시작", 37.5, 126.9),
                 new Location("끝",   37.59, 126.9),
-                TransitInfo.of("지하철", "2호선", 10), null);
+                TransitInfo.of("지하철", "2호선", 10), null, null);
 
         MobilityConfig config = MobilityConfig.kickboard(); // maxRange=5000m
 
@@ -84,7 +84,7 @@ class CandidatePointSelectorTest {
         Location start = new Location("출발", 37.5000, 127.0000);
         Location end   = new Location("도착", 37.5090, 127.0000);
         TransitInfo transitInfo = TransitInfo.of("140", "#0052A4", count);
-        Leg leg = new Leg(LegType.TRANSIT, "BUS", 20, 5000, start, end, transitInfo, null);
+        Leg leg = new Leg(LegType.TRANSIT, "BUS", 20, 5000, start, end, transitInfo, null, null);
         return List.of(leg);
     }
 

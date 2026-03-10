@@ -33,7 +33,7 @@ class RouteOptimizationServiceTest {
 
     @Test
     void SPECIFIC_모드_이동수단_없으면_대중교통만_반환한다() {
-        Leg leg = new Leg(LegType.TRANSIT, "BUS", 45, 10000, origin, dest, null, null);
+        Leg leg = new Leg(LegType.TRANSIT, "BUS", 45, 10000, origin, dest, null, null, null);
         when(transitRoutePort.getTransitRoute(any(), any())).thenReturn(Mono.just(List.of(leg)));
         when(scoreCalculator.calculate(any())).thenReturn(0.5);
 
@@ -45,7 +45,7 @@ class RouteOptimizationServiceTest {
 
     @Test
     void OPTIMAL_모드는_대중교통_경로를_항상_포함한다() {
-        Leg leg = new Leg(LegType.TRANSIT, "BUS", 40, 10000, origin, dest, null, null);
+        Leg leg = new Leg(LegType.TRANSIT, "BUS", 40, 10000, origin, dest, null, null, null);
         when(transitRoutePort.getTransitRoute(any(), any())).thenReturn(Mono.just(List.of(leg)));
         when(candidatePointSelector.select(any(), any())).thenReturn(List.of());
         when(candidatePointSelector.selectFirstMile(any(), any(), any())).thenReturn(List.of());

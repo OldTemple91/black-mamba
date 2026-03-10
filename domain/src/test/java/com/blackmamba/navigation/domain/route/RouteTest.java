@@ -13,8 +13,8 @@ class RouteTest {
         Location banpo = new Location("반포역", 37.5040, 127.0050);
         Location dest = new Location("목적지", 37.4979, 127.0276);
 
-        Leg transitLeg = new Leg(LegType.TRANSIT, "BUS", 18, 4200, seoul, banpo, null, null);
-        Leg kickboardLeg = new Leg(LegType.KICKBOARD, "KICKBOARD_SHARED", 9, 1800, banpo, dest, null, null);
+        Leg transitLeg = new Leg(LegType.TRANSIT, "BUS", 18, 4200, seoul, banpo, null, null, null);
+        Leg kickboardLeg = new Leg(LegType.KICKBOARD, "KICKBOARD_SHARED", 9, 1800, banpo, dest, null, null, null);
 
         Route route = Route.of(List.of(transitLeg, kickboardLeg), RouteType.TRANSIT_WITH_KICKBOARD);
 
@@ -25,7 +25,7 @@ class RouteTest {
     void 절약_시간을_계산할_수_있다() {
         Location a = new Location("A", 37.5, 127.0);
         Location b = new Location("B", 37.4, 127.1);
-        Leg leg = new Leg(LegType.TRANSIT, "BUS", 27, 5000, a, b, null, null);
+        Leg leg = new Leg(LegType.TRANSIT, "BUS", 27, 5000, a, b, null, null, null);
 
         Route route = Route.of(List.of(leg), RouteType.TRANSIT_ONLY);
         Route routeWithSaving = route.withComparison(new Comparison(45, 18));

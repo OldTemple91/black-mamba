@@ -54,7 +54,7 @@ class RouteScoreCalculatorTest {
         List<Leg> legs = new ArrayList<>();
         for (int i = 0; i <= transferCount; i++) {
             legs.add(new Leg(LegType.TRANSIT, "BUS", minutes / (transferCount + 1),
-                    1000, a, b, null, null));
+                    1000, a, b, null, null, null));
         }
         return new Route("id", RouteType.TRANSIT_ONLY, minutes, cost, 0, false, legs, null);
     }

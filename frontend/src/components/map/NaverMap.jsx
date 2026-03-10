@@ -1,6 +1,14 @@
 import { useEffect, useRef } from 'react'
 import { useNaverMap } from '../../hooks/useNaverMap'
 
+// 수단별 폴리라인 색상
+const LEG_COLOR = {
+  TRANSIT:   '#0052A4',  // 파랑 (대중교통)
+  WALK:      '#888888',  // 회색 (도보)
+  BIKE:      '#2DA44E',  // 초록 (자전거)
+  KICKBOARD: '#F97316',  // 주황 (킥보드)
+}
+
 /**
  * @param {object}   props
  * @param {object}   [props.selectedRoute]   - 선택된 경로 (폴리라인/마커 표시)
@@ -28,9 +36,12 @@ export default function NaverMap({ selectedRoute, onMapClick, mapMode }) {
     overlaysRef.current.forEach(overlay => overlay.setMap(null))
     overlaysRef.current = []
 
+    const isValid = p => p && Number.isFinite(p.lat) && Number.isFinite(p.lng)
+
+    // 출발·도착 마커 (leg 경계점들)
     const points = selectedRoute.legs
       .flatMap(leg => [leg.start, leg.end])
-      .filter(p => p && Number.isFinite(p.lat) && Number.isFinite(p.lng))
+      .filter(isValid)
 
     if (points.length === 0) return
 
@@ -43,24 +54,24 @@ export default function NaverMap({ selectedRoute, onMapClick, mapMode }) {
       if (marker) overlaysRef.current.push(marker)
     })
 
-    const path = selectedRoute.legs
-      .map(leg => leg.end)
-      .filter(p => p && Number.isFinite(p.lat) && Number.isFinite(p.lng))
+    // leg별 폴리라인: routeCoordinates 있으면 실제 도로 경로, 없으면 직선
+    selectedRoute.legs.forEach(leg => {
+      const color = LEG_COLOR[leg.type] ?? '#0052A4'
+      const hasRoadPath = Array.isArray(leg.routeCoordinates) && leg.routeCoordinates.length > 1
+      const coords = hasRoadPath
+        ? leg.routeCoordinates
+        : [leg.start, leg.end].filter(isValid)
 
-    if (selectedRoute.legs[0]?.start) {
-      const start = selectedRoute.legs[0].start
-      if (Number.isFinite(start.lat) && Number.isFinite(start.lng)) path.unshift(start)
-    }
+      if (coords.length > 1) {
+        const polyline = drawPolyline(coords, color)
+        if (polyline) overlaysRef.current.push(polyline)
+      }
+    })
 
-    if (path.length > 1) {
-      const polyline = drawPolyline(path)
-      if (polyline) overlaysRef.current.push(polyline)
-    }
-
-    const first = path[0]
-    if (first) {
-      const center = new window.naver.maps.LatLng(first.lat, first.lng)
-      mapRef.current.setCenter(center)
+    // 지도 중심을 첫 번째 출발지로 이동
+    const firstStart = selectedRoute.legs[0]?.start
+    if (isValid(firstStart)) {
+      mapRef.current.setCenter(new window.naver.maps.LatLng(firstStart.lat, firstStart.lng))
     }
 
     return () => {
