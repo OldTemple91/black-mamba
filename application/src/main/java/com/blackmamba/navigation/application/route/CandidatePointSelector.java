@@ -78,10 +78,15 @@ public class CandidatePointSelector {
             double latStep = (leg.end().lat() - leg.start().lat()) / (count - 1);
             double lngStep = (leg.end().lng() - leg.start().lng()) / (count - 1);
 
+            List<String> names = (leg.transitInfo() != null && leg.transitInfo().passThroughStations() != null)
+                    ? leg.transitInfo().passThroughStations()
+                    : List.of();
+
             for (int i = 0; i < count; i++) {
                 double lat = leg.start().lat() + i * latStep;
                 double lng = leg.start().lng() + i * lngStep;
-                stops.add(new Location("정류장" + i, lat, lng));
+                String name = i < names.size() ? names.get(i) : leg.start().name();
+                stops.add(new Location(name, lat, lng));
             }
         }
         return stops;
