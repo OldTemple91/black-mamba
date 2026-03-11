@@ -24,13 +24,13 @@ public class HubSelector {
 
     public List<Hub> selectLastMileHubs(List<Leg> legs, MobilityConfig config) {
         return candidatePointSelector.select(legs, config).stream()
-                .map(location -> toTransitHub(location, legs))
+                .map(location -> toTransitHub(location, legs, config))
                 .toList();
     }
 
     public List<Hub> selectFirstMileHubs(Location origin, List<Leg> legs, MobilityConfig config) {
         return candidatePointSelector.selectFirstMile(origin, legs, config).stream()
-                .map(location -> toTransitHub(location, legs))
+                .map(location -> toTransitHub(location, legs, config))
                 .toList();
     }
 
@@ -45,7 +45,7 @@ public class HubSelector {
         );
     }
 
-    private Hub toTransitHub(Location location, List<Leg> legs) {
+    private Hub toTransitHub(Location location, List<Leg> legs, MobilityConfig config) {
         HubType type = inferTransitHubType(location, legs);
         return new Hub(
                 hubId(location),
@@ -53,7 +53,10 @@ public class HubSelector {
                 type,
                 location,
                 DEFAULT_HUB_RADIUS_METERS,
-                Map.of("source", "baseline-transit-candidate")
+                Map.of(
+                        "source", "baseline-transit-candidate",
+                        "preferredMobility", config.mobilityType().name()
+                )
         );
     }
 
