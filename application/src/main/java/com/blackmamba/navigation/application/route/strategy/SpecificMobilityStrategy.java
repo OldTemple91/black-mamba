@@ -24,8 +24,7 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
     private final MobilityTimePort mobilityTimePort;
     private final MobilityAvailabilityPort mobilityAvailabilityPort;
     private final HubSelector hubSelector;
-    private final RouteScoreCalculator scoreCalculator;
-    private final RouteInsightFactory routeInsightFactory;
+    private final RouteEvaluator routeEvaluator;
     private final MobilitySegmentBuilder mobilitySegmentBuilder;
 
     public SpecificMobilityStrategy(List<MobilityType> mobilityTypes,
@@ -33,15 +32,13 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                                      MobilityTimePort mobilityTimePort,
                                      MobilityAvailabilityPort mobilityAvailabilityPort,
                                      HubSelector hubSelector,
-                                     RouteScoreCalculator scoreCalculator,
-                                     RouteInsightFactory routeInsightFactory) {
+                                     RouteEvaluator routeEvaluator) {
         this.mobilityTypes = mobilityTypes;
         this.transitRoutePort = transitRoutePort;
         this.mobilityTimePort = mobilityTimePort;
         this.mobilityAvailabilityPort = mobilityAvailabilityPort;
         this.hubSelector = hubSelector;
-        this.scoreCalculator = scoreCalculator;
-        this.routeInsightFactory = routeInsightFactory;
+        this.routeEvaluator = routeEvaluator;
         this.mobilitySegmentBuilder = new MobilitySegmentBuilder(mobilityTimePort);
     }
 
@@ -65,8 +62,7 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                     Route baseRoute = Route.of(routeLegs, RouteType.TRANSIT_ONLY);
 
                     if (mobilityTypes.isEmpty()) {
-                        Route scoredBase = baseRoute.withScore(scoreCalculator.calculate(baseRoute), true);
-                        return Mono.just(List.of(routeInsightFactory.enrich(scoredBase, scoredBase)));
+                        return Mono.just(List.of(routeEvaluator.evaluate(baseRoute, true)));
                     }
                     return generateCombinedRoutes(baseLegs, origin, destination)
                             .collectList()
@@ -185,16 +181,18 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
         List<Route> all = new ArrayList<>(combined);
         all.add(base);
         List<Route> scored = all.stream()
-                .map(r -> r.withScore(scoreCalculator.calculate(r), false))
+                .map(r -> routeEvaluator.evaluate(r, base, baseMinutes, false))
                 .sorted(Comparator.comparingDouble(Route::score).reversed())
-                .limit(5).toList();
-        List<Route> result = new ArrayList<>();
-        for (int i = 0; i < scored.size(); i++) {
-            int saved = Math.max(baseMinutes - scored.get(i).totalMinutes(), 0);
-            Route r = scored.get(i).withComparison(new Comparison(baseMinutes, saved));
-            Route ranked = i == 0 ? r.withScore(r.score(), true) : r;
-            result.add(routeInsightFactory.enrich(ranked, base));
+                .limit(5)
+                .toList();
+
+        if (scored.isEmpty()) {
+            return scored;
         }
+
+        List<Route> result = new ArrayList<>(scored);
+        Route top = result.getFirst();
+        result.set(0, routeEvaluator.evaluate(top, base, baseMinutes, true));
         return result;
     }
 
