@@ -37,22 +37,19 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     private final MobilityTimePort mobilityTimePort;
     private final MobilityAvailabilityPort mobilityAvailabilityPort;
     private final HubSelector hubSelector;
-    private final RouteScoreCalculator scoreCalculator;
-    private final RouteInsightFactory routeInsightFactory;
+    private final RouteEvaluator routeEvaluator;
     private final MobilitySegmentBuilder mobilitySegmentBuilder;
 
     public OptimalSearchStrategy(TransitRoutePort transitRoutePort,
                                   MobilityTimePort mobilityTimePort,
                                   MobilityAvailabilityPort mobilityAvailabilityPort,
                                   HubSelector hubSelector,
-                                  RouteScoreCalculator scoreCalculator,
-                                  RouteInsightFactory routeInsightFactory) {
+                                  RouteEvaluator routeEvaluator) {
         this.transitRoutePort = transitRoutePort;
         this.mobilityTimePort = mobilityTimePort;
         this.mobilityAvailabilityPort = mobilityAvailabilityPort;
         this.hubSelector = hubSelector;
-        this.scoreCalculator = scoreCalculator;
-        this.routeInsightFactory = routeInsightFactory;
+        this.routeEvaluator = routeEvaluator;
         this.mobilitySegmentBuilder = new MobilitySegmentBuilder(mobilityTimePort);
     }
 
@@ -319,24 +316,24 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
 
         List<Route> mixed = candidates.stream()
                 .filter(r -> r.type() != RouteType.TRANSIT_ONLY)
-                .map(r -> r.withScore(scoreCalculator.calculate(r), false))
+                .toList();
+
+        List<Route> evaluatedMixed = mixed.stream()
+                .map(route -> routeEvaluator.evaluate(route, baseRoute, baseMinutes, false))
                 .sorted(Comparator.comparingDouble(Route::score).reversed())
-                .limit(4)  // 혼합 최대 4개 + 대중교통 1개 = 최대 5개
+                .limit(4)
                 .toList();
 
         List<Route> result = new ArrayList<>();
-        for (int i = 0; i < mixed.size(); i++) {
-            int saved = Math.max(baseMinutes - mixed.get(i).totalMinutes(), 0);
-            Route r = mixed.get(i).withComparison(new Comparison(baseMinutes, saved));
-            Route ranked = i == 0 ? r.withScore(r.score(), true) : r;
-            result.add(routeInsightFactory.enrich(ranked, baseRoute));
+        if (!evaluatedMixed.isEmpty()) {
+            Route top = evaluatedMixed.getFirst();
+            result.add(routeEvaluator.evaluate(top, baseRoute, baseMinutes, true));
+            result.addAll(evaluatedMixed.stream().skip(1).toList());
         }
 
         // 대중교통 단독 옵션 항상 마지막에 추가
         transitOnly.ifPresent(r -> {
-            Route transitRoute = r.withComparison(new Comparison(baseMinutes, 0));
-            Route ranked = result.isEmpty() ? transitRoute.withScore(transitRoute.score(), true) : transitRoute;
-            result.add(routeInsightFactory.enrich(ranked, baseRoute));
+            result.add(routeEvaluator.evaluate(r, baseRoute, baseMinutes, result.isEmpty()));
         });
 
         return result;

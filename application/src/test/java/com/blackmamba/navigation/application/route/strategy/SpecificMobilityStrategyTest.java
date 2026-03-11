@@ -18,6 +18,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
@@ -28,8 +30,7 @@ class SpecificMobilityStrategyTest {
     @Mock MobilityTimePort mobilityTimePort;
     @Mock MobilityAvailabilityPort mobilityAvailabilityPort;
     @Mock HubSelector hubSelector;
-    @Mock RouteScoreCalculator scoreCalculator;
-    @Mock RouteInsightFactory routeInsightFactory;
+    @Mock RouteEvaluator routeEvaluator;
 
     @Test
     void 이동수단_없으면_대중교통만_반환한다() {
@@ -39,12 +40,14 @@ class SpecificMobilityStrategyTest {
 
         when(transitRoutePort.getTransitRoute(any(), any()))
                 .thenReturn(Mono.just(List.of(leg)));
-        when(scoreCalculator.calculate(any())).thenReturn(0.5);
-        when(routeInsightFactory.enrich(any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(routeEvaluator.evaluate(any(Route.class), eq(true))).thenAnswer(invocation -> {
+            Route route = invocation.getArgument(0);
+            return route.withScore(0.5, true);
+        });
 
         SpecificMobilityStrategy strategy = new SpecificMobilityStrategy(
                 List.of(), transitRoutePort, mobilityTimePort,
-                mobilityAvailabilityPort, hubSelector, scoreCalculator, routeInsightFactory);
+                mobilityAvailabilityPort, hubSelector, routeEvaluator);
 
         List<Route> routes = strategy.search(origin, dest).block();
 
@@ -73,12 +76,16 @@ class SpecificMobilityStrategyTest {
                         new MobilityInfo(MobilityType.KICKBOARD_SHARED, "씽씽",
                                 "DEV_001", 85, null, 37.52, 127.0, 0, 120))));
         when(hubSelector.selectLastMileHubs(any(), any())).thenReturn(List.of(hub(candidate)));
-        when(scoreCalculator.calculate(any())).thenReturn(0.8, 0.5);
-        when(routeInsightFactory.enrich(any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(routeEvaluator.evaluate(any(Route.class), any(Route.class), anyInt(), anyBoolean()))
+                .thenAnswer(invocation -> {
+                    Route route = invocation.getArgument(0);
+                    boolean recommended = invocation.getArgument(3);
+                    return route.withScore(recommended ? 0.8 : 0.5, recommended);
+                });
 
         SpecificMobilityStrategy strategy = new SpecificMobilityStrategy(
                 List.of(MobilityType.KICKBOARD_SHARED), transitRoutePort, mobilityTimePort,
-                mobilityAvailabilityPort, hubSelector, scoreCalculator, routeInsightFactory);
+                mobilityAvailabilityPort, hubSelector, routeEvaluator);
 
         List<Route> routes = strategy.search(origin, dest).block();
 

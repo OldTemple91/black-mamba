@@ -32,8 +32,7 @@ class OptimalSearchStrategyTest {
     @Mock MobilityTimePort mobilityTimePort;
     @Mock MobilityAvailabilityPort mobilityAvailabilityPort;
     @Mock HubSelector hubSelector;
-    @Mock RouteScoreCalculator scoreCalculator;
-    @Mock RouteInsightFactory routeInsightFactory;
+    @Mock RouteEvaluator routeEvaluator;
 
     OptimalSearchStrategy strategy;
     Location origin      = new Location("서울역", 37.5547, 126.9706);
@@ -45,11 +44,17 @@ class OptimalSearchStrategyTest {
     void setUp() {
         strategy = new OptimalSearchStrategy(
                 transitRoutePort, mobilityTimePort,
-                mobilityAvailabilityPort, hubSelector, scoreCalculator, routeInsightFactory);
+                mobilityAvailabilityPort, hubSelector, routeEvaluator);
         baseLeg = new Leg(LegType.TRANSIT, "BUS", 40, 10000, origin, destination, null, null, null);
         when(transitRoutePort.getTransitRoute(any(), any()))
                 .thenReturn(Mono.just(List.of(baseLeg)));
-        lenient().when(routeInsightFactory.enrich(any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(routeEvaluator.evaluate(any(Route.class), any(Route.class), anyInt(), anyBoolean()))
+                .thenAnswer(invocation -> {
+                    Route route = invocation.getArgument(0);
+                    boolean recommended = invocation.getArgument(3);
+                    double score = recommended ? 0.9 : 0.5;
+                    return route.withScore(score, recommended);
+                });
     }
 
     @Test
@@ -82,7 +87,6 @@ class OptimalSearchStrategyTest {
                                 null, 100, "강남역", 37.4979, 127.0276, 3, 0))));
         when(mobilityTimePort.getMobilityRoute(any(), any(), any()))
                 .thenReturn(Mono.just(MobilityRouteResult.timeOnly(30)));
-        when(scoreCalculator.calculate(any())).thenReturn(0.6, 0.5);
 
         List<Route> routes = strategy.search(origin, destination).block();
 
@@ -102,7 +106,6 @@ class OptimalSearchStrategyTest {
                                 "K001", 80, null, 37.52, 127.0, 1, 100))));
         lenient().when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.empty()));
-        when(scoreCalculator.calculate(any())).thenReturn(0.9, 0.8, 0.7, 0.5);
 
         List<Route> routes = strategy.search(origin, destination).block();
 
