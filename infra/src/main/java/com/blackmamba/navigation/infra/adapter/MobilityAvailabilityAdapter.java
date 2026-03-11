@@ -57,6 +57,37 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
         };
     }
 
+    @Override
+    public Mono<Optional<MobilityInfo>> findNearbyDropoff(double lat, double lng, MobilityType type) {
+        return switch (type) {
+            case DDAREUNGI -> ddareungiClient.getNearbyStations(lat, lng, SEARCH_RADIUS_METERS, false)
+                    .map(stations -> stations.stream().findFirst()
+                            .map(s -> new MobilityInfo(
+                                    MobilityType.DDAREUNGI,
+                                    "서울시 따릉이",
+                                    null,
+                                    100,
+                                    s.stationId(),
+                                    s.stationName(),
+                                    s.rackTotalCount(),
+                                    s.lat(),
+                                    s.lng(),
+                                    s.availableCount(),
+                                    distanceMeters(lat, lng, s.lat(), s.lng()),
+                                    null,
+                                    null,
+                                    0.0,
+                                    0.0
+                            )))
+                    .onErrorResume(ex -> {
+                        log.error("[따릉이] 반납 정류소 조회 오류: {}", ex.getMessage());
+                        ddareungiFallbackErrorCounter.increment();
+                        return Mono.just(Optional.<MobilityInfo>empty());
+                    });
+            case KICKBOARD_SHARED, PERSONAL -> findNearbyMobility(lat, lng, type);
+        };
+    }
+
     private Mono<Optional<MobilityInfo>> findNearbyDdareungi(double lat, double lng) {
         return ddareungiClient.getNearbyStations(lat, lng, SEARCH_RADIUS_METERS)
                 .map(stations -> {
@@ -72,11 +103,17 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                                         "서울시 따릉이",
                                         null,
                                         100,
+                                        s.stationId(),
                                         s.stationName(),
+                                        s.rackTotalCount(),
                                         s.lat(),
                                         s.lng(),
                                         s.availableCount(),
-                                        dist
+                                        dist,
+                                        null,
+                                        null,
+                                        0.0,
+                                        0.0
                                 );
                             });
                     if (result.isEmpty()) {
@@ -112,10 +149,16 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                                         d.deviceId(),
                                         d.batteryLevel(),
                                         null,
+                                        null,
+                                        0,
                                         d.lat(),
                                         d.lng(),
                                         1,
-                                        dist
+                                        dist,
+                                        null,
+                                        null,
+                                        0.0,
+                                        0.0
                                 );
                             });
                 })
@@ -133,10 +176,16 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                 null,
                 100,
                 null,
+                null,
+                0,
                 lat,
                 lng,
                 1,
-                0
+                0,
+                null,
+                null,
+                0.0,
+                0.0
         );
     }
 
@@ -148,10 +197,16 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                 null,
                 50,   // 실 배터리 미확인 → 50% 기본값 표시
                 null,
+                null,
+                0,
                 lat,
                 lng,
                 1,
-                0
+                0,
+                null,
+                null,
+                0.0,
+                0.0
         );
     }
 

@@ -28,11 +28,20 @@ function fmtDist(meters) {
   return meters >= 1000 ? `${(meters / 1000).toFixed(1)}km` : `${meters}m`
 }
 
-export default function LegItem({ leg, isLast }) {
+function getWalkLabel(prevLeg, nextLeg) {
+  if (nextLeg?.type === 'BIKE') return '자전거 정류소까지 도보'
+  if (prevLeg?.type === 'BIKE') return '자전거 반납 후 도보'
+  if (nextLeg?.type === 'KICKBOARD') return '킥보드까지 도보'
+  if (prevLeg?.type === 'KICKBOARD') return '킥보드 하차 후 도보'
+  if (prevLeg?.type === 'TRANSIT' || nextLeg?.type === 'TRANSIT') return '환승 도보'
+  return '도보'
+}
+
+export default function LegItem({ leg, prevLeg, nextLeg, isLast }) {
   const [showStops, setShowStops] = useState(false)
 
   const config = LEG_CONFIG[leg.type] ?? LEG_CONFIG.WALK
-  const label  = getLegLabel(leg)
+  const label  = leg.type === 'WALK' ? getWalkLabel(prevLeg, nextLeg) : getLegLabel(leg)
   const dist   = fmtDist(leg.distanceMeters)
 
   // TRANSIT 노선 배지 색상 (없으면 기본 파란색)
@@ -47,13 +56,35 @@ export default function LegItem({ leg, isLast }) {
   const tags = []
   if (leg.transitInfo?.stationCount > 0)
     tags.push(`${leg.transitInfo.stationCount}정거장`)
+  if (leg.mode === 'SUBWAY' && leg.transitInfo?.lineName)
+    tags.push(`노선 ${leg.transitInfo.lineName}`)
+  if (leg.mode === 'BUS' && leg.transitInfo?.lineName)
+    tags.push(`버스 ${leg.transitInfo.lineName}`)
   if (leg.mobilityInfo?.operatorName && leg.mobilityInfo.operatorName !== '개인')
     tags.push(leg.mobilityInfo.operatorName)
+  if (leg.mobilityInfo?.deviceId)
+    tags.push(`기기 ${leg.mobilityInfo.deviceId}`)
   if (leg.mobilityInfo?.batteryLevel != null && leg.mobilityInfo.batteryLevel < 100)
     tags.push(`🔋 ${leg.mobilityInfo.batteryLevel}%`)
   if (leg.mobilityInfo?.availableCount > 0)
     tags.push(`${leg.mobilityInfo.availableCount}대 이용 가능`)
+  if (leg.mobilityInfo?.stationId)
+    tags.push(`정류소 ${leg.mobilityInfo.stationId}`)
+  if (leg.mobilityInfo?.rackTotalCount > 0)
+    tags.push(`거치대 ${leg.mobilityInfo.rackTotalCount}개`)
   if (dist) tags.push(dist)
+
+  const startVerb = leg.type === 'WALK' ? '출발' : '승차'
+  const endVerb = leg.type === 'WALK' ? '도착' : '하차'
+  const walkHint = leg.type === 'WALK' && nextLeg?.type === 'BIKE'
+    ? `다음 구간: ${nextLeg.mobilityInfo?.stationName ?? nextLeg.start?.name ?? '자전거 정류소'}에서 자전거 탑승`
+    : leg.type === 'WALK' && prevLeg?.type === 'BIKE'
+      ? `이전 구간: ${prevLeg.mobilityInfo?.dropoffStationName ?? prevLeg.end?.name ?? '근처 정류소'}에 반납 후 목적지까지 이동`
+      : leg.type === 'WALK' && nextLeg?.type === 'KICKBOARD'
+        ? `다음 구간: ${nextLeg.mobilityInfo?.operatorName ?? '공유'} 킥보드 탑승`
+        : leg.type === 'WALK' && prevLeg?.type === 'KICKBOARD'
+          ? '킥보드 하차 후 목적지까지 이동'
+          : null
 
   return (
     <div className="flex gap-3">
@@ -85,7 +116,7 @@ export default function LegItem({ leg, isLast }) {
         {leg.start?.name && (
           <div className="flex items-center gap-1 mt-1">
             <span className="w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0" />
-            <span className="text-xs text-gray-600">{leg.start.name} 승차</span>
+            <span className="text-xs text-gray-600">{leg.start.name} {startVerb}</span>
           </div>
         )}
 
@@ -116,15 +147,32 @@ export default function LegItem({ leg, isLast }) {
         {leg.end?.name && (
           <div className="flex items-center gap-1 mt-0.5">
             <span className="w-1.5 h-1.5 rounded-full bg-gray-500 flex-shrink-0" />
-            <span className="text-xs text-gray-600">{leg.end.name} 하차</span>
+            <span className="text-xs text-gray-600">{leg.end.name} {endVerb}</span>
           </div>
+        )}
+
+        {walkHint && (
+          <p className="text-xs text-gray-500 mt-0.5">
+            {walkHint}
+          </p>
         )}
 
         {/* 이동수단 대여 위치 (BIKE/KICKBOARD) */}
         {(leg.type === 'BIKE' || leg.type === 'KICKBOARD') && leg.start?.name && (
-          <p className="text-xs text-gray-500 mt-0.5">
-            📍 {leg.start.name}에서 대여 → {leg.end?.name ?? '목적지'}
-          </p>
+          <div className="text-xs text-gray-500 mt-0.5 space-y-0.5">
+            <p>
+              📍 {leg.start.name}에서 대여 → {leg.end?.name ?? '목적지'}
+            </p>
+            {leg.mobilityInfo?.stationName && (
+              <p>대여 정류소: {leg.mobilityInfo.stationName}</p>
+            )}
+            {leg.mobilityInfo?.dropoffStationName && (
+              <p>근처 반납 정류소: {leg.mobilityInfo.dropoffStationName}</p>
+            )}
+            {leg.type === 'KICKBOARD' && leg.mobilityInfo?.lat && leg.mobilityInfo?.lng && (
+              <p>기기 위치: {leg.mobilityInfo.lat.toFixed(5)}, {leg.mobilityInfo.lng.toFixed(5)}</p>
+            )}
+          </div>
         )}
 
         {/* 상세 태그 */}

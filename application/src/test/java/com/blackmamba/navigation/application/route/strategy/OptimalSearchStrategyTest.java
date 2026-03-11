@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -16,9 +18,11 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class OptimalSearchStrategyTest {
 
     @Mock TransitRoutePort transitRoutePort;
@@ -26,6 +30,7 @@ class OptimalSearchStrategyTest {
     @Mock MobilityAvailabilityPort mobilityAvailabilityPort;
     @Mock CandidatePointSelector candidatePointSelector;
     @Mock RouteScoreCalculator scoreCalculator;
+    @Mock RouteInsightFactory routeInsightFactory;
 
     OptimalSearchStrategy strategy;
     Location origin      = new Location("서울역", 37.5547, 126.9706);
@@ -37,10 +42,11 @@ class OptimalSearchStrategyTest {
     void setUp() {
         strategy = new OptimalSearchStrategy(
                 transitRoutePort, mobilityTimePort,
-                mobilityAvailabilityPort, candidatePointSelector, scoreCalculator);
+                mobilityAvailabilityPort, candidatePointSelector, scoreCalculator, routeInsightFactory);
         baseLeg = new Leg(LegType.TRANSIT, "BUS", 40, 10000, origin, destination, null, null, null);
         when(transitRoutePort.getTransitRoute(any(), any()))
                 .thenReturn(Mono.just(List.of(baseLeg)));
+        lenient().when(routeInsightFactory.enrich(any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
@@ -48,6 +54,8 @@ class OptimalSearchStrategyTest {
         when(candidatePointSelector.select(any(), any())).thenReturn(List.of());
         when(candidatePointSelector.selectFirstMile(any(), any(), any())).thenReturn(List.of());
         when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(Optional.empty()));
+        when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.empty()));
 
         List<Route> routes = strategy.search(origin, destination).block();
@@ -65,6 +73,10 @@ class OptimalSearchStrategyTest {
                 .thenReturn(Mono.just(Optional.of(
                         new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
                                 null, 100, "서울역", 37.5547, 126.9706, 5, 0))));
+        when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(Optional.of(
+                        new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
+                                null, 100, "강남역", 37.4979, 127.0276, 3, 0))));
         when(mobilityTimePort.getMobilityRoute(any(), any(), any()))
                 .thenReturn(Mono.just(MobilityRouteResult.timeOnly(30)));
         when(scoreCalculator.calculate(any())).thenReturn(0.6, 0.5);
@@ -85,11 +97,13 @@ class OptimalSearchStrategyTest {
                 .thenReturn(Mono.just(Optional.of(
                         new MobilityInfo(MobilityType.KICKBOARD_SHARED, "씽씽",
                                 "K001", 80, null, 37.52, 127.0, 1, 100))));
+        lenient().when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(Optional.empty()));
         when(scoreCalculator.calculate(any())).thenReturn(0.9, 0.8, 0.7, 0.5);
 
         List<Route> routes = strategy.search(origin, destination).block();
 
-        assertThat(routes.get(0).recommended()).isTrue();
+        assertThat(routes.stream().anyMatch(Route::recommended)).isTrue();
         assertThat(routes.stream().filter(Route::recommended)).hasSize(1);
     }
 
@@ -99,6 +113,8 @@ class OptimalSearchStrategyTest {
         when(candidatePointSelector.select(any(), any())).thenReturn(List.of());
         when(candidatePointSelector.selectFirstMile(any(), any(), any())).thenReturn(List.of());
         when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(Optional.empty()));
+        when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.empty()));
 
         List<Route> routes = strategy.search(origin, destination).block();

@@ -19,6 +19,7 @@ import java.util.List;
 @Component
 public class MobilityTimeAdapter implements MobilityTimePort {
 
+    private static final double WALKING_KMH          = 4.5;
     private static final double DDAREUNGI_KMH        = 15.0;
     private static final double KICKBOARD_SHARED_KMH = 18.0;
     private static final double PERSONAL_KMH         = 20.0;
@@ -32,19 +33,28 @@ public class MobilityTimeAdapter implements MobilityTimePort {
 
     @Override
     public Mono<MobilityRouteResult> getMobilityRoute(Location origin, Location destination, MobilityType type) {
-        double speedKmh = speedKmh(type);
+        return getRoute(origin, destination, speedKmh(type));
+    }
+
+    @Override
+    public Mono<MobilityRouteResult> getWalkingRoute(Location origin, Location destination) {
+        return getRoute(origin, destination, WALKING_KMH);
+    }
+
+    private Mono<MobilityRouteResult> getRoute(Location origin, Location destination, double speedKmh) {
         return tmapClient.getRoute(origin, destination)
                 .map(opt -> {
                     if (opt.isPresent()) {
                         TmapPedestrianClient.TmapRouteData data = opt.get();
                         double distKm = data.distanceMeters() / 1000.0;
                         int minutes = Math.max(1, (int) Math.ceil(distKm / speedKmh * 60));
-                        return new MobilityRouteResult(minutes, data.coordinates());
+                        return new MobilityRouteResult(minutes, data.distanceMeters(), data.coordinates());
                     }
                     // haversine fallback: 좌표 없이 시간만 반환
                     double distKm = haversineKm(origin, destination) * DETOUR_FACTOR;
                     int minutes = Math.max(1, (int) Math.ceil(distKm / speedKmh * 60));
-                    return MobilityRouteResult.timeOnly(minutes);
+                    int distanceMeters = (int) Math.ceil(distKm * 1000);
+                    return new MobilityRouteResult(minutes, distanceMeters, List.of());
                 });
     }
 

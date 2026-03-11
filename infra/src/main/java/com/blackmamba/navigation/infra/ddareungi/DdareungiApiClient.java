@@ -31,6 +31,11 @@ public class DdareungiApiClient {
     }
 
     public Mono<List<DdareungiStation>> getNearbyStations(double lat, double lng, int radiusMeters) {
+        return getNearbyStations(lat, lng, radiusMeters, true);
+    }
+
+    public Mono<List<DdareungiStation>> getNearbyStations(double lat, double lng, int radiusMeters,
+                                                          boolean requireAvailableBike) {
         return webClient.get()
                 .uri("/{apiKey}/json/bikeList/1/1000/", apiKey)
                 .retrieve()
@@ -43,9 +48,9 @@ public class DdareungiApiClient {
                 .bodyToMono(DdareungiStationResponse.class)
                 .map(response -> {
                     List<DdareungiStation> all = response.toStations();
-                    List<DdareungiStation> nearby = filter.filterNearby(all, lat, lng, radiusMeters);
-                    log.info("[따릉이 API] 서울시 전체 정류소 {}개 → 반경 {}m 내 대여가능 {}개",
-                            all.size(), radiusMeters, nearby.size());
+                    List<DdareungiStation> nearby = filter.filterNearby(all, lat, lng, radiusMeters, requireAvailableBike);
+                    log.info("[따릉이 API] 서울시 전체 정류소 {}개 → 반경 {}m 내 {} 정류소 {}개",
+                            all.size(), radiusMeters, requireAvailableBike ? "대여가능" : "반납가능", nearby.size());
                     return nearby;
                 });
     }

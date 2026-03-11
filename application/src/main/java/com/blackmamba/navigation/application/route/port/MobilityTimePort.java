@@ -7,4 +7,5 @@ import reactor.core.publisher.Mono;
 
 public interface MobilityTimePort {
     Mono<MobilityRouteResult> getMobilityRoute(Location origin, Location destination, MobilityType type);
+    Mono<MobilityRouteResult> getWalkingRoute(Location origin, Location destination);
 }

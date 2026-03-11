@@ -10,8 +10,14 @@ public class DdareungiStationFilter {
 
     public List<DdareungiStation> filterNearby(List<DdareungiStation> stations,
                                                 double lat, double lng, int radiusMeters) {
+        return filterNearby(stations, lat, lng, radiusMeters, true);
+    }
+
+    public List<DdareungiStation> filterNearby(List<DdareungiStation> stations,
+                                               double lat, double lng, int radiusMeters,
+                                               boolean requireAvailableBike) {
         return stations.stream()
-                .filter(s -> s.availableCount() > 0)
+                .filter(s -> !requireAvailableBike || s.availableCount() > 0)
                 .filter(s -> distanceMeters(lat, lng, s.lat(), s.lng()) <= radiusMeters)
                 .toList();
     }

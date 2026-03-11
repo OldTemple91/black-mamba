@@ -32,4 +32,22 @@ class RouteTest {
 
         assertThat(routeWithSaving.comparison().savedMinutes()).isEqualTo(18);
     }
+
+    @Test
+    void 연속된_도보_구간은_하나로_병합한다() {
+        Location a = new Location("A", 37.5, 127.0);
+        Location b = new Location("B", 37.5005, 127.0010);
+        Location c = new Location("C", 37.5010, 127.0020);
+
+        Leg walk1 = new Leg(LegType.WALK, "WALK", 3, 180, a, b, null, null, List.of(a, b));
+        Leg walk2 = new Leg(LegType.WALK, "WALK", 5, 320, b, c, null, null, List.of(b, c));
+
+        Route route = Route.of(List.of(walk1, walk2), RouteType.TRANSIT_ONLY);
+
+        assertThat(route.legs()).hasSize(1);
+        assertThat(route.legs().getFirst().durationMinutes()).isEqualTo(8);
+        assertThat(route.legs().getFirst().distanceMeters()).isEqualTo(500);
+        assertThat(route.legs().getFirst().start()).isEqualTo(a);
+        assertThat(route.legs().getFirst().end()).isEqualTo(c);
+    }
 }

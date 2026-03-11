@@ -5,9 +5,67 @@ public record MobilityInfo(
         String operatorName,
         String deviceId,
         int batteryLevel,
+        String stationId,
         String stationName,
+        int rackTotalCount,
         double lat,
         double lng,
         int availableCount,
-        int distanceMeters
-) {}
+        int distanceMeters,
+        String dropoffStationId,
+        String dropoffStationName,
+        double dropoffLat,
+        double dropoffLng
+) {
+    public MobilityInfo(MobilityType mobilityType,
+                        String operatorName,
+                        String deviceId,
+                        int batteryLevel,
+                        String stationName,
+                        double lat,
+                        double lng,
+                        int availableCount,
+                        int distanceMeters) {
+        this(
+                mobilityType,
+                operatorName,
+                deviceId,
+                batteryLevel,
+                null,
+                stationName,
+                0,
+                lat,
+                lng,
+                availableCount,
+                distanceMeters,
+                null,
+                null,
+                0.0,
+                0.0
+        );
+    }
+
+    public MobilityInfo withDropoffStation(String stationId, String stationName, double lat, double lng) {
+        return new MobilityInfo(
+                mobilityType,
+                operatorName,
+                deviceId,
+                batteryLevel,
+                this.stationId,
+                this.stationName,
+                rackTotalCount,
+                this.lat,
+                this.lng,
+                availableCount,
+                distanceMeters,
+                stationId,
+                stationName,
+                lat,
+                lng
+        );
+    }
+
+    public boolean hasDropoffStation() {
+        return dropoffStationName != null && !dropoffStationName.isBlank();
+    }
+}

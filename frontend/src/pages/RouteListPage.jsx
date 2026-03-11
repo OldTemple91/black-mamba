@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { searchRoutes } from '../api/routeApi'
 import RouteCard from '../components/route/RouteCard'
 import NaverMap from '../components/map/NaverMap'
+import { buildComparisonContext, findBaselineRoute, getDebugFacts, getRecommendationReasons, getRiskBadges } from '../utils/routeInsights'
 
 // 장소명 → 좌표 변환
 // 우선순위: 1) "lat,lng" 좌표 문자열 직접 파싱  2) 네이버 지역 검색 API (POI 키워드)  3) 백엔드 NCP 지오코딩 폴백
@@ -47,6 +48,7 @@ export default function RouteListPage() {
   const [selectedRoute, setSelectedRoute] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [showDebug, setShowDebug] = useState(false)
 
   const originName = searchParams.get('origin') || ''
   const destName   = searchParams.get('dest')   || ''
@@ -75,6 +77,21 @@ export default function RouteListPage() {
     }).finally(() => setLoading(false))
   }, [originName, destName, mobilityParam, searchMode])
 
+  const baselineRoute = useMemo(() => findBaselineRoute(routes), [routes])
+  const comparisonContext = useMemo(() => buildComparisonContext(routes), [routes])
+  const selectedReasons = useMemo(
+    () => (selectedRoute ? getRecommendationReasons(selectedRoute, baselineRoute) : []),
+    [selectedRoute, baselineRoute]
+  )
+  const selectedRisks = useMemo(
+    () => (selectedRoute ? getRiskBadges(selectedRoute) : []),
+    [selectedRoute]
+  )
+  const selectedDebugFacts = useMemo(
+    () => (selectedRoute ? getDebugFacts(selectedRoute, baselineRoute, searchMode) : []),
+    [selectedRoute, baselineRoute, searchMode]
+  )
+
   if (loading) return (
     <div className="flex justify-center items-center h-screen">
       <div className="text-center">
@@ -102,11 +119,61 @@ export default function RouteListPage() {
         <button onClick={() => navigate('/')} className="text-gray-400 hover:text-gray-600">
           ← 
         </button>
-        <div>
+        <div className="flex-1">
           <h2 className="text-lg font-bold text-gray-800">경로 결과</h2>
           <p className="text-xs text-gray-500">{originName} → {destName}</p>
         </div>
+        <button
+          onClick={() => setShowDebug(v => !v)}
+          className={`text-xs px-3 py-1.5 rounded-full border transition ${
+            showDebug
+              ? 'bg-slate-900 text-white border-slate-900'
+              : 'bg-white text-slate-600 border-slate-300'
+          }`}
+        >
+          {showDebug ? '디버그 ON' : '디버그'}
+        </button>
       </div>
+
+      {selectedRoute && (
+        <div className="mb-4 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Selected Route</p>
+              <h3 className="mt-1 text-base font-semibold text-slate-800">
+                {selectedRoute.totalMinutes}분 경로 분석
+              </h3>
+            </div>
+            {selectedRoute.recommended && (
+              <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded-full">추천 경로</span>
+            )}
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {selectedReasons.map(reason => (
+              <span key={reason} className="text-xs px-2 py-1 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+                {reason}
+              </span>
+            ))}
+            {selectedRisks.map(risk => (
+              <span key={risk.label} className={`text-xs px-2 py-1 rounded-full ${risk.className}`}>
+                {risk.label}
+              </span>
+            ))}
+          </div>
+
+          {showDebug && (
+            <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3">
+              <p className="text-[11px] font-semibold text-slate-600">엔진 진단 요약</p>
+              <div className="mt-2 space-y-1">
+                {selectedDebugFacts.map(fact => (
+                  <p key={fact} className="text-xs text-slate-500">{fact}</p>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 경로 카드 목록 */}
       <div className="space-y-3 mb-4">
@@ -118,6 +185,10 @@ export default function RouteListPage() {
               route={route}
               selected={selectedRoute?.routeId === route.routeId}
               onClick={() => setSelectedRoute(route)}
+              baselineRoute={baselineRoute}
+              comparisonContext={comparisonContext}
+              searchMode={searchMode}
+              showDebug={showDebug}
             />
           ))
         }

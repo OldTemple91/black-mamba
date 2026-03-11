@@ -37,17 +37,22 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     private final MobilityAvailabilityPort mobilityAvailabilityPort;
     private final CandidatePointSelector candidatePointSelector;
     private final RouteScoreCalculator scoreCalculator;
+    private final RouteInsightFactory routeInsightFactory;
+    private final MobilitySegmentBuilder mobilitySegmentBuilder;
 
     public OptimalSearchStrategy(TransitRoutePort transitRoutePort,
                                   MobilityTimePort mobilityTimePort,
                                   MobilityAvailabilityPort mobilityAvailabilityPort,
                                   CandidatePointSelector candidatePointSelector,
-                                  RouteScoreCalculator scoreCalculator) {
+                                  RouteScoreCalculator scoreCalculator,
+                                  RouteInsightFactory routeInsightFactory) {
         this.transitRoutePort = transitRoutePort;
         this.mobilityTimePort = mobilityTimePort;
         this.mobilityAvailabilityPort = mobilityAvailabilityPort;
         this.candidatePointSelector = candidatePointSelector;
         this.scoreCalculator = scoreCalculator;
+        this.routeInsightFactory = routeInsightFactory;
+        this.mobilitySegmentBuilder = new MobilitySegmentBuilder(mobilityTimePort);
     }
 
     @Override
@@ -89,7 +94,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                     return allPatterns
                             .mergeWith(Mono.just(baseRoute))
                             .collectList()
-                            .map(candidates -> rank(candidates, baseMinutes));
+                            .map(candidates -> rank(candidates, baseMinutes, baseRoute));
                 });
     }
 
@@ -101,18 +106,26 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
         int baseMinutes = baseLegs.stream().mapToInt(Leg::durationMinutes).sum();
         return Flux.fromIterable(firstMile)
                 .flatMap(transitStart ->
-                        mobilityAvailabilityPort.findNearbyMobility(origin.lat(), origin.lng(), type)
+                        mobilityInfoForSegment(origin, transitStart, type)
                                 .filter(Optional::isPresent)
                                 .flatMap(avail -> {
                                     MobilityInfo info = avail.get();
-                                    // transitStart → destination: 전체 기준 나머지 구간 비율로 추정 (ODsay 추가 호출 없음)
-                                    int tranTime = proportionalTransitMinutes(transitStart, destination, origin, destination, baseMinutes);
-                                    return mobilityTimePort.getMobilityRoute(origin, transitStart, type)
-                                            .map(result -> buildRoute(
-                                                    List.of(
-                                                            mobilityLeg(type, result, origin, transitStart, info),
-                                                            transitLeg(tranTime, transitStart, destination, baseLegs)
-                                                    ), RouteType.MOBILITY_FIRST_TRANSIT));
+                                    Mono<List<Leg>> transitLegs = transitRoutePort.getTransitRoute(transitStart, destination);
+                                    Mono<Integer> transitTime = transitRoutePort.getTransitTimeMinutes(transitStart, destination);
+                                    return Mono.zip(
+                                                    mobilitySegmentBuilder.build(origin, transitStart, type, info),
+                                                    transitLegs,
+                                                    transitTime
+                                            )
+                                            .map(tuple -> {
+                                                List<Leg> partialTransit = tuple.getT2().isEmpty()
+                                                        ? List.of(transitLeg(tuple.getT3(), transitStart, destination, baseLegs))
+                                                        : tuple.getT2();
+                                                List<Leg> legs = new ArrayList<>();
+                                                legs.addAll(tuple.getT1());
+                                                legs.addAll(partialTransit);
+                                                return buildRoute(legs, RouteType.MOBILITY_FIRST_TRANSIT);
+                                            });
                                 })
                 );
     }
@@ -125,18 +138,25 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
         int baseMinutes = baseLegs.stream().mapToInt(Leg::durationMinutes).sum();
         return Flux.fromIterable(lastMile)
                 .flatMap(switchPoint ->
-                        mobilityAvailabilityPort.findNearbyMobility(switchPoint.lat(), switchPoint.lng(), type)
+                        mobilityInfoForSegment(switchPoint, destination, type)
                                 .filter(Optional::isPresent)
                                 .flatMap(avail -> {
                                     MobilityInfo info = avail.get();
-                                    // origin → switchPoint: 전체 기준 비율로 추정 (ODsay 추가 호출 없음)
-                                    int tranTime = proportionalTransitMinutes(origin, switchPoint, origin, destination, baseMinutes);
-                                    return mobilityTimePort.getMobilityRoute(switchPoint, destination, type)
-                                            .map(result -> buildRoute(
-                                                    List.of(
-                                                            transitLeg(tranTime, origin, switchPoint, baseLegs),
-                                                            mobilityLeg(type, result, switchPoint, destination, info)
-                                                    ), routeTypeFor(type)));
+                                    Mono<List<Leg>> transitLegs = transitRoutePort.getTransitRoute(origin, switchPoint);
+                                    Mono<Integer> transitTime = transitRoutePort.getTransitTimeMinutes(origin, switchPoint);
+                                    return Mono.zip(
+                                                    transitLegs,
+                                                    transitTime,
+                                                    mobilitySegmentBuilder.build(switchPoint, destination, type, info)
+                                            )
+                                            .map(tuple -> {
+                                                List<Leg> partialTransit = tuple.getT1().isEmpty()
+                                                        ? List.of(transitLeg(tuple.getT2(), origin, switchPoint, baseLegs))
+                                                        : tuple.getT1();
+                                                List<Leg> legs = new ArrayList<>(partialTransit);
+                                                legs.addAll(tuple.getT3());
+                                                return buildRoute(legs, routeTypeFor(type));
+                                            });
                                 })
                 );
     }
@@ -151,20 +171,29 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
         Location transitStart = firstMile.get(0);
         Location transitEnd   = lastMile.get(lastMile.size() / 2);
 
-        return mobilityAvailabilityPort.findNearbyMobility(origin.lat(), origin.lng(), type)
-                .filter(Optional::isPresent)
-                .flatMapMany(avail -> {
-                    MobilityInfo info = avail.get();
-                    Mono<MobilityRouteResult> mob1  = mobilityTimePort.getMobilityRoute(origin, transitStart, type);
-                    Mono<Integer>             tran  = transitRoutePort.getTransitTimeMinutes(transitStart, transitEnd);
-                    Mono<MobilityRouteResult> mob2  = mobilityTimePort.getMobilityRoute(transitEnd, destination, type);
-                    return Mono.zip(mob1, tran, mob2)
-                            .map(t -> buildRoute(
-                                    List.of(
-                                            mobilityLeg(type, t.getT1(), origin, transitStart, info),
-                                            transitLeg(t.getT2(), transitStart, transitEnd, baseLegs),
-                                            mobilityLeg(type, t.getT3(), transitEnd, destination, info)
-                                    ), RouteType.MOBILITY_TRANSIT_MOBILITY))
+        Mono<Optional<MobilityInfo>> startInfo = mobilityInfoForSegment(origin, transitStart, type);
+        Mono<Optional<MobilityInfo>> endInfo   = mobilityInfoForSegment(transitEnd, destination, type);
+
+        return Mono.zip(startInfo, endInfo)
+                .filter(tuple -> tuple.getT1().isPresent() && tuple.getT2().isPresent())
+                .flatMapMany(tuple -> {
+                    MobilityInfo startMobility = tuple.getT1().get();
+                    MobilityInfo endMobility   = tuple.getT2().get();
+                    Mono<List<Leg>> startSegment = mobilitySegmentBuilder.build(origin, transitStart, type, startMobility);
+                    Mono<List<Leg>>           tranLegs = transitRoutePort.getTransitRoute(transitStart, transitEnd);
+                    Mono<Integer>             tranTime = transitRoutePort.getTransitTimeMinutes(transitStart, transitEnd);
+                    Mono<List<Leg>> endSegment = mobilitySegmentBuilder.build(transitEnd, destination, type, endMobility);
+                    return Mono.zip(startSegment, tranLegs, tranTime, endSegment)
+                            .map(t -> {
+                                List<Leg> middleTransit = t.getT2().isEmpty()
+                                        ? List.of(transitLeg(t.getT3(), transitStart, transitEnd, baseLegs))
+                                        : t.getT2();
+                                List<Leg> legs = new ArrayList<>();
+                                legs.addAll(t.getT1());
+                                legs.addAll(middleTransit);
+                                legs.addAll(t.getT4());
+                                return buildRoute(legs, RouteType.MOBILITY_TRANSIT_MOBILITY);
+                            })
                             .flux();
                 });
     }
@@ -175,16 +204,35 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
         double dist = haversineMeters(origin.lat(), origin.lng(), destination.lat(), destination.lng());
         if (dist > config.maxRangeMeters()) return Flux.empty();
 
-        return mobilityAvailabilityPort.findNearbyMobility(origin.lat(), origin.lng(), type)
+        return mobilityInfoForSegment(origin, destination, type)
                 .filter(Optional::isPresent)
                 .flatMapMany(avail -> {
-                    MobilityInfo info = avail.get();
-                    return mobilityTimePort.getMobilityRoute(origin, destination, type)
-                            .map(result -> buildRoute(
-                                    List.of(mobilityLeg(type, result, origin, destination, info)),
-                                    RouteType.MOBILITY_ONLY))
+                    return mobilitySegmentBuilder.build(origin, destination, type, avail.get())
+                            .map(legs -> buildRoute(legs, RouteType.MOBILITY_ONLY))
                             .flux();
                 });
+    }
+
+    private Mono<Optional<MobilityInfo>> mobilityInfoForSegment(Location start, Location end, MobilityType type) {
+        Mono<Optional<MobilityInfo>> pickup = mobilityAvailabilityPort
+                .findNearbyMobility(start.lat(), start.lng(), type);
+
+        if (type != MobilityType.DDAREUNGI) {
+            return pickup;
+        }
+
+        Mono<Optional<MobilityInfo>> dropoff = mobilityAvailabilityPort
+                .findNearbyDropoff(end.lat(), end.lng(), type);
+
+        return Mono.zip(pickup, dropoff)
+                .map(tuple -> tuple.getT1()
+                        .flatMap(pickupInfo -> tuple.getT2()
+                                .map(dropoffInfo -> pickupInfo.withDropoffStation(
+                                        dropoffInfo.stationId(),
+                                        dropoffInfo.stationName(),
+                                        dropoffInfo.lat(),
+                                        dropoffInfo.lng()
+                                ))));
     }
 
     // ── 헬퍼 ──────────────────────────────────────────────────────────────────
@@ -241,11 +289,6 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
         return new Leg(LegType.TRANSIT, "대중교통", minutes, 0, from, to, transitInfo, null, null);
     }
 
-    private Leg mobilityLeg(MobilityType type, MobilityRouteResult result, Location from, Location to, MobilityInfo info) {
-        LegType legType = isKickboardType(type) ? LegType.KICKBOARD : LegType.BIKE;
-        return new Leg(legType, type.name(), result.durationMinutes(), 0, from, to, null, info, result.routeCoordinates());
-    }
-
     private MobilityConfig configFor(MobilityType type) {
         return isKickboardType(type) ? MobilityConfig.kickboard() : MobilityConfig.bike();
     }
@@ -259,7 +302,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
         return type == MobilityType.KICKBOARD_SHARED || type == MobilityType.PERSONAL;
     }
 
-    private List<Route> rank(List<Route> candidates, int baseMinutes) {
+    private List<Route> rank(List<Route> candidates, int baseMinutes, Route baseRoute) {
         // TRANSIT_ONLY는 항상 마지막에 고정 노출 — 점수와 무관하게 분리
         Optional<Route> transitOnly = candidates.stream()
                 .filter(r -> r.type() == RouteType.TRANSIT_ONLY)
@@ -276,28 +319,18 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
         for (int i = 0; i < mixed.size(); i++) {
             int saved = Math.max(baseMinutes - mixed.get(i).totalMinutes(), 0);
             Route r = mixed.get(i).withComparison(new Comparison(baseMinutes, saved));
-            result.add(i == 0 ? r.withScore(r.score(), true) : r);
+            Route ranked = i == 0 ? r.withScore(r.score(), true) : r;
+            result.add(routeInsightFactory.enrich(ranked, baseRoute));
         }
 
         // 대중교통 단독 옵션 항상 마지막에 추가
-        transitOnly.ifPresent(r ->
-                result.add(r.withComparison(new Comparison(baseMinutes, 0)))
-        );
+        transitOnly.ifPresent(r -> {
+            Route transitRoute = r.withComparison(new Comparison(baseMinutes, 0));
+            Route ranked = result.isEmpty() ? transitRoute.withScore(transitRoute.score(), true) : transitRoute;
+            result.add(routeInsightFactory.enrich(ranked, baseRoute));
+        });
 
         return result;
-    }
-
-    /**
-     * 출발-도착 간 전체 baseMinutes에서 from→to 구간 비율을 추정.
-     * ODsay 추가 호출 없이 패턴 B/C의 부분 대중교통 시간을 계산한다.
-     */
-    private int proportionalTransitMinutes(Location from, Location to,
-                                           Location origin, Location destination, int baseMinutes) {
-        double totalDist = haversineMeters(origin.lat(), origin.lng(), destination.lat(), destination.lng());
-        if (totalDist == 0) return baseMinutes;
-        double partDist = haversineMeters(from.lat(), from.lng(), to.lat(), to.lng());
-        double ratio = Math.min(1.0, partDist / totalDist);
-        return Math.max(1, (int) Math.round(ratio * baseMinutes));
     }
 
     private double haversineMeters(double lat1, double lng1, double lat2, double lng2) {
