@@ -23,7 +23,7 @@ class RouteOptimizationServiceTest {
     @Mock TransitRoutePort transitRoutePort;
     @Mock MobilityTimePort mobilityTimePort;
     @Mock MobilityAvailabilityPort mobilityAvailabilityPort;
-    @Mock CandidatePointSelector candidatePointSelector;
+    @Mock HubSelector hubSelector;
     @Mock RouteScoreCalculator scoreCalculator;
     @Mock RouteInsightFactory routeInsightFactory;
 
@@ -49,13 +49,13 @@ class RouteOptimizationServiceTest {
     void OPTIMAL_모드는_대중교통_경로를_항상_포함한다() {
         Leg leg = new Leg(LegType.TRANSIT, "BUS", 40, 10000, origin, dest, null, null, null);
         when(transitRoutePort.getTransitRoute(any(), any())).thenReturn(Mono.just(List.of(leg)));
-        when(candidatePointSelector.select(any(), any())).thenReturn(List.of());
-        when(candidatePointSelector.selectFirstMile(any(), any(), any())).thenReturn(List.of());
         when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.empty()));
         when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.empty()));
         when(routeInsightFactory.enrich(any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(hubSelector.selectLastMileHubs(any(), any())).thenReturn(List.of());
+        when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of());
         List<Route> routes = service.findRoutes(origin, dest, List.of(), SearchMode.OPTIMAL).block();
 
         assertThat(routes).isNotEmpty();

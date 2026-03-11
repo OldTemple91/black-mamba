@@ -2,6 +2,7 @@ package com.blackmamba.navigation.application.route.strategy;
 
 import com.blackmamba.navigation.application.route.*;
 import com.blackmamba.navigation.application.route.port.*;
+import com.blackmamba.navigation.domain.hub.Hub;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.*;
 import org.slf4j.Logger;
@@ -35,7 +36,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     private final TransitRoutePort transitRoutePort;
     private final MobilityTimePort mobilityTimePort;
     private final MobilityAvailabilityPort mobilityAvailabilityPort;
-    private final CandidatePointSelector candidatePointSelector;
+    private final HubSelector hubSelector;
     private final RouteScoreCalculator scoreCalculator;
     private final RouteInsightFactory routeInsightFactory;
     private final MobilitySegmentBuilder mobilitySegmentBuilder;
@@ -43,13 +44,13 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     public OptimalSearchStrategy(TransitRoutePort transitRoutePort,
                                   MobilityTimePort mobilityTimePort,
                                   MobilityAvailabilityPort mobilityAvailabilityPort,
-                                  CandidatePointSelector candidatePointSelector,
+                                  HubSelector hubSelector,
                                   RouteScoreCalculator scoreCalculator,
                                   RouteInsightFactory routeInsightFactory) {
         this.transitRoutePort = transitRoutePort;
         this.mobilityTimePort = mobilityTimePort;
         this.mobilityAvailabilityPort = mobilityAvailabilityPort;
-        this.candidatePointSelector = candidatePointSelector;
+        this.hubSelector = hubSelector;
         this.scoreCalculator = scoreCalculator;
         this.routeInsightFactory = routeInsightFactory;
         this.mobilitySegmentBuilder = new MobilitySegmentBuilder(mobilityTimePort);
@@ -75,8 +76,8 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
 
                     // 후보 지점 진단
                     MobilityConfig diagConfig = MobilityConfig.kickboard();
-                    List<Location> diagCandidates = candidatePointSelector.select(baseLegs, diagConfig);
-                    log.info("[OPTIMAL] lastMile 후보={}개 (kickboard 기준)", diagCandidates.size());
+                    List<Hub> diagHubs = hubSelector.selectLastMileHubs(baseLegs, diagConfig);
+                    log.info("[OPTIMAL] lastMile 허브={}개 (kickboard 기준)", diagHubs.size());
 
                     Route baseRoute = Route.of(baseRouteLegs, RouteType.TRANSIT_ONLY);
 
@@ -101,8 +102,10 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     // 패턴 B: 이동수단으로 첫 정류장까지 → 대중교통으로 목적지
     private Flux<Route> patternB(Location origin, Location destination,
                                   List<Leg> baseLegs, MobilityType type, MobilityConfig config) {
-        List<Location> firstMile = candidatePointSelector.selectFirstMile(origin, baseLegs, config)
-                .stream().limit(3).toList();
+        List<Location> firstMile = hubSelector.selectFirstMileHubs(origin, baseLegs, config).stream()
+                .map(Hub::location)
+                .limit(3)
+                .toList();
         int baseMinutes = baseLegs.stream().mapToInt(Leg::durationMinutes).sum();
         return Flux.fromIterable(firstMile)
                 .flatMap(transitStart ->
@@ -133,8 +136,10 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     // 패턴 C: 대중교통으로 환승점까지 → 이동수단으로 목적지
     private Flux<Route> patternC(Location origin, Location destination,
                                   List<Leg> baseLegs, MobilityType type, MobilityConfig config) {
-        List<Location> lastMile = candidatePointSelector.select(baseLegs, config)
-                .stream().limit(3).toList();
+        List<Location> lastMile = hubSelector.selectLastMileHubs(baseLegs, config).stream()
+                .map(Hub::location)
+                .limit(3)
+                .toList();
         int baseMinutes = baseLegs.stream().mapToInt(Leg::durationMinutes).sum();
         return Flux.fromIterable(lastMile)
                 .flatMap(switchPoint ->
@@ -164,8 +169,12 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     // 패턴 D: 이동수단→정류장 + 대중교통(중간) + 이동수단→목적지
     private Flux<Route> patternD(Location origin, Location destination,
                                   List<Leg> baseLegs, MobilityType type, MobilityConfig config) {
-        List<Location> firstMile = candidatePointSelector.selectFirstMile(origin, baseLegs, config);
-        List<Location> lastMile  = candidatePointSelector.select(baseLegs, config);
+        List<Location> firstMile = hubSelector.selectFirstMileHubs(origin, baseLegs, config).stream()
+                .map(Hub::location)
+                .toList();
+        List<Location> lastMile  = hubSelector.selectLastMileHubs(baseLegs, config).stream()
+                .map(Hub::location)
+                .toList();
         if (firstMile.isEmpty() || lastMile.isEmpty()) return Flux.empty();
 
         Location transitStart = firstMile.get(0);

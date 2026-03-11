@@ -21,20 +21,20 @@ public class RouteOptimizationService {
     private final TransitRoutePort transitRoutePort;
     private final MobilityTimePort mobilityTimePort;
     private final MobilityAvailabilityPort mobilityAvailabilityPort;
-    private final CandidatePointSelector candidatePointSelector;
+    private final HubSelector hubSelector;
     private final RouteScoreCalculator scoreCalculator;
     private final RouteInsightFactory routeInsightFactory;
 
     public RouteOptimizationService(TransitRoutePort transitRoutePort,
                                      MobilityTimePort mobilityTimePort,
                                      MobilityAvailabilityPort mobilityAvailabilityPort,
-                                     CandidatePointSelector candidatePointSelector,
+                                     HubSelector hubSelector,
                                      RouteScoreCalculator scoreCalculator,
                                      RouteInsightFactory routeInsightFactory) {
         this.transitRoutePort = transitRoutePort;
         this.mobilityTimePort = mobilityTimePort;
         this.mobilityAvailabilityPort = mobilityAvailabilityPort;
-        this.candidatePointSelector = candidatePointSelector;
+        this.hubSelector = hubSelector;
         this.scoreCalculator = scoreCalculator;
         this.routeInsightFactory = routeInsightFactory;
     }
@@ -45,10 +45,10 @@ public class RouteOptimizationService {
         RouteSearchStrategy strategy = switch (searchMode) {
             case OPTIMAL -> new OptimalSearchStrategy(
                     transitRoutePort, mobilityTimePort,
-                    mobilityAvailabilityPort, candidatePointSelector, scoreCalculator, routeInsightFactory);
+                    mobilityAvailabilityPort, hubSelector, scoreCalculator, routeInsightFactory);
             case SPECIFIC -> new SpecificMobilityStrategy(
                     mobilityTypes, transitRoutePort, mobilityTimePort,
-                    mobilityAvailabilityPort, candidatePointSelector, scoreCalculator, routeInsightFactory);
+                    mobilityAvailabilityPort, hubSelector, scoreCalculator, routeInsightFactory);
         };
         return strategy.search(origin, destination);
     }

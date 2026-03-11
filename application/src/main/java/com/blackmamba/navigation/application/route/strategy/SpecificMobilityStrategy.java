@@ -2,6 +2,7 @@ package com.blackmamba.navigation.application.route.strategy;
 
 import com.blackmamba.navigation.application.route.*;
 import com.blackmamba.navigation.application.route.port.*;
+import com.blackmamba.navigation.domain.hub.Hub;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.*;
 import reactor.core.publisher.Flux;
@@ -22,7 +23,7 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
     private final TransitRoutePort transitRoutePort;
     private final MobilityTimePort mobilityTimePort;
     private final MobilityAvailabilityPort mobilityAvailabilityPort;
-    private final CandidatePointSelector candidatePointSelector;
+    private final HubSelector hubSelector;
     private final RouteScoreCalculator scoreCalculator;
     private final RouteInsightFactory routeInsightFactory;
     private final MobilitySegmentBuilder mobilitySegmentBuilder;
@@ -31,14 +32,14 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                                      TransitRoutePort transitRoutePort,
                                      MobilityTimePort mobilityTimePort,
                                      MobilityAvailabilityPort mobilityAvailabilityPort,
-                                     CandidatePointSelector candidatePointSelector,
+                                     HubSelector hubSelector,
                                      RouteScoreCalculator scoreCalculator,
                                      RouteInsightFactory routeInsightFactory) {
         this.mobilityTypes = mobilityTypes;
         this.transitRoutePort = transitRoutePort;
         this.mobilityTimePort = mobilityTimePort;
         this.mobilityAvailabilityPort = mobilityAvailabilityPort;
-        this.candidatePointSelector = candidatePointSelector;
+        this.hubSelector = hubSelector;
         this.scoreCalculator = scoreCalculator;
         this.routeInsightFactory = routeInsightFactory;
         this.mobilitySegmentBuilder = new MobilitySegmentBuilder(mobilityTimePort);
@@ -78,7 +79,8 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                 .flatMap(type -> {
                     MobilityConfig config = isKickboardType(type)
                             ? MobilityConfig.kickboard() : MobilityConfig.bike();
-                    List<Location> candidates = candidatePointSelector.select(baseLegs, config);
+                    List<Hub> candidateHubs = hubSelector.selectLastMileHubs(baseLegs, config);
+                    List<Location> candidates = candidateHubs.stream().map(Hub::location).toList();
 
                     if (candidates.isEmpty()) {
                         // 대중교통 경로 없음 → 출발지에서 목적지 직접 이동수단 경로로 폴백
