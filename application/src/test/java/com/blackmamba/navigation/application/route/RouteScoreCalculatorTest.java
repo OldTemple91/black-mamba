@@ -44,6 +44,48 @@ class RouteScoreCalculatorTest {
         assertThat(score).isBetween(0.0, 1.0);
     }
 
+    @Test
+    void 접근_도보가_길수록_점수가_낮다() {
+        Location a = new Location("A", 37.5, 127.0);
+        Location hub = new Location("Hub", 37.51, 127.01);
+        Location b = new Location("B", 37.4, 127.1);
+        MobilityInfo bike = new MobilityInfo(MobilityType.DDAREUNGI, "따릉이", null, 100, "정류소", 37.51, 127.01, 5, 50)
+                .withDropoffStation("D1", "반납", 37.4, 127.1);
+
+        Route shortAccess = Route.of(List.of(
+                new Leg(LegType.TRANSIT, "BUS", 15, 1200, a, hub, null, null, null),
+                new Leg(LegType.WALK, "WALK", 2, 120, hub, hub, null, null, null),
+                new Leg(LegType.BIKE, "DDAREUNGI", 10, 1500, hub, b, null, bike, null)
+        ), RouteType.TRANSIT_WITH_BIKE);
+
+        Route longAccess = Route.of(List.of(
+                new Leg(LegType.TRANSIT, "BUS", 15, 1200, a, hub, null, null, null),
+                new Leg(LegType.WALK, "WALK", 7, 520, hub, hub, null, null, null),
+                new Leg(LegType.BIKE, "DDAREUNGI", 10, 1500, hub, b, null, bike, null)
+        ), RouteType.TRANSIT_WITH_BIKE);
+
+        assertThat(calculator.calculate(shortAccess)).isGreaterThan(calculator.calculate(longAccess));
+    }
+
+    @Test
+    void 반납_정류소가_없으면_점수가_낮다() {
+        Location a = new Location("A", 37.5, 127.0);
+        Location b = new Location("B", 37.4, 127.1);
+        MobilityInfo stableBike = new MobilityInfo(MobilityType.DDAREUNGI, "따릉이", null, 100, "정류소", 37.5, 127.0, 5, 50)
+                .withDropoffStation("D1", "반납", 37.4, 127.1);
+        MobilityInfo unstableBike = new MobilityInfo(MobilityType.DDAREUNGI, "따릉이", null, 100, "정류소", 37.5, 127.0, 1, 50);
+
+        Route withDropoff = Route.of(List.of(
+                new Leg(LegType.BIKE, "DDAREUNGI", 18, 2200, a, b, null, stableBike, null)
+        ), RouteType.MOBILITY_ONLY);
+
+        Route withoutDropoff = Route.of(List.of(
+                new Leg(LegType.BIKE, "DDAREUNGI", 18, 2200, a, b, null, unstableBike, null)
+        ), RouteType.MOBILITY_ONLY);
+
+        assertThat(calculator.calculate(withDropoff)).isGreaterThan(calculator.calculate(withoutDropoff));
+    }
+
     // -----------------------------------------------------------------
     // helpers
     // -----------------------------------------------------------------
