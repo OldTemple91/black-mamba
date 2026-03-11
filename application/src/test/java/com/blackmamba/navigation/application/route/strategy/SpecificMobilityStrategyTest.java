@@ -2,6 +2,8 @@ package com.blackmamba.navigation.application.route.strategy;
 
 import com.blackmamba.navigation.application.route.*;
 import com.blackmamba.navigation.application.route.port.*;
+import com.blackmamba.navigation.domain.hub.Hub;
+import com.blackmamba.navigation.domain.hub.HubType;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.*;
 import org.junit.jupiter.api.Test;
@@ -11,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,7 +27,7 @@ class SpecificMobilityStrategyTest {
     @Mock TransitRoutePort transitRoutePort;
     @Mock MobilityTimePort mobilityTimePort;
     @Mock MobilityAvailabilityPort mobilityAvailabilityPort;
-    @Mock CandidatePointSelector candidatePointSelector;
+    @Mock HubSelector hubSelector;
     @Mock RouteScoreCalculator scoreCalculator;
     @Mock RouteInsightFactory routeInsightFactory;
 
@@ -41,7 +44,7 @@ class SpecificMobilityStrategyTest {
 
         SpecificMobilityStrategy strategy = new SpecificMobilityStrategy(
                 List.of(), transitRoutePort, mobilityTimePort,
-                mobilityAvailabilityPort, candidatePointSelector, scoreCalculator, routeInsightFactory);
+                mobilityAvailabilityPort, hubSelector, scoreCalculator, routeInsightFactory);
 
         List<Route> routes = strategy.search(origin, dest).block();
 
@@ -69,17 +72,21 @@ class SpecificMobilityStrategyTest {
                 .thenReturn(Mono.just(Optional.of(
                         new MobilityInfo(MobilityType.KICKBOARD_SHARED, "씽씽",
                                 "DEV_001", 85, null, 37.52, 127.0, 0, 120))));
-        when(candidatePointSelector.select(any(), any())).thenReturn(List.of(candidate));
+        when(hubSelector.selectLastMileHubs(any(), any())).thenReturn(List.of(hub(candidate)));
         when(scoreCalculator.calculate(any())).thenReturn(0.8, 0.5);
         when(routeInsightFactory.enrich(any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         SpecificMobilityStrategy strategy = new SpecificMobilityStrategy(
                 List.of(MobilityType.KICKBOARD_SHARED), transitRoutePort, mobilityTimePort,
-                mobilityAvailabilityPort, candidatePointSelector, scoreCalculator, routeInsightFactory);
+                mobilityAvailabilityPort, hubSelector, scoreCalculator, routeInsightFactory);
 
         List<Route> routes = strategy.search(origin, dest).block();
 
         assertThat(routes.get(0).recommended()).isTrue();
         assertThat(routes.get(0).totalMinutes()).isEqualTo(27);
+    }
+
+    private Hub hub(Location location) {
+        return new Hub("hub-1", location.name(), HubType.MOBILITY_TRANSFER_POINT, location, 150, Map.of());
     }
 }
