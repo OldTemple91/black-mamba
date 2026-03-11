@@ -104,7 +104,7 @@ export default function LegItem({ leg, isLast }) {
                 {midStops.map((stop, i) => (
                   <div key={i} className="flex items-center gap-1">
                     <span className="w-1 h-1 rounded-full bg-gray-300 flex-shrink-0" />
-                    <span className="text-xs text-gray-400">{stop}</span>
+                    <span className="text-xs text-gray-400">{stop.name}</span>
                   </div>
                 ))}
               </div>

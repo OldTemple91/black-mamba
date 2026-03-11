@@ -1,7 +1,9 @@
+// KICKBOARD_SHARED: TAGO API 서울 데이터 미제공으로 실데이터 없음 (B-3)
+// → unavailable 플래그로 표시만 하고 선택 불가 처리
 const MOBILITY_OPTIONS = [
-  { id: 'DDAREUNGI',       label: '🚲 따릉이' },
-  { id: 'KICKBOARD_SHARED', label: '🛴 킥보드' },
-  { id: 'PERSONAL',        label: '🛴 개인킥보드' },
+  { id: 'DDAREUNGI',        label: '🚲 따릉이',    unavailable: false },
+  { id: 'KICKBOARD_SHARED', label: '🛴 공유킥보드', unavailable: true  },
+  { id: 'PERSONAL',         label: '🛴 개인킥보드', unavailable: false },
 ]
 
 const OPTIMAL_ID = 'OPTIMAL'
@@ -30,16 +32,17 @@ export default function MobilitySelector({ selected, onChange, searchMode, onSea
       {MOBILITY_OPTIONS.map(opt => (
         <button
           key={opt.id}
-          onClick={() => toggle(opt.id)}
-          disabled={isOptimal}
+          onClick={() => !opt.unavailable && toggle(opt.id)}
+          disabled={isOptimal || opt.unavailable}
+          title={opt.unavailable ? '현재 데이터 미제공' : undefined}
           className={`px-3 py-1 rounded-full border text-sm transition
-            ${isOptimal
+            ${isOptimal || opt.unavailable
               ? 'opacity-40 cursor-not-allowed bg-white text-gray-400 border-gray-200'
               : selected.includes(opt.id)
                 ? 'bg-blue-500 text-white border-blue-500'
                 : 'bg-white text-gray-600 border-gray-300'}`}
         >
-          {opt.label}
+          {opt.label}{opt.unavailable ? ' (준비중)' : ''}
         </button>
       ))}
       {/* 최적 탐색 버튼 */}

@@ -41,9 +41,9 @@ public class OdsayRouteMapper {
             int stationCount = subPath.stationCount() > 0
                     ? subPath.stationCount()
                     : stations.size();
-            // 경유 정류장 이름 목록 (첫 역·끝 역 포함)
-            List<String> passThroughStations = stations.stream()
-                    .map(OdsayRouteResponse.Station::stationName)
+            // 경유 정류장: 이름 + 실제 좌표 (ODsay passStopList 제공)
+            List<Location> passThroughStations = stations.stream()
+                    .map(s -> new Location(s.stationName(), s.lat(), s.lng()))
                     .toList();
 
             if (lane != null) {

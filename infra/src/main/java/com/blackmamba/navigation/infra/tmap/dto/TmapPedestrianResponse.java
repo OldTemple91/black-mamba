@@ -30,14 +30,23 @@ public record TmapPedestrianResponse(List<TmapFeature> features) {
     /**
      * LineString Feature에서 실제 도로 경로 좌표 추출.
      * TMAP GeoJSON 좌표는 [lng, lat] 순서.
+     *
+     * NOTE: geometry.coordinates 는 Feature 타입에 따라 JSON 형태가 다름.
+     *   - Point     : [lng, lat]          → Jackson이 List<Object> 에 Double 원소로 역직렬화
+     *   - LineString: [[lng, lat], ...]   → Jackson이 List<Object> 에 List 원소로 역직렬화
+     * 따라서 LineString만 필터한 뒤 원소를 List<Number>로 안전하게 캐스트한다.
      */
+    @SuppressWarnings("unchecked")
     public List<Location> routeCoordinates() {
         if (features == null) return List.of();
         return features.stream()
-                .filter(f -> f.geometry() != null && "LineString".equals(f.geometry().type()))
+                .filter(f -> f.geometry() != null && "LineString".equals(f.geometry().type())
+                        && f.geometry().coordinates() != null)
                 .flatMap(f -> f.geometry().coordinates().stream())
-                .filter(c -> c != null && c.size() >= 2)
-                .map(c -> new Location(null, c.get(1), c.get(0)))  // [lng, lat] → Location(lat, lng)
+                .filter(c -> c instanceof List<?>)
+                .map(c -> (List<Number>) c)
+                .filter(pair -> pair.size() >= 2)
+                .map(pair -> new Location(null, pair.get(1).doubleValue(), pair.get(0).doubleValue()))
                 .toList();
     }
 
@@ -45,7 +54,7 @@ public record TmapPedestrianResponse(List<TmapFeature> features) {
     public record TmapFeature(TmapGeometry geometry, TmapProperties properties) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record TmapGeometry(String type, List<List<Double>> coordinates) {}
+    public record TmapGeometry(String type, List<Object> coordinates) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record TmapProperties(int distance, int totalDistance, int totalTime) {}
