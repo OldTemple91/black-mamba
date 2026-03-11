@@ -27,7 +27,7 @@ class RouteControllerTest {
     @Test
     void 경로_탐색_API가_200을_반환한다() throws Exception {
         Route route = new Route("rt_001", RouteType.TRANSIT_ONLY, 45, 1250,
-                0.5, true, List.of(), new Comparison(45, 0));
+                0.5, true, List.of(), new Comparison(45, 0), null);
 
         when(routeOptimizationService.findRoutes(any(), any(), any(), any()))
                 .thenReturn(Mono.just(List.of(route)));
@@ -45,7 +45,7 @@ class RouteControllerTest {
     @Test
     void mobility_파라미터_없이도_경로를_탐색한다() throws Exception {
         Route route = new Route("rt_002", RouteType.TRANSIT_ONLY, 30, 1250,
-                0.6, true, List.of(), new Comparison(30, 0));
+                0.6, true, List.of(), new Comparison(30, 0), null);
 
         when(routeOptimizationService.findRoutes(any(), any(), any(), any()))
                 .thenReturn(Mono.just(List.of(route)));
@@ -62,7 +62,7 @@ class RouteControllerTest {
     @Test
     void searchMode_OPTIMAL_파라미터로_경로를_탐색한다() throws Exception {
         Route route = new Route("rt_opt", RouteType.MOBILITY_ONLY, 20, 0,
-                0.9, true, List.of(), null);
+                0.9, true, List.of(), null, null);
 
         when(routeOptimizationService.findRoutes(any(), any(), any(), eq(SearchMode.OPTIMAL)))
                 .thenReturn(Mono.just(List.of(route)));

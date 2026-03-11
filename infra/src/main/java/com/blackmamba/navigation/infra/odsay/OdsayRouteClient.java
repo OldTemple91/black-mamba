@@ -14,6 +14,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -105,7 +106,7 @@ public class OdsayRouteClient {
                             log.warn("[ODsay] 경로(path) 배열 비어있음");
                             return Mono.just(List.<Leg>of());
                         }
-                        List<Leg> legs = mapper.toLegs(paths.get(0));
+                        List<Leg> legs = normalizeWalkLegs(mapper.toLegs(paths.get(0)), origin, destination);
                         log.info("[ODsay] 파싱 성공 — leg {}개: {}", legs.size(),
                                 legs.stream().map(l ->
                                         l.type() + "(transitInfo=" + (l.transitInfo() != null
@@ -125,6 +126,55 @@ public class OdsayRouteClient {
                     log.warn("[ODsay] 호출 실패 → 빈 리스트 반환. 원인: {}", ex.getMessage());
                     return Mono.just(List.of());
                 }));
+    }
+
+    private List<Leg> normalizeWalkLegs(List<Leg> legs, Location origin, Location destination) {
+        List<Leg> normalized = new ArrayList<>();
+        for (int i = 0; i < legs.size(); i++) {
+            Leg leg = legs.get(i);
+            if (leg.type().name().equals("WALK") && (leg.start() == null || leg.end() == null)) {
+                Location start = leg.start() != null ? leg.start() : findPreviousEndpoint(legs, i, origin);
+                Location end = leg.end() != null ? leg.end() : findNextStartpoint(legs, i, destination);
+                normalized.add(new Leg(
+                        leg.type(),
+                        leg.mode(),
+                        leg.durationMinutes(),
+                        leg.distanceMeters(),
+                        start,
+                        end,
+                        leg.transitInfo(),
+                        leg.mobilityInfo(),
+                        leg.routeCoordinates()
+                ));
+                continue;
+            }
+            normalized.add(leg);
+        }
+        return normalized.stream()
+                .filter(leg -> !isDegenerateWalk(leg))
+                .toList();
+    }
+
+    private boolean isDegenerateWalk(Leg leg) {
+        if (!leg.type().name().equals("WALK")) return false;
+        if (leg.durationMinutes() <= 0 || leg.distanceMeters() <= 0) return true;
+        if (leg.start() == null || leg.end() == null) return false;
+        return Double.compare(leg.start().lat(), leg.end().lat()) == 0
+                && Double.compare(leg.start().lng(), leg.end().lng()) == 0;
+    }
+
+    private Location findPreviousEndpoint(List<Leg> legs, int index, Location fallback) {
+        for (int i = index - 1; i >= 0; i--) {
+            if (legs.get(i).end() != null) return legs.get(i).end();
+        }
+        return fallback;
+    }
+
+    private Location findNextStartpoint(List<Leg> legs, int index, Location fallback) {
+        for (int i = index + 1; i < legs.size(); i++) {
+            if (legs.get(i).start() != null) return legs.get(i).start();
+        }
+        return fallback;
     }
 
     public Mono<Integer> getTransitTimeMinutes(Location origin, Location destination) {

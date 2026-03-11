@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import LegItem from './LegItem'
-
-const MOBILITY_EMOJI = {
-  TRANSIT: '🚌', WALK: '🚶', BIKE: '🚲', KICKBOARD: '🛴'
-}
+import {
+  getComparisonBars,
+  getDebugFacts,
+  getRecommendationReasons,
+  getRiskBadges,
+  getTransferSummary,
+} from '../../utils/routeInsights'
 
 const ROUTE_TYPE_LABEL = {
   TRANSIT_ONLY:              '대중교통',
@@ -23,12 +26,36 @@ function getMobilityOnlyLabel(legs) {
   return (leg && MOBILITY_ONLY_LABEL[leg.type]) ?? '직접 이동'
 }
 
-export default function RouteCard({ route, selected, onClick }) {
+function summarizeLeg(leg) {
+  if (leg.type === 'TRANSIT') {
+    if (leg.mode === 'SUBWAY') return `🚇 ${leg.transitInfo?.lineName ?? '지하철'}`
+    if (leg.mode === 'BUS') return `🚌 ${leg.transitInfo?.lineName ?? '버스'}`
+    return `🚌 ${leg.transitInfo?.lineName ?? '대중교통'}`
+  }
+  if (leg.type === 'BIKE') return '🚲 자전거'
+  if (leg.type === 'KICKBOARD') return '🛴 킥보드'
+  return '🚶 도보'
+}
+
+export default function RouteCard({
+  route,
+  selected,
+  onClick,
+  baselineRoute,
+  comparisonContext,
+  searchMode,
+  showDebug,
+}) {
   const [expanded, setExpanded] = useState(false)
 
   const routeLabel = route.type === 'MOBILITY_ONLY'
     ? getMobilityOnlyLabel(route.legs)
     : (ROUTE_TYPE_LABEL[route.type] ?? route.type)
+  const reasons = getRecommendationReasons(route, baselineRoute)
+  const risks = getRiskBadges(route)
+  const transfers = getTransferSummary(route)
+  const comparisonBars = comparisonContext ? getComparisonBars(route, comparisonContext) : []
+  const debugFacts = showDebug ? getDebugFacts(route, baselineRoute, searchMode) : []
 
   return (
     <div
@@ -46,10 +73,15 @@ export default function RouteCard({ route, selected, onClick }) {
               </span>
             )}
             <span className="text-xs text-gray-400">{routeLabel}</span>
+            {risks.map(risk => (
+              <span key={risk.label} className={`text-[11px] px-2 py-0.5 rounded-full ${risk.className}`}>
+                {risk.label}
+              </span>
+            ))}
           </div>
           {/* 이동수단 체인 */}
           <span className="text-sm text-gray-600">
-            {route.legs.map(l => MOBILITY_EMOJI[l.type] ?? '🔵').join(' → ')}
+            {route.legs.map(summarizeLeg).join(' → ')}
           </span>
         </div>
         <div className="text-right">
@@ -67,6 +99,37 @@ export default function RouteCard({ route, selected, onClick }) {
         </p>
       )}
 
+      <div className="mt-3 flex flex-wrap gap-2">
+        {reasons.map(reason => (
+          <span key={reason} className="text-xs px-2 py-1 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+            {reason}
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {comparisonBars.map(bar => (
+          <div key={bar.key} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
+            <div className="flex items-center justify-between text-[11px] text-slate-500">
+              <span>{bar.label}</span>
+              <span>{bar.value.toLocaleString()}{bar.suffix}</span>
+            </div>
+            <div className="mt-2 h-1.5 rounded-full bg-white overflow-hidden">
+              <div className={`h-full rounded-full ${bar.color}`} style={{ width: `${bar.percent}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+        <p className="text-[11px] font-semibold text-slate-600">핵심 환승 포인트</p>
+        <div className="mt-1 space-y-1">
+          {transfers.map(step => (
+            <p key={step} className="text-xs text-slate-600">{step}</p>
+          ))}
+        </div>
+      </div>
+
       {/* 상세 토글 */}
       <button
         onClick={e => { e.stopPropagation(); setExpanded(v => !v) }}
@@ -82,9 +145,22 @@ export default function RouteCard({ route, selected, onClick }) {
             <LegItem
               key={i}
               leg={leg}
+              prevLeg={i > 0 ? route.legs[i - 1] : null}
+              nextLeg={i < route.legs.length - 1 ? route.legs[i + 1] : null}
               isLast={i === route.legs.length - 1}
             />
           ))}
+
+          {showDebug && (
+            <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-3">
+              <p className="text-[11px] font-semibold text-slate-600">엔진 디버그</p>
+              <div className="mt-2 space-y-1">
+                {debugFacts.map(fact => (
+                  <p key={fact} className="text-xs text-slate-500">{fact}</p>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

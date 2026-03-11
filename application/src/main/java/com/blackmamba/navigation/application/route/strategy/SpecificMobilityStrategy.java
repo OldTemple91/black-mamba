@@ -24,19 +24,24 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
     private final MobilityAvailabilityPort mobilityAvailabilityPort;
     private final CandidatePointSelector candidatePointSelector;
     private final RouteScoreCalculator scoreCalculator;
+    private final RouteInsightFactory routeInsightFactory;
+    private final MobilitySegmentBuilder mobilitySegmentBuilder;
 
     public SpecificMobilityStrategy(List<MobilityType> mobilityTypes,
                                      TransitRoutePort transitRoutePort,
                                      MobilityTimePort mobilityTimePort,
                                      MobilityAvailabilityPort mobilityAvailabilityPort,
                                      CandidatePointSelector candidatePointSelector,
-                                     RouteScoreCalculator scoreCalculator) {
+                                     RouteScoreCalculator scoreCalculator,
+                                     RouteInsightFactory routeInsightFactory) {
         this.mobilityTypes = mobilityTypes;
         this.transitRoutePort = transitRoutePort;
         this.mobilityTimePort = mobilityTimePort;
         this.mobilityAvailabilityPort = mobilityAvailabilityPort;
         this.candidatePointSelector = candidatePointSelector;
         this.scoreCalculator = scoreCalculator;
+        this.routeInsightFactory = routeInsightFactory;
+        this.mobilitySegmentBuilder = new MobilitySegmentBuilder(mobilityTimePort);
     }
 
     @Override
@@ -59,7 +64,8 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                     Route baseRoute = Route.of(routeLegs, RouteType.TRANSIT_ONLY);
 
                     if (mobilityTypes.isEmpty()) {
-                        return Mono.just(List.of(baseRoute.withScore(scoreCalculator.calculate(baseRoute), true)));
+                        Route scoredBase = baseRoute.withScore(scoreCalculator.calculate(baseRoute), true);
+                        return Mono.just(List.of(routeInsightFactory.enrich(scoredBase, scoredBase)));
                     }
                     return generateCombinedRoutes(baseLegs, origin, destination)
                             .collectList()
@@ -86,25 +92,23 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
     private Mono<Route> buildRoute(Location origin, Location switchPoint,
                                     Location destination, MobilityType type,
                                     List<Leg> baseLegs) {
+        Mono<List<Leg>>           transitLegs  = transitRoutePort.getTransitRoute(origin, switchPoint);
         Mono<Integer>             transitTime  = transitRoutePort.getTransitTimeMinutes(origin, switchPoint);
-        Mono<MobilityRouteResult> mobilityTime = mobilityTimePort.getMobilityRoute(switchPoint, destination, type);
-        Mono<java.util.Optional<MobilityInfo>> avail =
-                mobilityAvailabilityPort.findNearbyMobility(switchPoint.lat(), switchPoint.lng(), type);
+        Mono<java.util.Optional<MobilityInfo>> avail = mobilityInfoForSegment(switchPoint, destination, type);
 
-        return Mono.zip(transitTime, mobilityTime, avail)
-                .filter(t -> t.getT3().isPresent())
-                .map(t -> {
-                    MobilityInfo info = t.getT3().get();
-                    MobilityRouteResult mobResult = t.getT2();
-                    LegType legType = isKickboardType(type) ? LegType.KICKBOARD : LegType.BIKE;
+        return Mono.zip(transitLegs, transitTime, avail)
+                .filter(tuple -> tuple.getT3().isPresent())
+                .flatMap(tuple -> mobilitySegmentBuilder.build(switchPoint, destination, type, tuple.getT3().get())
+                .map(mobilityLegs -> {
                     RouteType routeType = isKickboardType(type)
                             ? RouteType.TRANSIT_WITH_KICKBOARD : RouteType.TRANSIT_WITH_BIKE;
-                    List<Leg> legs = List.of(
-                            buildTransitLeg(t.getT1(), origin, switchPoint, baseLegs),
-                            new Leg(legType, type.name(), mobResult.durationMinutes(), 0, switchPoint, destination, null, info, mobResult.routeCoordinates())
-                    );
+                    List<Leg> partialTransit = tuple.getT1().isEmpty()
+                            ? List.of(buildTransitLeg(tuple.getT2(), origin, switchPoint, baseLegs))
+                            : tuple.getT1();
+                    List<Leg> legs = new ArrayList<>(partialTransit);
+                    legs.addAll(mobilityLegs);
                     return Route.of(legs, routeType);
-                });
+                }));
     }
 
     /** baseLegs에서 노선 정보를 추출해 TransitInfo가 채워진 Leg 생성 */
@@ -140,21 +144,34 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
 
     /** ODsay 없이 출발지→목적지 직접 이동수단 경로 */
     private Mono<Route> buildDirectRoute(Location origin, Location destination, MobilityType type) {
-        Mono<MobilityRouteResult> mobilityTime = mobilityTimePort.getMobilityRoute(origin, destination, type);
-        Mono<java.util.Optional<MobilityInfo>> avail =
-                mobilityAvailabilityPort.findNearbyMobility(origin.lat(), origin.lng(), type);
+        Mono<java.util.Optional<MobilityInfo>> avail = mobilityInfoForSegment(origin, destination, type);
 
-        return Mono.zip(mobilityTime, avail)
-                .filter(t -> t.getT2().isPresent())
-                .map(t -> {
-                    MobilityInfo info = t.getT2().get();
-                    MobilityRouteResult result = t.getT1();
-                    LegType legType = isKickboardType(type) ? LegType.KICKBOARD : LegType.BIKE;
-                    List<Leg> legs = List.of(
-                            new Leg(legType, type.name(), result.durationMinutes(), 0, origin, destination, null, info, result.routeCoordinates())
-                    );
-                    return Route.of(legs, RouteType.MOBILITY_ONLY);
-                });
+        return avail
+                .filter(java.util.Optional::isPresent)
+                .flatMap(optionalInfo -> mobilitySegmentBuilder.build(origin, destination, type, optionalInfo.get())
+                        .map(legs -> Route.of(legs, RouteType.MOBILITY_ONLY)));
+    }
+
+    private Mono<java.util.Optional<MobilityInfo>> mobilityInfoForSegment(Location start, Location end, MobilityType type) {
+        Mono<java.util.Optional<MobilityInfo>> pickup = mobilityAvailabilityPort
+                .findNearbyMobility(start.lat(), start.lng(), type);
+
+        if (type != MobilityType.DDAREUNGI) {
+            return pickup;
+        }
+
+        Mono<java.util.Optional<MobilityInfo>> dropoff = mobilityAvailabilityPort
+                .findNearbyDropoff(end.lat(), end.lng(), type);
+
+        return Mono.zip(pickup, dropoff)
+                .map(tuple -> tuple.getT1()
+                        .flatMap(pickupInfo -> tuple.getT2()
+                                .map(dropoffInfo -> pickupInfo.withDropoffStation(
+                                        dropoffInfo.stationId(),
+                                        dropoffInfo.stationName(),
+                                        dropoffInfo.lat(),
+                                        dropoffInfo.lng()
+                                ))));
     }
 
     /** KICKBOARD_SHARED 및 PERSONAL 모두 킥보드 타입으로 처리 */
@@ -173,7 +190,8 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
         for (int i = 0; i < scored.size(); i++) {
             int saved = Math.max(baseMinutes - scored.get(i).totalMinutes(), 0);
             Route r = scored.get(i).withComparison(new Comparison(baseMinutes, saved));
-            result.add(i == 0 ? r.withScore(r.score(), true) : r);
+            Route ranked = i == 0 ? r.withScore(r.score(), true) : r;
+            result.add(routeInsightFactory.enrich(ranked, base));
         }
         return result;
     }

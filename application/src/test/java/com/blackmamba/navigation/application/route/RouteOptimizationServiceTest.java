@@ -25,6 +25,7 @@ class RouteOptimizationServiceTest {
     @Mock MobilityAvailabilityPort mobilityAvailabilityPort;
     @Mock CandidatePointSelector candidatePointSelector;
     @Mock RouteScoreCalculator scoreCalculator;
+    @Mock RouteInsightFactory routeInsightFactory;
 
     @InjectMocks RouteOptimizationService service;
 
@@ -36,6 +37,7 @@ class RouteOptimizationServiceTest {
         Leg leg = new Leg(LegType.TRANSIT, "BUS", 45, 10000, origin, dest, null, null, null);
         when(transitRoutePort.getTransitRoute(any(), any())).thenReturn(Mono.just(List.of(leg)));
         when(scoreCalculator.calculate(any())).thenReturn(0.5);
+        when(routeInsightFactory.enrich(any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         List<Route> routes = service.findRoutes(origin, dest, List.of(), SearchMode.SPECIFIC).block();
 
@@ -51,6 +53,9 @@ class RouteOptimizationServiceTest {
         when(candidatePointSelector.selectFirstMile(any(), any(), any())).thenReturn(List.of());
         when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.empty()));
+        when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(Optional.empty()));
+        when(routeInsightFactory.enrich(any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
         List<Route> routes = service.findRoutes(origin, dest, List.of(), SearchMode.OPTIMAL).block();
 
         assertThat(routes).isNotEmpty();

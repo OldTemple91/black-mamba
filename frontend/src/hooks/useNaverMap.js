@@ -34,6 +34,36 @@ export function useNaverMap(containerId, options = {}) {
     })
   }
 
+  const addRichMarker = ({
+    lat,
+    lng,
+    title = '',
+    label = '',
+    accentColor = '#2563EB',
+    html
+  }) => {
+    if (!mapRef.current) return null
+
+    const labelHtml = label
+      ? `<div style="margin-left:8px;background:#fff;border:1px solid ${accentColor};border-radius:999px;padding:4px 8px;font-size:11px;font-weight:600;color:#111827;box-shadow:0 4px 12px rgba(15,23,42,0.12);white-space:nowrap;">${label}</div>`
+      : ''
+
+    return new window.naver.maps.Marker({
+      position: new window.naver.maps.LatLng(lat, lng),
+      map: mapRef.current,
+      title,
+      icon: {
+        content: html ?? `
+          <div style="display:flex;align-items:center;transform:translate(-12px,-12px);">
+            <div style="width:14px;height:14px;border-radius:999px;background:${accentColor};border:3px solid #fff;box-shadow:0 4px 12px rgba(15,23,42,0.18);"></div>
+            ${labelHtml}
+          </div>
+        `,
+        anchor: new window.naver.maps.Point(12, 12)
+      }
+    })
+  }
+
   const drawPolyline = (coords, color = '#0052A4') => {
     if (!mapRef.current) return
     return new window.naver.maps.Polyline({
@@ -66,5 +96,5 @@ export function useNaverMap(containerId, options = {}) {
     }
   }, [])
 
-  return { mapRef, addMarker, drawPolyline, setClickHandler }
+  return { mapRef, addMarker, addRichMarker, drawPolyline, setClickHandler }
 }

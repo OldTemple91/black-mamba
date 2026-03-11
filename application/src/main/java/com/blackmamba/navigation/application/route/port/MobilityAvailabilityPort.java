@@ -8,4 +8,5 @@ import java.util.Optional;
 
 public interface MobilityAvailabilityPort {
     Mono<Optional<MobilityInfo>> findNearbyMobility(double lat, double lng, MobilityType type);
+    Mono<Optional<MobilityInfo>> findNearbyDropoff(double lat, double lng, MobilityType type);
 }

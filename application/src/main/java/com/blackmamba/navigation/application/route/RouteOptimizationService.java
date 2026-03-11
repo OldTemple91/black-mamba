@@ -23,17 +23,20 @@ public class RouteOptimizationService {
     private final MobilityAvailabilityPort mobilityAvailabilityPort;
     private final CandidatePointSelector candidatePointSelector;
     private final RouteScoreCalculator scoreCalculator;
+    private final RouteInsightFactory routeInsightFactory;
 
     public RouteOptimizationService(TransitRoutePort transitRoutePort,
                                      MobilityTimePort mobilityTimePort,
                                      MobilityAvailabilityPort mobilityAvailabilityPort,
                                      CandidatePointSelector candidatePointSelector,
-                                     RouteScoreCalculator scoreCalculator) {
+                                     RouteScoreCalculator scoreCalculator,
+                                     RouteInsightFactory routeInsightFactory) {
         this.transitRoutePort = transitRoutePort;
         this.mobilityTimePort = mobilityTimePort;
         this.mobilityAvailabilityPort = mobilityAvailabilityPort;
         this.candidatePointSelector = candidatePointSelector;
         this.scoreCalculator = scoreCalculator;
+        this.routeInsightFactory = routeInsightFactory;
     }
 
     public Mono<List<Route>> findRoutes(Location origin, Location destination,
@@ -42,10 +45,10 @@ public class RouteOptimizationService {
         RouteSearchStrategy strategy = switch (searchMode) {
             case OPTIMAL -> new OptimalSearchStrategy(
                     transitRoutePort, mobilityTimePort,
-                    mobilityAvailabilityPort, candidatePointSelector, scoreCalculator);
+                    mobilityAvailabilityPort, candidatePointSelector, scoreCalculator, routeInsightFactory);
             case SPECIFIC -> new SpecificMobilityStrategy(
                     mobilityTypes, transitRoutePort, mobilityTimePort,
-                    mobilityAvailabilityPort, candidatePointSelector, scoreCalculator);
+                    mobilityAvailabilityPort, candidatePointSelector, scoreCalculator, routeInsightFactory);
         };
         return strategy.search(origin, destination);
     }

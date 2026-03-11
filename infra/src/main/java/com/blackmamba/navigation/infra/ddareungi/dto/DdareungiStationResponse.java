@@ -13,10 +13,12 @@ public record DdareungiStationResponse(RentBikeStatus rentBikeStatus) {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Row(
+            String stationId,
             String stationName,
             String stationLatitude,
             String stationLongitude,
-            String parkingBikeTotCnt  // 잔여 대수 (String으로 내려옴)
+            String parkingBikeTotCnt,  // 잔여 대수 (String으로 내려옴)
+            String rackTotCnt
     ) {}
 
     public List<DdareungiStation> toStations() {
@@ -35,7 +37,8 @@ public record DdareungiStationResponse(RentBikeStatus rentBikeStatus) {
             double lat = Double.parseDouble(row.stationLatitude());
             double lng = Double.parseDouble(row.stationLongitude());
             int available = parseInt(row.parkingBikeTotCnt());
-            return new DdareungiStation(row.stationName(), lat, lng, available);
+            int rackTotal = parseInt(row.rackTotCnt());
+            return new DdareungiStation(row.stationId(), row.stationName(), lat, lng, available, rackTotal);
         } catch (NumberFormatException e) {
             // 좌표 파싱 실패 row는 제외
             return null;
