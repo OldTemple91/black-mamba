@@ -27,8 +27,10 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
 
     private static final Logger log = LoggerFactory.getLogger(OptimalSearchStrategy.class);
     private static final double EARTH_RADIUS_METERS = 6_371_000;
+    // KICKBOARD_SHARED 제외: TAGO API 서울 데이터 미제공으로 가상 경로만 생성됨 (B-1)
+    // 향후 PERSONAL_KICKBOARD 또는 MobilityHub 모델 도입 시 재추가
     private static final List<MobilityType> ALL_TYPES =
-            List.of(MobilityType.DDAREUNGI, MobilityType.KICKBOARD_SHARED);
+            List.of(MobilityType.DDAREUNGI);
 
     private final TransitRoutePort transitRoutePort;
     private final MobilityTimePort mobilityTimePort;
@@ -228,7 +230,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                 : Math.max(2, totalStations / 2);
 
         // 경유 정류장: base 경로의 passThroughStations 합산 (근사 표시용)
-        List<String> passThroughStations = transitLegs.stream()
+        List<Location> passThroughStations = transitLegs.stream()
                 .filter(l -> l.transitInfo().passThroughStations() != null)
                 .flatMap(l -> l.transitInfo().passThroughStations().stream())
                 .toList();

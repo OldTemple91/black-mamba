@@ -6,6 +6,7 @@ ddareungi:
 
 tago:
   api-key: ${TAGO_API_KEY}
+  city-code: 11   # 서울특별시 지역코드
 
 tmap:
   app-key: ${TMAP_APP_KEY}

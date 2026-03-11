@@ -58,6 +58,7 @@ class OdsayRouteClientTest {
         assertThat(legs.get(0).start().name()).isEqualTo("서울역");
         assertThat(legs.get(0).end().name()).isEqualTo("반포역");
         assertThat(legs.get(0).transitInfo().passThroughStations())
+                .extracting(com.blackmamba.navigation.domain.location.Location::name)
                 .containsExactly("서울역", "반포역");
     }
 
@@ -80,6 +81,7 @@ class OdsayRouteClientTest {
 
         assertThat(legs.get(0).transitInfo().stationCount()).isEqualTo(4);
         assertThat(legs.get(0).transitInfo().passThroughStations())
+                .extracting(com.blackmamba.navigation.domain.location.Location::name)
                 .containsExactly("강남역", "역삼역", "선릉역", "삼성역");
     }
 

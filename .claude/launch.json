@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "black-mamba-frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "/Users/sjw/Desktop/black-mamba/frontend"],
+      "port": 5173
+    }
+  ]
+}

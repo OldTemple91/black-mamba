@@ -4,6 +4,13 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * TAGO API - GetPMListByProvider 응답 DTO
+ * 엔드포인트: /GetPMListByProvider?cityCode={code}&_type=json
+ *
+ * 실제 응답 필드명 (JSON lowercase):
+ *   vehicleid, providername, battery, latitude, longitude
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record KickboardResponse(Response response) {
 
@@ -18,11 +25,11 @@ public record KickboardResponse(Response response) {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Item(
-            String deviceId,
-            String operatorName,
-            String latitude,
-            String longitude,
-            String batteryLevel
+            String vehicleid,      // 장치 ID
+            String providername,   // 운영사명 (예: SWING)
+            double latitude,       // 위도 (WGS84)
+            double longitude,      // 경도 (WGS84)
+            int battery            // 배터리 잔량 (%)
     ) {}
 
     public List<KickboardDevice> toDevices() {
@@ -33,23 +40,10 @@ public record KickboardResponse(Response response) {
         }
         return response.body().items().item().stream()
                 .filter(Objects::nonNull)
-                .map(this::toDevice)
-                .filter(Objects::nonNull)  // 파싱 실패 제외
+                .map(i -> new KickboardDevice(
+                        i.vehicleid(), i.providername(),
+                        i.latitude(), i.longitude(), i.battery()))
+                .filter(Objects::nonNull)
                 .toList();
-    }
-
-    private KickboardDevice toDevice(Item item) {
-        try {
-            double lat = Double.parseDouble(item.latitude());
-            double lng = Double.parseDouble(item.longitude());
-            int battery = parseInt(item.batteryLevel());
-            return new KickboardDevice(item.deviceId(), item.operatorName(), lat, lng, battery);
-        } catch (NumberFormatException e) {
-            return null;  // 좌표 파싱 실패 → 제외
-        }
-    }
-
-    private int parseInt(String value) {
-        try { return Integer.parseInt(value); } catch (NumberFormatException e) { return 0; }
     }
 }

@@ -129,7 +129,7 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
         int approxStations = totalBaseMinutes > 0
                 ? Math.max(2, (int) Math.round((double) minutes / totalBaseMinutes * totalStations))
                 : Math.max(2, totalStations / 2);
-        List<String> passThroughStations = transitLegs.stream()
+        List<Location> passThroughStations = transitLegs.stream()
                 .filter(l -> l.transitInfo().passThroughStations() != null)
                 .flatMap(l -> l.transitInfo().passThroughStations().stream())
                 .toList();

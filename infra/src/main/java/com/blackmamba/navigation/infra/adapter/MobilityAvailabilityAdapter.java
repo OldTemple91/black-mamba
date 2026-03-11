@@ -7,6 +7,8 @@ import com.blackmamba.navigation.infra.ddareungi.DdareungiApiClient;
 import com.blackmamba.navigation.infra.kickboard.KickboardApiClient;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
@@ -15,6 +17,7 @@ import java.util.Optional;
 @Component
 public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
 
+    private static final Logger log = LoggerFactory.getLogger(MobilityAvailabilityAdapter.class);
     private static final int SEARCH_RADIUS_METERS = 500;
 
     private final DdareungiApiClient ddareungiClient;
@@ -56,20 +59,33 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
 
     private Mono<Optional<MobilityInfo>> findNearbyDdareungi(double lat, double lng) {
         return ddareungiClient.getNearbyStations(lat, lng, SEARCH_RADIUS_METERS)
-                .map(stations -> stations.stream().findFirst()
-                        .map(s -> new MobilityInfo(
-                                MobilityType.DDAREUNGI,
-                                "서울시 따릉이",
-                                null,
-                                100,
-                                s.stationName(),
-                                s.lat(),
-                                s.lng(),
-                                s.availableCount(),
-                                distanceMeters(lat, lng, s.lat(), s.lng())
-                        ))
-                )
+                .map(stations -> {
+                    log.info("[따릉이] 검색 lat={}, lng={}, 반경={}m → 반경 내 대여가능 정류소 {}개",
+                            lat, lng, SEARCH_RADIUS_METERS, stations.size());
+                    Optional<MobilityInfo> result = stations.stream().findFirst()
+                            .map(s -> {
+                                int dist = distanceMeters(lat, lng, s.lat(), s.lng());
+                                log.info("[따릉이] 선택: {} | 대여가능 {}대 | 거리 {}m",
+                                        s.stationName(), s.availableCount(), dist);
+                                return new MobilityInfo(
+                                        MobilityType.DDAREUNGI,
+                                        "서울시 따릉이",
+                                        null,
+                                        100,
+                                        s.stationName(),
+                                        s.lat(),
+                                        s.lng(),
+                                        s.availableCount(),
+                                        dist
+                                );
+                            });
+                    if (result.isEmpty()) {
+                        log.info("[따릉이] 반경 내 대여 가능한 정류소 없음");
+                    }
+                    return result;
+                })
                 .onErrorResume(ex -> {
+                    log.error("[따릉이] API 오류: {}", ex.getMessage());
                     ddareungiFallbackErrorCounter.increment();
                     return Mono.just(Optional.<MobilityInfo>empty());
                 });
@@ -78,24 +94,33 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
     private Mono<Optional<MobilityInfo>> findNearbyKickboard(double lat, double lng) {
         return kickboardClient.getNearbyDevices(lat, lng, SEARCH_RADIUS_METERS)
                 .map(devices -> {
+                    log.info("[킥보드] 검색 lat={}, lng={}, 반경={}m → 반경 내 배터리≥20% 기기 {}개",
+                            lat, lng, SEARCH_RADIUS_METERS, devices.size());
                     if (devices.isEmpty()) {
                         kickboardFallbackEmptyCounter.increment();
+                        log.info("[킥보드] 반경 내 기기 없음 → 가상 킥보드(추정)로 폴백");
                         return Optional.of(syntheticKickboard(lat, lng));
                     }
                     return devices.stream().findFirst()
-                            .map(d -> new MobilityInfo(
-                                    MobilityType.KICKBOARD_SHARED,
-                                    d.operatorName(),
-                                    d.deviceId(),
-                                    d.batteryLevel(),
-                                    null,
-                                    d.lat(),
-                                    d.lng(),
-                                    1,
-                                    distanceMeters(lat, lng, d.lat(), d.lng())
-                            ));
+                            .map(d -> {
+                                int dist = distanceMeters(lat, lng, d.lat(), d.lng());
+                                log.info("[킥보드] 선택: {} | 기기 ID {} | 배터리 {}% | 거리 {}m",
+                                        d.operatorName(), d.deviceId(), d.batteryLevel(), dist);
+                                return new MobilityInfo(
+                                        MobilityType.KICKBOARD_SHARED,
+                                        d.operatorName(),
+                                        d.deviceId(),
+                                        d.batteryLevel(),
+                                        null,
+                                        d.lat(),
+                                        d.lng(),
+                                        1,
+                                        dist
+                                );
+                            });
                 })
                 .onErrorResume(ex -> {
+                    log.error("[킥보드] API 오류: {} → 가상 킥보드(추정)로 폴백", ex.getMessage());
                     kickboardFallbackErrorCounter.increment();
                     return Mono.just(Optional.of(syntheticKickboard(lat, lng)));
                 });
@@ -115,12 +140,13 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
         );
     }
 
+    // B-4: battery=0 노출 방지. TAGO API 미제공으로 실 데이터 없음을 명시.
     private MobilityInfo syntheticKickboard(double lat, double lng) {
         return new MobilityInfo(
                 MobilityType.KICKBOARD_SHARED,
                 "공유 킥보드(추정)",
                 null,
-                0,
+                50,   // 실 배터리 미확인 → 50% 기본값 표시
                 null,
                 lat,
                 lng,

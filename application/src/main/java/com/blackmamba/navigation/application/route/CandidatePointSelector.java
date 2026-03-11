@@ -62,8 +62,8 @@ public class CandidatePointSelector {
 
     /**
      * TRANSIT Leg에서 정류장 목록을 추출.
-     * transitInfo.stationCount()를 이용해 start→end 사이를 선형 보간하여 중간 정류장 좌표를 생성.
-     * transitInfo가 없으면 start/end 2점만 사용.
+     * ODsay passStopList에서 받은 실제 좌표(passThroughStations)를 우선 사용.
+     * 좌표 정보가 없는 경우에만 stationCount 기반 선형 보간으로 fallback.
      */
     private List<Location> extractTransitStops(List<Leg> legs) {
         List<Location> stops = new ArrayList<>();
@@ -71,22 +71,27 @@ public class CandidatePointSelector {
             if (leg.type() != LegType.TRANSIT) continue;
             if (leg.start() == null || leg.end() == null) continue;
 
-            int count = (leg.transitInfo() != null && leg.transitInfo().stationCount() > 1)
-                    ? leg.transitInfo().stationCount()
-                    : 2;
-
-            double latStep = (leg.end().lat() - leg.start().lat()) / (count - 1);
-            double lngStep = (leg.end().lng() - leg.start().lng()) / (count - 1);
-
-            List<String> names = (leg.transitInfo() != null && leg.transitInfo().passThroughStations() != null)
+            List<Location> realStops = (leg.transitInfo() != null
+                    && leg.transitInfo().passThroughStations() != null
+                    && !leg.transitInfo().passThroughStations().isEmpty())
                     ? leg.transitInfo().passThroughStations()
                     : List.of();
 
-            for (int i = 0; i < count; i++) {
-                double lat = leg.start().lat() + i * latStep;
-                double lng = leg.start().lng() + i * lngStep;
-                String name = i < names.size() ? names.get(i) : leg.start().name();
-                stops.add(new Location(name, lat, lng));
+            if (!realStops.isEmpty()) {
+                // ODsay 실제 정류장 좌표 사용
+                stops.addAll(realStops);
+            } else {
+                // fallback: stationCount 기반 선형 보간
+                int count = (leg.transitInfo() != null && leg.transitInfo().stationCount() > 1)
+                        ? leg.transitInfo().stationCount()
+                        : 2;
+                double latStep = (leg.end().lat() - leg.start().lat()) / (count - 1);
+                double lngStep = (leg.end().lng() - leg.start().lng()) / (count - 1);
+                for (int i = 0; i < count; i++) {
+                    double lat = leg.start().lat() + i * latStep;
+                    double lng = leg.start().lng() + i * lngStep;
+                    stops.add(new Location(leg.start().name(), lat, lng));
+                }
             }
         }
         return stops;
