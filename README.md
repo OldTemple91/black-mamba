@@ -2,6 +2,16 @@
 
 대중교통, 공공자전거, 개인 이동수단을 결합해 도착 성공 가능성이 높은 경로를 추천하는 도시형 멀티모달 라우팅 엔진입니다.
 
+## Screenshots
+
+### Main Search
+
+![Main Search UI](output/playwright/main-page.png)
+
+### Route Recommendation
+
+![Route Recommendation UI](output/playwright/routes-page.png)
+
 ## 1. Project Overview
 
 기존 길찾기 서비스는 주로 최단시간 또는 최단거리 중심으로 경로를 추천합니다.
@@ -83,6 +93,19 @@
 - `frontend`
   - 경로 비교, 지도 시각화, 추천 이유/리스크 노출
 
+```mermaid
+flowchart LR
+    UI["Frontend (React / Vite)"] --> API["Route API"]
+    API --> APP["Application Layer"]
+    APP --> STRATEGY["RouteSearchStrategy"]
+    APP --> SCORE["RouteScoreCalculator"]
+    APP --> INSIGHT["RouteInsightFactory"]
+    STRATEGY --> DOMAIN["Route / Leg / MobilityInfo"]
+    STRATEGY --> ODSAY["ODsay Adapter"]
+    STRATEGY --> TMAP["TMAP Adapter"]
+    STRATEGY --> BIKE["Ddareungi Adapter"]
+```
+
 ## 6. Routing Flow
 
 ### Baseline
@@ -105,6 +128,18 @@
 - `MOBILITY_FIRST_TRANSIT`
 - `MOBILITY_TRANSIT_MOBILITY`
 - `MOBILITY_ONLY`
+
+```mermaid
+flowchart TD
+    A["Origin / Destination"] --> B["Baseline Transit Route"]
+    B --> C["Candidate Point Selection"]
+    C --> D["Mobility Availability Check"]
+    D --> E["Pickup / Dropoff Validation"]
+    E --> F["Route Composition"]
+    F --> G["Reliability-Aware Ranking"]
+    G --> H["Recommendation Reasons / Risk Badges"]
+    H --> I["Explainable UI"]
+```
 
 ## 7. Reliability-Aware Recommendation
 
@@ -230,6 +265,7 @@ npm run dev
 
 - `BikeStation` 수준을 넘어 `Hub` 도메인으로 일반화
 - `SUBWAY_STATION`, `BUS_STOP`, `BIKE_STATION`, `CARSHARE_ZONE`, `CHARGING_STATION` 등으로 확장
+- 상세 설계 문서: [`docs/plans/2026-03-11-hub-reliability-design.md`](docs/plans/2026-03-11-hub-reliability-design.md)
 
 ### 2) Reliability Score Enhancement
 
