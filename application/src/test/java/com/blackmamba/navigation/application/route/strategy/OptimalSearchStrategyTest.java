@@ -48,11 +48,15 @@ class OptimalSearchStrategyTest {
         baseLeg = new Leg(LegType.TRANSIT, "BUS", 40, 10000, origin, destination, null, null, null);
         when(transitRoutePort.getTransitRoute(any(), any()))
                 .thenReturn(Mono.just(List.of(baseLeg)));
+        lenient().when(transitRoutePort.getTransitTimeMinutes(any(), any()))
+                .thenReturn(Mono.just(20));
+        lenient().when(mobilityTimePort.getWalkingRoute(any(), any()))
+                .thenReturn(Mono.just(MobilityRouteResult.timeOnly(3)));
         lenient().when(routeEvaluator.evaluate(any(Route.class), any(Route.class), anyInt(), anyBoolean()))
                 .thenAnswer(invocation -> {
                     Route route = invocation.getArgument(0);
                     boolean recommended = invocation.getArgument(3);
-                    double score = recommended ? 0.9 : 0.5;
+                    double score = route.type() == RouteType.TRANSIT_ONLY ? 0.8 : 0.5;
                     return route.withScore(score, recommended);
                 });
     }
@@ -111,6 +115,28 @@ class OptimalSearchStrategyTest {
 
         assertThat(routes.stream().anyMatch(Route::recommended)).isTrue();
         assertThat(routes.stream().filter(Route::recommended)).hasSize(1);
+    }
+
+    @Test
+    void 대중교통_점수가_더_높으면_대중교통이_추천된다() {
+        when(hubSelector.selectLastMileHubs(any(), any())).thenReturn(List.of(hub(candidate)));
+        when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of());
+        when(mobilityTimePort.getMobilityRoute(any(), any(), any()))
+                .thenReturn(Mono.just(MobilityRouteResult.timeOnly(8)));
+        when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(Optional.of(
+                        new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
+                                null, 100, "정류소", 37.52, 127.0, 5, 100))));
+        when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(Optional.of(
+                        new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
+                                null, 100, "반납", 37.50, 127.02, 5, 100))));
+
+        List<Route> routes = strategy.search(origin, destination).block();
+
+        assertThat(routes).isNotEmpty();
+        assertThat(routes.getFirst().type()).isEqualTo(RouteType.TRANSIT_ONLY);
+        assertThat(routes.getFirst().recommended()).isTrue();
     }
 
     @Test

@@ -56,6 +56,8 @@ export default function LegItem({ leg, prevLeg, nextLeg, isLast }) {
   const tags = []
   if (leg.transitInfo?.stationCount > 0)
     tags.push(`${leg.transitInfo.stationCount}정거장`)
+  if ((leg.transitInfo?.fareWon ?? 0) > 0)
+    tags.push(`요금 ${leg.transitInfo.fareWon.toLocaleString()}원`)
   if (leg.mode === 'SUBWAY' && leg.transitInfo?.lineName)
     tags.push(`노선 ${leg.transitInfo.lineName}`)
   if (leg.mode === 'BUS' && leg.transitInfo?.lineName)
@@ -72,6 +74,16 @@ export default function LegItem({ leg, prevLeg, nextLeg, isLast }) {
     tags.push(`정류소 ${leg.mobilityInfo.stationId}`)
   if (leg.mobilityInfo?.rackTotalCount > 0)
     tags.push(`거치대 ${leg.mobilityInfo.rackTotalCount}개`)
+  if (leg.type === 'BIKE' && leg.mode === 'DDAREUNGI') {
+    const fare = leg.durationMinutes <= 60
+      ? 1000
+      : leg.durationMinutes <= 120
+        ? 2000
+        : leg.durationMinutes <= 180
+          ? 3000
+          : 3000 + Math.ceil((leg.durationMinutes - 180) / 5) * 200
+    tags.push(`예상 ${fare.toLocaleString()}원`)
+  }
   if (dist) tags.push(dist)
 
   const startVerb = leg.type === 'WALK' ? '출발' : '승차'

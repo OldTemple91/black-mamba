@@ -13,12 +13,16 @@ class RouteTest {
         Location banpo = new Location("반포역", 37.5040, 127.0050);
         Location dest = new Location("목적지", 37.4979, 127.0276);
 
-        Leg transitLeg = new Leg(LegType.TRANSIT, "BUS", 18, 4200, seoul, banpo, null, null, null);
+        TransitInfo transitInfo = new TransitInfo("간선 140", "#0052A4", 6, 1_500, List.of(seoul, banpo));
+        Leg transitLeg = new Leg(LegType.TRANSIT, "BUS", 18, 4200, seoul, banpo, transitInfo, null, null);
         Leg kickboardLeg = new Leg(LegType.KICKBOARD, "KICKBOARD_SHARED", 9, 1800, banpo, dest, null, null, null);
 
         Route route = Route.of(List.of(transitLeg, kickboardLeg), RouteType.TRANSIT_WITH_KICKBOARD);
 
         assertThat(route.totalMinutes()).isEqualTo(27);
+        assertThat(route.totalCostWon()).isEqualTo(1_500);
+        assertThat(route.costBreakdown().items())
+                .containsExactly(new CostComponent("대중교통", 1_500));
     }
 
     @Test
@@ -49,5 +53,22 @@ class RouteTest {
         assertThat(route.legs().getFirst().distanceMeters()).isEqualTo(500);
         assertThat(route.legs().getFirst().start()).isEqualTo(a);
         assertThat(route.legs().getFirst().end()).isEqualTo(c);
+    }
+
+    @Test
+    void 따릉이_구간은_이용시간_기준으로_요금을_계산한다() {
+        Location station = new Location("정류소", 37.5, 127.0);
+        Location dropoff = new Location("반납", 37.51, 127.01);
+        MobilityInfo bike = new MobilityInfo(MobilityType.DDAREUNGI, "따릉이", null, 100,
+                "정류소", 37.5, 127.0, 4, 50)
+                .withDropoffStation("D1", "반납", 37.51, 127.01);
+
+        Leg bikeLeg = new Leg(LegType.BIKE, "DDAREUNGI", 70, 3200, station, dropoff, null, bike, null);
+
+        Route route = Route.of(List.of(bikeLeg), RouteType.MOBILITY_ONLY);
+
+        assertThat(route.totalCostWon()).isEqualTo(2_000);
+        assertThat(route.costBreakdown().items())
+                .containsExactly(new CostComponent("따릉이", 2_000));
     }
 }

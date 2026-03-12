@@ -86,6 +86,31 @@ class RouteScoreCalculatorTest {
         assertThat(calculator.calculate(withDropoff)).isGreaterThan(calculator.calculate(withoutDropoff));
     }
 
+    @Test
+    void 평가_데이터에_허브와_세부점수가_포함된다() {
+        Location subway = new Location("서울역", 37.55, 126.97);
+        Location bikeStation = new Location("171. 임광빌딩 앞", 37.56, 126.98);
+        Location dest = new Location("목적지", 37.57, 126.99);
+        MobilityInfo bike = new MobilityInfo(MobilityType.DDAREUNGI, "따릉이", null, 100,
+                "171. 임광빌딩 앞", 37.56, 126.98, 4, 50)
+                .withDropoffStation("D1", "반납", 37.57, 126.99);
+
+        Route route = Route.of(List.of(
+                new Leg(LegType.TRANSIT, "SUBWAY", 12, 3200, subway, subway,
+                        new TransitInfo("5호선", "#996CAC", 4, 1400, List.of(subway)), null, null),
+                new Leg(LegType.WALK, "WALK", 2, 120, subway, bikeStation, null, null, null),
+                new Leg(LegType.BIKE, "DDAREUNGI", 9, 1800, bikeStation, dest, null, bike, null)
+        ), RouteType.TRANSIT_WITH_BIKE);
+
+        RouteEvaluation evaluation = calculator.evaluate(route);
+
+        assertThat(evaluation.totalScore()).isBetween(0.0, 1.0);
+        assertThat(evaluation.hubs())
+                .extracting(RouteHub::type)
+                .contains(com.blackmamba.navigation.domain.hub.HubType.SUBWAY_STATION,
+                        com.blackmamba.navigation.domain.hub.HubType.BIKE_STATION);
+    }
+
     // -----------------------------------------------------------------
     // helpers
     // -----------------------------------------------------------------
@@ -98,6 +123,8 @@ class RouteScoreCalculatorTest {
             legs.add(new Leg(LegType.TRANSIT, "BUS", minutes / (transferCount + 1),
                     1000, a, b, null, null, null));
         }
-        return new Route("id", RouteType.TRANSIT_ONLY, minutes, cost, 0, false, legs, null, null);
+        return new Route("id", RouteType.TRANSIT_ONLY, minutes, cost,
+                new RouteCostBreakdown(List.of(new CostComponent("대중교통", cost)), cost),
+                List.of(), null, 0, false, legs, null, null);
     }
 }

@@ -19,12 +19,16 @@ public class RouteEvaluator {
     public Route evaluate(Route route, Route baselineRoute, int baselineMinutes, boolean recommended) {
         int savedMinutes = Math.max(baselineMinutes - route.totalMinutes(), 0);
         Route compared = route.withComparison(new Comparison(baselineMinutes, savedMinutes));
-        Route scored = compared.withScore(routeScoreCalculator.calculate(compared), recommended);
+        var evaluation = routeScoreCalculator.evaluate(compared);
+        Route scored = compared.withEvaluation(evaluation)
+                .withScore(evaluation.totalScore(), recommended);
         return routeInsightFactory.enrich(scored, baselineRoute);
     }
 
     public Route evaluate(Route route, boolean recommended) {
-        Route scored = route.withScore(routeScoreCalculator.calculate(route), recommended);
+        var evaluation = routeScoreCalculator.evaluate(route);
+        Route scored = route.withEvaluation(evaluation)
+                .withScore(evaluation.totalScore(), recommended);
         return routeInsightFactory.enrich(scored, route);
     }
 }
