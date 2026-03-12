@@ -246,6 +246,9 @@ export function getDebugFacts(route, baselineRoute, searchMode, recommendationPr
     kickboardLegs.length > 0
       ? `킥보드 배터리: ${kickboardLegs.map(leg => `${leg.mobilityInfo?.batteryLevel ?? 0}%`).join(', ')}`
       : '킥보드 구간 없음',
+    ...(Array.isArray(route.insights?.generationDiagnostics) && route.insights.generationDiagnostics.length > 0
+      ? route.insights.generationDiagnostics.map(reason => `혼합 경로 미생성: ${reason}`)
+      : []),
     baselineRoute ? `기준 경로 시간: ${baselineRoute.totalMinutes}분` : '기준 경로 없음',
   ].filter(Boolean)
 }

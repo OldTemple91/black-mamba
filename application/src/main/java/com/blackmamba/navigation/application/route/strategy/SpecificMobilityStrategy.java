@@ -11,6 +11,7 @@ import reactor.core.publisher.Mono;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -69,7 +70,13 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                     }
                     return generateCombinedRoutes(baseLegs, origin, destination)
                             .collectList()
-                            .map(combined -> rank(baseRoute, combined, baseTime));
+                            .flatMap(combined -> {
+                                if (combined.isEmpty()) {
+                                    return buildNoMixedDiagnostics(baseLegs, origin, destination)
+                                            .map(diagnostics -> rank(withDiagnostics(baseRoute, diagnostics), combined, baseTime));
+                                }
+                                return Mono.just(rank(baseRoute, combined, baseTime));
+                            });
                 });
     }
 
@@ -175,7 +182,8 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                                         dropoffInfo.stationName(),
                                         dropoffInfo.lat(),
                                         dropoffInfo.lng()
-                                ))));
+                                ))
+                                .filter(info -> !info.hasSamePickupAndDropoffStation())));
     }
 
     /** KICKBOARD_SHARED 및 PERSONAL 모두 킥보드 타입으로 처리 */
@@ -200,6 +208,47 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
         Route top = result.getFirst();
         result.set(0, routeEvaluator.evaluate(top, base, baseMinutes, true, recommendationPreference));
         return result;
+    }
+
+    private Route withDiagnostics(Route route, List<String> diagnostics) {
+        return route.withInsights(new RouteInsights(List.of(), List.of(), diagnostics));
+    }
+
+    private Mono<List<String>> buildNoMixedDiagnostics(List<Leg> baseLegs, Location origin, Location destination) {
+        return Flux.fromIterable(mobilityTypes)
+                .flatMap(type -> diagnosticsForType(baseLegs, origin, destination, type))
+                .distinct()
+                .collectList()
+                .map(list -> list.isEmpty() ? List.of("혼합 경로 후보를 만들지 못했습니다.") : list);
+    }
+
+    private Flux<String> diagnosticsForType(List<Leg> baseLegs, Location origin, Location destination, MobilityType type) {
+        MobilityConfig config = isKickboardType(type) ? MobilityConfig.kickboard() : MobilityConfig.bike();
+        List<Hub> candidateHubs = hubSelector.selectLastMileHubs(baseLegs, destination, config).stream()
+                .limit(3)
+                .toList();
+
+        if (candidateHubs.isEmpty()) {
+            return Flux.just(labelFor(type) + " 라스트마일 후보 허브가 없습니다.");
+        }
+
+        return Flux.fromIterable(candidateHubs)
+                .flatMap(hub -> mobilityInfoForSegment(hub.location(), destination, type))
+                .any(Optional::isPresent)
+                .flatMapMany(available -> {
+                    if (available) {
+                        return Flux.empty();
+                    }
+                    return Flux.just(labelFor(type) + " 라스트마일 구간에서 대여/반납 가능한 수단을 찾지 못했습니다.");
+                });
+    }
+
+    private String labelFor(MobilityType type) {
+        return switch (type) {
+            case DDAREUNGI -> "따릉이";
+            case KICKBOARD_SHARED -> "공유 킥보드";
+            case PERSONAL -> "개인 킥보드";
+        };
     }
 
     /** 대중교통 소요 시간 추정 (직선거리 × 1.4 우회계수 ÷ 25 km/h) */

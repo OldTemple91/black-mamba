@@ -18,9 +18,13 @@ public class RouteInsightFactory {
     private static final int TOTAL_WALK_WARNING_METERS = 800;
 
     public Route enrich(Route route, Route baselineRoute) {
+        List<String> generationDiagnostics = route.insights() != null
+                ? route.insights().generationDiagnostics()
+                : List.of();
         return route.withInsights(new RouteInsights(
                 recommendationReasons(route, baselineRoute),
-                riskBadges(route)
+                riskBadges(route),
+                generationDiagnostics
         ));
     }
 

@@ -140,6 +140,26 @@ class OptimalSearchStrategyTest {
     }
 
     @Test
+    void 같은_따릉이_정류소_대여반납_조합은_혼합경로에서_제외된다() {
+        when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of(hub(candidate)));
+        when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of(hub(candidate)));
+        when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(Optional.of(
+                        new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
+                                null, 100, "142. 아현역 4번출구 앞", 37.52, 127.0, 5, 20)
+                                .withDropoffStation("S-142", "142. 아현역 4번출구 앞", 37.52, 127.0))));
+        when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(Optional.of(
+                        new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
+                                null, 100, "142. 아현역 4번출구 앞", 37.52, 127.0, 5, 20))));
+
+        List<Route> routes = strategy.search(origin, destination).block();
+
+        assertThat(routes).hasSize(1);
+        assertThat(routes.getFirst().type()).isEqualTo(RouteType.TRANSIT_ONLY);
+    }
+
+    @Test
     void ODsay_기본경로가_비어도_추천경로가_0분이_아니다() {
         when(transitRoutePort.getTransitRoute(any(), any())).thenReturn(Mono.just(List.of()));
         when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of());
@@ -153,6 +173,23 @@ class OptimalSearchStrategyTest {
 
         assertThat(routes).isNotEmpty();
         assertThat(routes.get(0).totalMinutes()).isGreaterThan(0);
+    }
+
+    @Test
+    void 혼합경로를_만들지_못하면_미생성_사유를_남긴다() {
+        when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of(hub(candidate)));
+        when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of());
+        when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(Optional.empty()));
+        when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(Optional.empty()));
+
+        List<Route> routes = strategy.search(origin, destination).block();
+
+        assertThat(routes).hasSize(1);
+        assertThat(routes.getFirst().type()).isEqualTo(RouteType.TRANSIT_ONLY);
+        assertThat(routes.getFirst().insights()).isNotNull();
+        assertThat(routes.getFirst().insights().generationDiagnostics()).isNotEmpty();
     }
 
     private Hub hub(Location location) {
