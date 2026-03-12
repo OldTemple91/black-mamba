@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * TMAP 보행자 경로 API 클라이언트.
@@ -30,22 +32,32 @@ public class TmapPedestrianClient {
     private final WebClient webClient;
     private final String appKey;
     private final Counter fallbackCounter;
+    private final Counter quotaFallbackCounter;
+    private final Counter quotaShortCircuitCounter;
     private final Counter routeCacheHitCounter;
     private final Counter routeCacheMissCounter;
     private final ConcurrentHashMap<RouteKey, CacheEntry<Optional<TmapRouteData>>> routeCache = new ConcurrentHashMap<>();
     private final long routeCacheTtlMs;
+    private final long quotaBackoffMs;
+    private final AtomicLong quotaBlockedUntilMs = new AtomicLong(0L);
 
     public TmapPedestrianClient(
             WebClient.Builder webClientBuilder,
             @Value("${tmap.app-key}") String appKey,
             @Value("${navigation.cache.tmap-pedestrian-route-ttl-ms:300000}") long routeCacheTtlMs,
+            @Value("${navigation.cache.tmap-rate-limit-backoff-ms:3600000}") long quotaBackoffMs,
             MeterRegistry meterRegistry
     ) {
         this.webClient = webClientBuilder.baseUrl(BASE_URL).build();
         this.appKey = appKey;
         this.routeCacheTtlMs = routeCacheTtlMs;
+        this.quotaBackoffMs = quotaBackoffMs;
         this.fallbackCounter = meterRegistry.counter(
                 "navigation.tmap.fallback.total", "reason", "error");
+        this.quotaFallbackCounter = meterRegistry.counter(
+                "navigation.tmap.fallback.total", "reason", "quota_exceeded");
+        this.quotaShortCircuitCounter = meterRegistry.counter(
+                "navigation.tmap.fallback.total", "reason", "quota_short_circuit");
         this.routeCacheHitCounter = meterRegistry.counter(
                 "navigation.cache.total",
                 "cache", "tmap_pedestrian_route",
@@ -64,8 +76,14 @@ public class TmapPedestrianClient {
      * 실패 또는 경로 없으면 Optional.empty().
      */
     public Mono<Optional<TmapRouteData>> getRoute(Location origin, Location destination) {
-        RouteKey key = new RouteKey(origin, destination);
+        long blockedUntil = quotaBlockedUntilMs.get();
         long now = System.currentTimeMillis();
+        if (blockedUntil > now) {
+            quotaShortCircuitCounter.increment();
+            log.warn("[TMAP] quota backoff active -> API 호출 생략 ({}초 남음)", (blockedUntil - now) / 1000);
+            return Mono.just(Optional.empty());
+        }
+        RouteKey key = new RouteKey(origin, destination);
         return routeCache.compute(key, (ignored, existing) -> {
             if (existing != null && !existing.isExpired(now)) {
                 routeCacheHitCounter.increment();
@@ -106,10 +124,23 @@ public class TmapPedestrianClient {
                     return Optional.<TmapRouteData>empty();
                 })
                 .onErrorResume(ex -> {
+                    if (isTooManyRequests(ex)) {
+                        quotaFallbackCounter.increment();
+                        long blockedUntil = System.currentTimeMillis() + quotaBackoffMs;
+                        quotaBlockedUntilMs.set(blockedUntil);
+                        log.warn("[TMAP] 429 감지 -> {}ms 동안 외부 호출 차단 후 haversine fallback", quotaBackoffMs);
+                        return Mono.just(Optional.empty());
+                    }
                     fallbackCounter.increment();
                     log.warn("[TMAP] 보행자 경로 조회 실패 → haversine fallback. 원인: {}", ex.getMessage());
                     return Mono.just(Optional.empty());
                 });
+    }
+
+    private boolean isTooManyRequests(Throwable throwable) {
+        return throwable instanceof WebClientResponseException.TooManyRequests
+                || (throwable instanceof WebClientResponseException responseException
+                && responseException.getStatusCode().value() == 429);
     }
 
     public record TmapRouteData(int distanceMeters, List<Location> coordinates) {}

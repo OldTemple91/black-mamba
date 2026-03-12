@@ -35,3 +35,4 @@ navigation:
     kickboard-snapshot-ttl-ms: 30000
     mobility-availability-ttl-ms: 20000
     tmap-pedestrian-route-ttl-ms: 300000
+    tmap-rate-limit-backoff-ms: 3600000
