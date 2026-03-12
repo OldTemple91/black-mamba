@@ -15,6 +15,7 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * TMAP 보행자 경로 API 클라이언트.
@@ -26,20 +27,35 @@ public class TmapPedestrianClient {
 
     private static final String BASE_URL = "https://apis.openapi.sk.com";
     private static final Logger log = LoggerFactory.getLogger(TmapPedestrianClient.class);
-
     private final WebClient webClient;
     private final String appKey;
     private final Counter fallbackCounter;
+    private final Counter routeCacheHitCounter;
+    private final Counter routeCacheMissCounter;
+    private final ConcurrentHashMap<RouteKey, CacheEntry<Optional<TmapRouteData>>> routeCache = new ConcurrentHashMap<>();
+    private final long routeCacheTtlMs;
 
     public TmapPedestrianClient(
             WebClient.Builder webClientBuilder,
             @Value("${tmap.app-key}") String appKey,
+            @Value("${navigation.cache.tmap-pedestrian-route-ttl-ms:300000}") long routeCacheTtlMs,
             MeterRegistry meterRegistry
     ) {
         this.webClient = webClientBuilder.baseUrl(BASE_URL).build();
         this.appKey = appKey;
+        this.routeCacheTtlMs = routeCacheTtlMs;
         this.fallbackCounter = meterRegistry.counter(
                 "navigation.tmap.fallback.total", "reason", "error");
+        this.routeCacheHitCounter = meterRegistry.counter(
+                "navigation.cache.total",
+                "cache", "tmap_pedestrian_route",
+                "result", "hit"
+        );
+        this.routeCacheMissCounter = meterRegistry.counter(
+                "navigation.cache.total",
+                "cache", "tmap_pedestrian_route",
+                "result", "miss"
+        );
     }
 
     /**
@@ -48,6 +64,19 @@ public class TmapPedestrianClient {
      * 실패 또는 경로 없으면 Optional.empty().
      */
     public Mono<Optional<TmapRouteData>> getRoute(Location origin, Location destination) {
+        RouteKey key = new RouteKey(origin, destination);
+        long now = System.currentTimeMillis();
+        return routeCache.compute(key, (ignored, existing) -> {
+            if (existing != null && !existing.isExpired(now)) {
+                routeCacheHitCounter.increment();
+                return existing;
+            }
+            routeCacheMissCounter.increment();
+            return new CacheEntry<>(requestRoute(origin, destination).cache(), now + routeCacheTtlMs);
+        }).value();
+    }
+
+    private Mono<Optional<TmapRouteData>> requestRoute(Location origin, Location destination) {
         Map<String, Object> body = Map.of(
                 "startX", String.valueOf(origin.lng()),
                 "startY", String.valueOf(origin.lat()),
@@ -84,4 +113,16 @@ public class TmapPedestrianClient {
     }
 
     public record TmapRouteData(int distanceMeters, List<Location> coordinates) {}
+
+    private record RouteKey(double originLat, double originLng, double destinationLat, double destinationLng) {
+        private RouteKey(Location origin, Location destination) {
+            this(origin.lat(), origin.lng(), destination.lat(), destination.lng());
+        }
+    }
+
+    private record CacheEntry<T>(Mono<T> value, long expiresAtMs) {
+        private boolean isExpired(long nowMs) {
+            return nowMs >= expiresAtMs;
+        }
+    }
 }

@@ -16,6 +16,8 @@ import reactor.core.publisher.Mono;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Component
@@ -25,25 +27,30 @@ public class OdsayRouteClient {
     private static final Logger log = LoggerFactory.getLogger(OdsayRouteClient.class);
 
     private static final long RATE_INTERVAL_MS = 200L; // max 5 req/sec
-
     private final WebClient webClient;
     private final OdsayRouteMapper mapper;
     private final ObjectMapper objectMapper;
     private final String apiKey;
     private final Counter transitRouteErrorFallbackCounter;
     private final Counter transitTimeEstimateFallbackCounter;
+    private final Counter routeCacheHitCounter;
+    private final Counter routeCacheMissCounter;
     private final AtomicLong nextPermitMs = new AtomicLong(0);
+    private final ConcurrentHashMap<RouteKey, CacheEntry<List<Leg>>> routeCache = new ConcurrentHashMap<>();
+    private final long routeCacheTtlMs;
 
     public OdsayRouteClient(
             WebClient.Builder webClientBuilder,
             OdsayRouteMapper mapper,
             ObjectMapper objectMapper,
             @Value("${odsay.api-key}") String apiKey,
+            @Value("${navigation.cache.odsay-route-ttl-ms:30000}") long routeCacheTtlMs,
             MeterRegistry meterRegistry
     ) {
         this.mapper = mapper;
         this.objectMapper = objectMapper;
         this.apiKey = apiKey;
+        this.routeCacheTtlMs = routeCacheTtlMs;
         this.webClient = webClientBuilder.baseUrl(BASE_URL).build();
         this.transitRouteErrorFallbackCounter = meterRegistry.counter(
                 "navigation.odsay.fallback.total",
@@ -54,6 +61,16 @@ public class OdsayRouteClient {
                 "navigation.odsay.fallback.total",
                 "type", "transit_time",
                 "reason", "empty_or_zero"
+        );
+        this.routeCacheHitCounter = meterRegistry.counter(
+                "navigation.cache.total",
+                "cache", "odsay_route",
+                "result", "hit"
+        );
+        this.routeCacheMissCounter = meterRegistry.counter(
+                "navigation.cache.total",
+                "cache", "odsay_route",
+                "result", "miss"
         );
     }
 
@@ -74,6 +91,19 @@ public class OdsayRouteClient {
     }
 
     public Mono<List<Leg>> getTransitRoute(Location origin, Location destination) {
+        RouteKey key = new RouteKey(origin, destination);
+        long now = System.currentTimeMillis();
+        return routeCache.compute(key, (ignored, existing) -> {
+            if (existing != null && !existing.isExpired(now)) {
+                routeCacheHitCounter.increment();
+                return existing;
+            }
+            routeCacheMissCounter.increment();
+            return new CacheEntry<>(requestTransitRoute(origin, destination).cache(), now + routeCacheTtlMs);
+        }).value();
+    }
+
+    private Mono<List<Leg>> requestTransitRoute(Location origin, Location destination) {
         return rateLimit().then(webClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/searchPubTransPathT")
@@ -91,7 +121,6 @@ public class OdsayRouteClient {
                                     return Mono.error(new RuntimeException("ODsay API 오류: " + response.statusCode() + " " + body));
                                 })
                 )
-                // ① raw JSON 문자열로 먼저 받아서 로그 찍기 (진단용)
                 .bodyToMono(String.class)
                 .flatMap(rawJson -> {
                     log.info("[ODsay] raw 응답 (첫 500자): {}", rawJson.length() > 500 ? rawJson.substring(0, 500) : rawJson);
@@ -199,5 +228,32 @@ public class OdsayRouteClient {
                 * Math.sin(dLng / 2) * Math.sin(dLng / 2);
         double distKm = 6371.0 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
         return Math.max((int) Math.ceil(distKm * 1.4 / 25.0 * 60), 5);
+    }
+
+    private record RouteKey(double originLat, double originLng, double destinationLat, double destinationLng) {
+        private RouteKey(Location origin, Location destination) {
+            this(origin.lat(), origin.lng(), destination.lat(), destination.lng());
+        }
+
+        @Override
+        public boolean equals(Object object) {
+            if (this == object) return true;
+            if (!(object instanceof RouteKey routeKey)) return false;
+            return Double.compare(originLat, routeKey.originLat) == 0
+                    && Double.compare(originLng, routeKey.originLng) == 0
+                    && Double.compare(destinationLat, routeKey.destinationLat) == 0
+                    && Double.compare(destinationLng, routeKey.destinationLng) == 0;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(originLat, originLng, destinationLat, destinationLng);
+        }
+    }
+
+    private record CacheEntry<T>(Mono<T> value, long expiresAtMs) {
+        private boolean isExpired(long nowMs) {
+            return nowMs >= expiresAtMs;
+        }
     }
 }

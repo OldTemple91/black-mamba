@@ -22,8 +22,12 @@ public class HubSelector {
         this.candidatePointSelector = candidatePointSelector;
     }
 
-    public List<Hub> selectLastMileHubs(List<Leg> legs, MobilityConfig config) {
-        return candidatePointSelector.select(legs, config).stream()
+    public List<Hub> selectLastMileHubs(List<Leg> legs, Location destination, MobilityConfig config) {
+        return candidatePointSelector.filterByMobilityRange(
+                        candidatePointSelector.select(legs, config),
+                        destination,
+                        config.mobilityType()
+                ).stream()
                 .map(location -> toTransitHub(location, legs, config, "LAST_MILE"))
                 .toList();
     }

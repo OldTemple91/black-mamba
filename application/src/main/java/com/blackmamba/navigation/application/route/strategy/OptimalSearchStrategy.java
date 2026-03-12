@@ -73,7 +73,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
 
                     // 후보 지점 진단
                     MobilityConfig diagConfig = MobilityConfig.kickboard();
-                    List<Hub> diagHubs = hubSelector.selectLastMileHubs(baseLegs, diagConfig);
+                    List<Hub> diagHubs = hubSelector.selectLastMileHubs(baseLegs, destination, diagConfig);
                     log.info("[OPTIMAL] lastMile 허브={}개 (kickboard 기준)", diagHubs.size());
 
                     Route baseRoute = Route.of(baseRouteLegs, RouteType.TRANSIT_ONLY);
@@ -133,7 +133,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     // 패턴 C: 대중교통으로 환승점까지 → 이동수단으로 목적지
     private Flux<Route> patternC(Location origin, Location destination,
                                   List<Leg> baseLegs, MobilityType type, MobilityConfig config) {
-        List<Hub> lastMile = hubSelector.selectLastMileHubs(baseLegs, config).stream()
+        List<Hub> lastMile = hubSelector.selectLastMileHubs(baseLegs, destination, config).stream()
                 .limit(3)
                 .toList();
         return Flux.fromIterable(lastMile)
@@ -167,7 +167,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     private Flux<Route> patternD(Location origin, Location destination,
                                   List<Leg> baseLegs, MobilityType type, MobilityConfig config) {
         List<Hub> firstMile = hubSelector.selectFirstMileHubs(origin, baseLegs, config);
-        List<Hub> lastMile  = hubSelector.selectLastMileHubs(baseLegs, config);
+        List<Hub> lastMile  = hubSelector.selectLastMileHubs(baseLegs, destination, config);
         if (firstMile.isEmpty() || lastMile.isEmpty()) return Flux.empty();
 
         Hub startHub = firstMile.get(0);

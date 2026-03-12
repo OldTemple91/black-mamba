@@ -13,24 +13,30 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
 
     private static final Logger log = LoggerFactory.getLogger(MobilityAvailabilityAdapter.class);
     private static final int SEARCH_RADIUS_METERS = 500;
-
     private final DdareungiApiClient ddareungiClient;
     private final KickboardApiClient kickboardClient;
     private final Counter ddareungiFallbackErrorCounter;
     private final Counter kickboardFallbackErrorCounter;
     private final Counter kickboardFallbackEmptyCounter;
+    private final Counter availabilityCacheHitCounter;
+    private final Counter availabilityCacheMissCounter;
+    private final ConcurrentHashMap<AvailabilityKey, CacheEntry<Optional<MobilityInfo>>> availabilityCache = new ConcurrentHashMap<>();
+    private final long availabilityCacheTtlMs;
 
     public MobilityAvailabilityAdapter(DdareungiApiClient ddareungiClient,
                                        KickboardApiClient kickboardClient,
+                                       @org.springframework.beans.factory.annotation.Value("${navigation.cache.mobility-availability-ttl-ms:20000}") long availabilityCacheTtlMs,
                                        MeterRegistry meterRegistry) {
         this.ddareungiClient = ddareungiClient;
         this.kickboardClient = kickboardClient;
+        this.availabilityCacheTtlMs = availabilityCacheTtlMs;
         this.ddareungiFallbackErrorCounter = meterRegistry.counter(
                 "navigation.mobility.fallback.total",
                 "mobility", "ddareungi",
@@ -46,20 +52,30 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                 "mobility", "kickboard_shared",
                 "reason", "empty"
         );
+        this.availabilityCacheHitCounter = meterRegistry.counter(
+                "navigation.cache.total",
+                "cache", "mobility_availability",
+                "result", "hit"
+        );
+        this.availabilityCacheMissCounter = meterRegistry.counter(
+                "navigation.cache.total",
+                "cache", "mobility_availability",
+                "result", "miss"
+        );
     }
 
     @Override
     public Mono<Optional<MobilityInfo>> findNearbyMobility(double lat, double lng, MobilityType type) {
-        return switch (type) {
-            case DDAREUNGI      -> findNearbyDdareungi(lat, lng);
+        return cachedLookup(lat, lng, type, false, () -> switch (type) {
+            case DDAREUNGI -> findNearbyDdareungi(lat, lng);
             case KICKBOARD_SHARED -> findNearbyKickboard(lat, lng);
-            case PERSONAL       -> Mono.just(Optional.of(personalMobility(lat, lng)));
-        };
+            case PERSONAL -> Mono.just(Optional.of(personalMobility(lat, lng)));
+        });
     }
 
     @Override
     public Mono<Optional<MobilityInfo>> findNearbyDropoff(double lat, double lng, MobilityType type) {
-        return switch (type) {
+        return cachedLookup(lat, lng, type, true, () -> switch (type) {
             case DDAREUNGI -> ddareungiClient.getNearbyStations(lat, lng, SEARCH_RADIUS_METERS, false)
                     .map(stations -> stations.stream().findFirst()
                             .map(s -> new MobilityInfo(
@@ -85,7 +101,21 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                         return Mono.just(Optional.<MobilityInfo>empty());
                     });
             case KICKBOARD_SHARED, PERSONAL -> findNearbyMobility(lat, lng, type);
-        };
+        });
+    }
+
+    private Mono<Optional<MobilityInfo>> cachedLookup(double lat, double lng, MobilityType type, boolean dropoff,
+                                                      java.util.function.Supplier<Mono<Optional<MobilityInfo>>> loaderSupplier) {
+        long now = System.currentTimeMillis();
+        AvailabilityKey key = AvailabilityKey.of(lat, lng, type, dropoff);
+        return availabilityCache.compute(key, (ignored, existing) -> {
+            if (existing != null && !existing.isExpired(now)) {
+                availabilityCacheHitCounter.increment();
+                return existing;
+            }
+            availabilityCacheMissCounter.increment();
+            return new CacheEntry<>(loaderSupplier.get().cache(), now + availabilityCacheTtlMs);
+        }).value();
     }
 
     private Mono<Optional<MobilityInfo>> findNearbyDdareungi(double lat, double lng) {
@@ -217,5 +247,21 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
                 * Math.sin(dLng / 2) * Math.sin(dLng / 2);
         return (int) (6_371_000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+    }
+
+    private record AvailabilityKey(double latBucket, double lngBucket, MobilityType type, boolean dropoff) {
+        private static AvailabilityKey of(double lat, double lng, MobilityType type, boolean dropoff) {
+            return new AvailabilityKey(round(lat), round(lng), type, dropoff);
+        }
+
+        private static double round(double value) {
+            return Math.round(value * 10_000d) / 10_000d;
+        }
+    }
+
+    private record CacheEntry<T>(Mono<T> value, long expiresAtMs) {
+        private boolean isExpired(long nowMs) {
+            return nowMs >= expiresAtMs;
+        }
     }
 }
