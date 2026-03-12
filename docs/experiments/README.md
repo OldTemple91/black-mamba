@@ -13,6 +13,7 @@
 ## 입력 샘플
 
 - [od-samples.seoul.json](/Users/sjw/Desktop/black-mamba/docs/experiments/od-samples.seoul.json)
+- [od-samples.mixed-opportunity.json](/Users/sjw/Desktop/black-mamba/docs/experiments/od-samples.mixed-opportunity.json)
 
 ## 실행 방법
 
@@ -28,7 +29,18 @@
 /Users/sjw/Desktop/black-mamba/scripts/evaluate_routes.py \
   --base-url http://localhost:8081 \
   --search-mode OPTIMAL \
+  --recommendation-preference RELIABILITY \
   --input /Users/sjw/Desktop/black-mamba/docs/experiments/od-samples.seoul.json
+```
+
+mixed 경로가 유리할 가능성이 있는 목적지 세트:
+
+```bash
+/Users/sjw/Desktop/black-mamba/scripts/evaluate_routes.py \
+  --base-url http://localhost:8081 \
+  --search-mode OPTIMAL \
+  --recommendation-preference TIME_PRIORITY \
+  --input /Users/sjw/Desktop/black-mamba/docs/experiments/od-samples.mixed-opportunity.json
 ```
 
 ## 출력
@@ -64,3 +76,7 @@
 - 이 경우 추천 경로와 baseline 차이는 0이 되므로,
   `best mixed alternative` 지표를 같이 봐야 엔진이 왜 혼합 경로를 배제했는지 해석할 수 있다.
 - 따릉이 비용은 실제 결제 연동이 아니라 정책 기반 추정값이다.
+- `od-samples.mixed-opportunity.json` 실험에서도 mixed가 항상 추천되진 않는다.
+- 예를 들어 `hapjeong_res_to_worldcup_park`는 mixed가 시간 기준 `2분` 더 빠르지만,
+  접근 도보(`369m`), 공유수단 의존, 비용 증가 때문에 총점은 baseline보다 낮았다.
+- `--recommendation-preference` 옵션으로 `RELIABILITY`와 `TIME_PRIORITY`를 나눠 비교할 수 있다.

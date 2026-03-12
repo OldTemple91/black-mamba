@@ -44,7 +44,7 @@ class OptimalSearchStrategyTest {
     void setUp() {
         strategy = new OptimalSearchStrategy(
                 transitRoutePort, mobilityTimePort,
-                mobilityAvailabilityPort, hubSelector, routeEvaluator);
+                mobilityAvailabilityPort, hubSelector, routeEvaluator, RecommendationPreference.RELIABILITY);
         baseLeg = new Leg(LegType.TRANSIT, "BUS", 40, 10000, origin, destination, null, null, null);
         when(transitRoutePort.getTransitRoute(any(), any()))
                 .thenReturn(Mono.just(List.of(baseLeg)));
@@ -52,7 +52,7 @@ class OptimalSearchStrategyTest {
                 .thenReturn(Mono.just(20));
         lenient().when(mobilityTimePort.getWalkingRoute(any(), any()))
                 .thenReturn(Mono.just(MobilityRouteResult.timeOnly(3)));
-        lenient().when(routeEvaluator.evaluate(any(Route.class), any(Route.class), anyInt(), anyBoolean()))
+        lenient().when(routeEvaluator.evaluate(any(Route.class), any(Route.class), anyInt(), anyBoolean(), eq(RecommendationPreference.RELIABILITY)))
                 .thenAnswer(invocation -> {
                     Route route = invocation.getArgument(0);
                     boolean recommended = invocation.getArgument(3);

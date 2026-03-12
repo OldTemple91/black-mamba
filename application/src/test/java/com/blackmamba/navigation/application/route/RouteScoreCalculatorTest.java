@@ -111,6 +111,36 @@ class RouteScoreCalculatorTest {
                         com.blackmamba.navigation.domain.hub.HubType.BIKE_STATION);
     }
 
+    @Test
+    void 시간_우선_모드는_빠른_혼합경로에_더_유리한_점수를_준다() {
+        Location a = new Location("A", 37.5, 127.0);
+        Location hub = new Location("Hub", 37.51, 127.01);
+        Location b = new Location("B", 37.4, 127.1);
+        MobilityInfo stableBike = new MobilityInfo(MobilityType.DDAREUNGI, "따릉이", null, 100,
+                "정류소", 37.51, 127.01, 6, 50)
+                .withDropoffStation("D1", "반납", 37.4, 127.1);
+
+        Route reliableTransit = Route.of(List.of(
+                new Leg(LegType.TRANSIT, "BUS", 36, 1800, a, b, null, null, null),
+                new Leg(LegType.WALK, "WALK", 4, 260, b, b, null, null, null)
+        ), RouteType.TRANSIT_ONLY);
+
+        Route fasterButRiskyMixed = Route.of(List.of(
+                new Leg(LegType.TRANSIT, "BUS", 10, 1200, a, hub, null, null, null),
+                new Leg(LegType.WALK, "WALK", 4, 320, hub, hub, null, null, null),
+                new Leg(LegType.BIKE, "DDAREUNGI", 13, 1800, hub, b, null, stableBike, null)
+        ), RouteType.TRANSIT_WITH_BIKE);
+
+        double reliabilityScoreTransit = calculator.calculate(reliableTransit, RecommendationPreference.RELIABILITY);
+        double reliabilityScoreMixed = calculator.calculate(fasterButRiskyMixed, RecommendationPreference.RELIABILITY);
+        double timePriorityScoreTransit = calculator.calculate(reliableTransit, RecommendationPreference.TIME_PRIORITY);
+        double timePriorityScoreMixed = calculator.calculate(fasterButRiskyMixed, RecommendationPreference.TIME_PRIORITY);
+
+        assertThat(reliabilityScoreTransit).isGreaterThan(reliabilityScoreMixed);
+        assertThat(timePriorityScoreTransit).isLessThan(reliabilityScoreTransit);
+        assertThat(timePriorityScoreMixed).isGreaterThan(timePriorityScoreTransit);
+    }
+
     // -----------------------------------------------------------------
     // helpers
     // -----------------------------------------------------------------

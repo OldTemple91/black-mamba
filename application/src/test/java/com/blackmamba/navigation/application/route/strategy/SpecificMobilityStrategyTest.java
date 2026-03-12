@@ -40,14 +40,14 @@ class SpecificMobilityStrategyTest {
 
         when(transitRoutePort.getTransitRoute(any(), any()))
                 .thenReturn(Mono.just(List.of(leg)));
-        when(routeEvaluator.evaluate(any(Route.class), eq(true))).thenAnswer(invocation -> {
+        when(routeEvaluator.evaluate(any(Route.class), eq(true), eq(RecommendationPreference.RELIABILITY))).thenAnswer(invocation -> {
             Route route = invocation.getArgument(0);
             return route.withScore(0.5, true);
         });
 
         SpecificMobilityStrategy strategy = new SpecificMobilityStrategy(
                 List.of(), transitRoutePort, mobilityTimePort,
-                mobilityAvailabilityPort, hubSelector, routeEvaluator);
+                mobilityAvailabilityPort, hubSelector, routeEvaluator, RecommendationPreference.RELIABILITY);
 
         List<Route> routes = strategy.search(origin, dest).block();
 
@@ -76,7 +76,7 @@ class SpecificMobilityStrategyTest {
                         new MobilityInfo(MobilityType.KICKBOARD_SHARED, "씽씽",
                                 "DEV_001", 85, null, 37.52, 127.0, 0, 120))));
         when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of(hub(candidate)));
-        when(routeEvaluator.evaluate(any(Route.class), any(Route.class), anyInt(), anyBoolean()))
+        when(routeEvaluator.evaluate(any(Route.class), any(Route.class), anyInt(), anyBoolean(), eq(RecommendationPreference.RELIABILITY)))
                 .thenAnswer(invocation -> {
                     Route route = invocation.getArgument(0);
                     boolean recommended = invocation.getArgument(3);
@@ -85,7 +85,7 @@ class SpecificMobilityStrategyTest {
 
         SpecificMobilityStrategy strategy = new SpecificMobilityStrategy(
                 List.of(MobilityType.KICKBOARD_SHARED), transitRoutePort, mobilityTimePort,
-                mobilityAvailabilityPort, hubSelector, routeEvaluator);
+                mobilityAvailabilityPort, hubSelector, routeEvaluator, RecommendationPreference.RELIABILITY);
 
         List<Route> routes = strategy.search(origin, dest).block();
 

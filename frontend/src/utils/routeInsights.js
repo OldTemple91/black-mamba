@@ -212,13 +212,14 @@ export function getComparisonBars(route, context) {
   }))
 }
 
-export function getDebugFacts(route, baselineRoute, searchMode) {
+export function getDebugFacts(route, baselineRoute, searchMode, recommendationPreference = 'RELIABILITY') {
   const bikeLegs = route.legs.filter(leg => leg.type === 'BIKE')
   const kickboardLegs = route.legs.filter(leg => leg.type === 'KICKBOARD')
   const transitLegs = route.legs.filter(leg => leg.type === 'TRANSIT')
 
   return [
     `탐색 모드: ${searchMode}`,
+    `추천 성향: ${recommendationPreference === 'TIME_PRIORITY' ? '시간 우선' : '신뢰도 우선'}`,
     `경로 타입: ${route.type}`,
     `총 구간 수: ${route.legs.length}개`,
     `대중교통 구간: ${transitLegs.length}개 / 환승 ${countTransfers(route)}회`,

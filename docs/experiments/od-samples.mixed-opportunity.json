@@ -1,0 +1,62 @@
+[
+  {
+    "id": "banpo_res_to_hangang_park",
+    "origin": { "name": "반포 주거지", "lat": 37.5038, "lng": 127.0118 },
+    "destination": { "name": "반포한강공원", "lat": 37.5129, "lng": 126.9958 }
+  },
+  {
+    "id": "seongsu_office_to_seoul_forest_inner",
+    "origin": { "name": "성수 오피스", "lat": 37.5441, "lng": 127.0557 },
+    "destination": { "name": "서울숲 내부", "lat": 37.5447, "lng": 127.0374 }
+  },
+  {
+    "id": "yeouido_office_to_yeouido_park_inner",
+    "origin": { "name": "여의도 오피스", "lat": 37.5253, "lng": 126.9244 },
+    "destination": { "name": "여의도공원 내부", "lat": 37.5266, "lng": 126.9182 }
+  },
+  {
+    "id": "gwangnaru_res_to_ttukseom_hangang",
+    "origin": { "name": "광나루 주거지", "lat": 37.5472, "lng": 127.1032 },
+    "destination": { "name": "뚝섬한강공원 내부", "lat": 37.5291, "lng": 127.0671 }
+  },
+  {
+    "id": "sinchon_res_to_yonsei_campus_inner",
+    "origin": { "name": "연희동 주거지", "lat": 37.5704, "lng": 126.9360 },
+    "destination": { "name": "연세대 캠퍼스 내부", "lat": 37.5658, "lng": 126.9386 }
+  },
+  {
+    "id": "gupabal_res_to_bukhan_entrance",
+    "origin": { "name": "구파발 주거지", "lat": 37.6365, "lng": 126.9181 },
+    "destination": { "name": "북한산 입구", "lat": 37.6587, "lng": 126.9386 }
+  },
+  {
+    "id": "hapjeong_res_to_worldcup_park",
+    "origin": { "name": "합정 주거지", "lat": 37.5511, "lng": 126.9085 },
+    "destination": { "name": "월드컵공원 내부", "lat": 37.5688, "lng": 126.8786 }
+  },
+  {
+    "id": "yongsan_office_to_national_museum",
+    "origin": { "name": "용산 오피스", "lat": 37.5319, "lng": 126.9684 },
+    "destination": { "name": "국립중앙박물관", "lat": 37.5230, "lng": 126.9804 }
+  },
+  {
+    "id": "jamsil_res_to_olympic_park_inner",
+    "origin": { "name": "잠실 주거지", "lat": 37.5113, "lng": 127.0907 },
+    "destination": { "name": "올림픽공원 내부", "lat": 37.5207, "lng": 127.1210 }
+  },
+  {
+    "id": "hanyang_univ_to_seoul_forest_inner",
+    "origin": { "name": "한양대 앞", "lat": 37.5570, "lng": 127.0436 },
+    "destination": { "name": "서울숲 내부", "lat": 37.5447, "lng": 127.0374 }
+  },
+  {
+    "id": "mapo_office_to_hyochang_park",
+    "origin": { "name": "마포 오피스", "lat": 37.5397, "lng": 126.9452 },
+    "destination": { "name": "효창공원 내부", "lat": 37.5390, "lng": 126.9610 }
+  },
+  {
+    "id": "gangseo_res_to_seoul_botanic_park",
+    "origin": { "name": "마곡 주거지", "lat": 37.5664, "lng": 126.8290 },
+    "destination": { "name": "서울식물원 내부", "lat": 37.5699, "lng": 126.8351 }
+  }
+]

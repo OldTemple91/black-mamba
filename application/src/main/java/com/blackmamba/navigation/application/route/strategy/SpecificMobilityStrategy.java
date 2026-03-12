@@ -25,6 +25,7 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
     private final MobilityAvailabilityPort mobilityAvailabilityPort;
     private final HubSelector hubSelector;
     private final RouteEvaluator routeEvaluator;
+    private final RecommendationPreference recommendationPreference;
     private final MobilitySegmentBuilder mobilitySegmentBuilder;
 
     public SpecificMobilityStrategy(List<MobilityType> mobilityTypes,
@@ -32,13 +33,15 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                                      MobilityTimePort mobilityTimePort,
                                      MobilityAvailabilityPort mobilityAvailabilityPort,
                                      HubSelector hubSelector,
-                                     RouteEvaluator routeEvaluator) {
+                                     RouteEvaluator routeEvaluator,
+                                     RecommendationPreference recommendationPreference) {
         this.mobilityTypes = mobilityTypes;
         this.transitRoutePort = transitRoutePort;
         this.mobilityTimePort = mobilityTimePort;
         this.mobilityAvailabilityPort = mobilityAvailabilityPort;
         this.hubSelector = hubSelector;
         this.routeEvaluator = routeEvaluator;
+        this.recommendationPreference = recommendationPreference;
         this.mobilitySegmentBuilder = new MobilitySegmentBuilder(mobilityTimePort);
     }
 
@@ -62,7 +65,7 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                     Route baseRoute = Route.of(routeLegs, RouteType.TRANSIT_ONLY);
 
                     if (mobilityTypes.isEmpty()) {
-                        return Mono.just(List.of(routeEvaluator.evaluate(baseRoute, true)));
+                        return Mono.just(List.of(routeEvaluator.evaluate(baseRoute, true, recommendationPreference)));
                     }
                     return generateCombinedRoutes(baseLegs, origin, destination)
                             .collectList()
@@ -184,7 +187,7 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
         List<Route> all = new ArrayList<>(combined);
         all.add(base);
         List<Route> scored = all.stream()
-                .map(r -> routeEvaluator.evaluate(r, base, baseMinutes, false))
+                .map(r -> routeEvaluator.evaluate(r, base, baseMinutes, false, recommendationPreference))
                 .sorted(Comparator.comparingDouble(Route::score).reversed())
                 .limit(5)
                 .toList();
@@ -195,7 +198,7 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
 
         List<Route> result = new ArrayList<>(scored);
         Route top = result.getFirst();
-        result.set(0, routeEvaluator.evaluate(top, base, baseMinutes, true));
+        result.set(0, routeEvaluator.evaluate(top, base, baseMinutes, true, recommendationPreference));
         return result;
     }
 

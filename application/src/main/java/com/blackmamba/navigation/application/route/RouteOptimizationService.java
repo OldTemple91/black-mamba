@@ -39,13 +39,20 @@ public class RouteOptimizationService {
     public Mono<List<Route>> findRoutes(Location origin, Location destination,
                                          List<MobilityType> mobilityTypes,
                                          SearchMode searchMode) {
+        return findRoutes(origin, destination, mobilityTypes, searchMode, RecommendationPreference.RELIABILITY);
+    }
+
+    public Mono<List<Route>> findRoutes(Location origin, Location destination,
+                                        List<MobilityType> mobilityTypes,
+                                        SearchMode searchMode,
+                                        RecommendationPreference recommendationPreference) {
         RouteSearchStrategy strategy = switch (searchMode) {
             case OPTIMAL -> new OptimalSearchStrategy(
                     transitRoutePort, mobilityTimePort,
-                    mobilityAvailabilityPort, hubSelector, routeEvaluator);
+                    mobilityAvailabilityPort, hubSelector, routeEvaluator, recommendationPreference);
             case SPECIFIC -> new SpecificMobilityStrategy(
                     mobilityTypes, transitRoutePort, mobilityTimePort,
-                    mobilityAvailabilityPort, hubSelector, routeEvaluator);
+                    mobilityAvailabilityPort, hubSelector, routeEvaluator, recommendationPreference);
         };
         return strategy.search(origin, destination);
     }

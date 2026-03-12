@@ -27,13 +27,14 @@ def load_samples(path: Path):
         return json.load(fp)
 
 
-def fetch_routes(base_url: str, sample: dict, search_mode: str):
+def fetch_routes(base_url: str, sample: dict, search_mode: str, recommendation_preference: str):
     params = {
         "originLat": sample["origin"]["lat"],
         "originLng": sample["origin"]["lng"],
         "destLat": sample["destination"]["lat"],
         "destLng": sample["destination"]["lng"],
         "searchMode": search_mode,
+        "recommendationPreference": recommendation_preference,
     }
     url = f"{base_url.rstrip('/')}/api/routes?{urllib.parse.urlencode(params)}"
     with urllib.request.urlopen(url, timeout=30) as response:
@@ -238,13 +239,14 @@ def build_summary(results: list[dict]) -> dict:
     }
 
 
-def render_markdown(summary: dict, results: list[dict], input_path: Path, base_url: str, search_mode: str, cache_metrics: dict[str, dict[str, float]] | None) -> str:
+def render_markdown(summary: dict, results: list[dict], input_path: Path, base_url: str, search_mode: str, recommendation_preference: str, cache_metrics: dict[str, dict[str, float]] | None) -> str:
     lines = [
         "# Route Evaluation Report",
         "",
         f"- Generated at: `{datetime.now().isoformat(timespec='seconds')}`",
         f"- API base URL: `{base_url}`",
         f"- Search mode: `{search_mode}`",
+        f"- Recommendation preference: `{recommendation_preference}`",
         f"- Sample file: `{input_path}`",
         "",
         "## Summary",
@@ -347,6 +349,7 @@ def main():
     parser.add_argument("--input", default=str(DEFAULT_INPUT), help="Path to O/D sample JSON")
     parser.add_argument("--base-url", default="http://localhost:8081", help="Base URL for the running backend")
     parser.add_argument("--search-mode", default="OPTIMAL", help="Search mode to evaluate")
+    parser.add_argument("--recommendation-preference", default="RELIABILITY", help="Recommendation preference to evaluate")
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR), help="Directory to write evaluation results")
     args = parser.parse_args()
 
@@ -358,7 +361,7 @@ def main():
     results = []
     for sample in samples:
         try:
-            payload = fetch_routes(args.base_url, sample, args.search_mode)
+            payload = fetch_routes(args.base_url, sample, args.search_mode, args.recommendation_preference)
             results.append(evaluate_sample(sample, payload))
         except Exception as exc:  # noqa: BLE001
             results.append({
@@ -375,12 +378,13 @@ def main():
         "generatedAt": datetime.now().isoformat(timespec="seconds"),
         "baseUrl": args.base_url,
         "searchMode": args.search_mode,
+        "recommendationPreference": args.recommendation_preference,
         "input": str(input_path),
         "summary": summary,
         "cacheMetrics": cache_metrics,
         "results": results,
     }
-    markdown = render_markdown(summary, results, input_path, args.base_url, args.search_mode, cache_metrics)
+    markdown = render_markdown(summary, results, input_path, args.base_url, args.search_mode, args.recommendation_preference, cache_metrics)
     json_path, md_path = write_outputs(output_dir, report_payload, markdown)
 
     print(f"Wrote JSON report: {json_path}")
