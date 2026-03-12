@@ -95,7 +95,16 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                     return allPatterns
                             .mergeWith(Mono.just(baseRoute))
                             .collectList()
-                            .map(candidates -> rank(candidates, baseMinutes, baseRoute));
+                            .flatMap(candidates -> {
+                                if (hasOnlyTransitCandidate(candidates)) {
+                                    return buildNoMixedDiagnostics(origin, destination, baseLegs)
+                                            .map(diagnostics -> {
+                                                Route enrichedBaseRoute = withDiagnostics(baseRoute, diagnostics);
+                                                return rank(List.of(enrichedBaseRoute), baseMinutes, enrichedBaseRoute);
+                                            });
+                                }
+                                return Mono.just(rank(candidates, baseMinutes, baseRoute));
+                            });
                 });
     }
 
@@ -243,7 +252,8 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                                         dropoffInfo.stationName(),
                                         dropoffInfo.lat(),
                                         dropoffInfo.lng()
-                                ))));
+                                ))
+                                .filter(info -> !info.hasSamePickupAndDropoffStation())));
     }
 
     // ── 헬퍼 ──────────────────────────────────────────────────────────────────
@@ -328,6 +338,71 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
         Route top = result.getFirst();
         result.set(0, routeEvaluator.evaluate(top, baseRoute, baseMinutes, true, recommendationPreference));
         return result;
+    }
+
+    private boolean hasOnlyTransitCandidate(List<Route> candidates) {
+        return candidates.size() == 1 && candidates.getFirst().type() == RouteType.TRANSIT_ONLY;
+    }
+
+    private Route withDiagnostics(Route route, List<String> diagnostics) {
+        return route.withInsights(new RouteInsights(List.of(), List.of(), diagnostics));
+    }
+
+    private Mono<List<String>> buildNoMixedDiagnostics(Location origin, Location destination, List<Leg> baseLegs) {
+        return Flux.fromIterable(ALL_TYPES)
+                .flatMap(type -> diagnosticsForType(origin, destination, baseLegs, type))
+                .distinct()
+                .collectList()
+                .map(list -> list.isEmpty() ? List.of("혼합 경로 후보를 만들지 못했습니다.") : list);
+    }
+
+    private Flux<String> diagnosticsForType(Location origin, Location destination, List<Leg> baseLegs, MobilityType type) {
+        MobilityConfig config = configFor(type);
+        List<Hub> lastMileHubs = hubSelector.selectLastMileHubs(baseLegs, destination, config).stream()
+                .limit(3)
+                .toList();
+        List<Hub> firstMileHubs = hubSelector.selectFirstMileHubs(origin, baseLegs, config).stream()
+                .limit(3)
+                .toList();
+
+        List<String> immediateReasons = new ArrayList<>();
+        if (firstMileHubs.isEmpty()) immediateReasons.add(labelFor(type) + " 퍼스트마일 후보 허브가 없습니다.");
+        if (lastMileHubs.isEmpty()) immediateReasons.add(labelFor(type) + " 라스트마일 후보 허브가 없습니다.");
+
+        double directDistance = haversineMeters(origin.lat(), origin.lng(), destination.lat(), destination.lng());
+        if (directDistance > config.maxRangeMeters()) {
+            immediateReasons.add(labelFor(type) + " 직접 이동 가능 거리(" + config.maxRangeMeters() + "m)를 초과했습니다.");
+        }
+
+        Mono<Boolean> anyLastMileAvailable = Flux.fromIterable(lastMileHubs)
+                .flatMap(hub -> mobilityInfoForSegment(hub.location(), destination, type))
+                .any(Optional::isPresent)
+                .defaultIfEmpty(false);
+
+        Mono<Boolean> anyFirstMileAvailable = Flux.fromIterable(firstMileHubs)
+                .flatMap(hub -> mobilityInfoForSegment(origin, hub.location(), type))
+                .any(Optional::isPresent)
+                .defaultIfEmpty(false);
+
+        return Mono.zip(anyFirstMileAvailable, anyLastMileAvailable)
+                .flatMapMany(tuple -> {
+                    List<String> reasons = new ArrayList<>(immediateReasons);
+                    if (!tuple.getT1() && !firstMileHubs.isEmpty()) {
+                        reasons.add(labelFor(type) + " 퍼스트마일 구간에서 반경 내 대여 가능 수단을 찾지 못했습니다.");
+                    }
+                    if (!tuple.getT2() && !lastMileHubs.isEmpty()) {
+                        reasons.add(labelFor(type) + " 라스트마일 구간에서 대여/반납 가능한 수단을 찾지 못했습니다.");
+                    }
+                    return Flux.fromIterable(reasons);
+                });
+    }
+
+    private String labelFor(MobilityType type) {
+        return switch (type) {
+            case DDAREUNGI -> "따릉이";
+            case KICKBOARD_SHARED -> "공유 킥보드";
+            case PERSONAL -> "개인 킥보드";
+        };
     }
 
     private double haversineMeters(double lat1, double lng1, double lat2, double lng2) {

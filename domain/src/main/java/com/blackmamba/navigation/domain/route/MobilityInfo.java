@@ -68,4 +68,17 @@ public record MobilityInfo(
     public boolean hasDropoffStation() {
         return dropoffStationName != null && !dropoffStationName.isBlank();
     }
+
+    public boolean hasSamePickupAndDropoffStation() {
+        if (!hasDropoffStation()) {
+            return false;
+        }
+        if (stationId != null && !stationId.isBlank() && dropoffStationId != null && !dropoffStationId.isBlank()) {
+            return stationId.equals(dropoffStationId);
+        }
+        if (stationName != null && !stationName.isBlank() && dropoffStationName != null && !dropoffStationName.isBlank()) {
+            return stationName.equals(dropoffStationName);
+        }
+        return false;
+    }
 }
