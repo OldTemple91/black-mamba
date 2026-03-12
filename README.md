@@ -184,9 +184,11 @@ flowchart TD
 무료 외부 API의 호출 제한을 고려해 아래 최적화를 적용했습니다.
 
 - `ODsay`: 동일 출발/도착 쌍 route/time 재사용
+- `ODsay`: 출발지/도착지 직선거리 700m 이하 구간은 검색을 차단하고 사용자에게 재검색을 유도
 - `따릉이`: 전체 정류소 snapshot 캐시 후 반경 필터링만 재계산
 - `킥보드`: 전체 기기 snapshot 캐시 후 반경 필터링만 재계산
 - `TMAP`: 동일 보행 경로 캐시
+- `TMAP`: 429 quota 초과 발생 시 일정 시간 외부 호출을 차단하고 haversine fallback
 - `MobilityAvailability`: pickup/dropoff 조회 캐시
 - `Hub pruning`: 목적지 기준 이동수단 최대 범위를 벗어난 라스트마일 후보를 사전 제거
 - `Candidate deduplication`: 서로 매우 가까운 정류소 후보는 하나로 병합
@@ -198,8 +200,14 @@ flowchart TD
 - `navigation.cache.kickboard-snapshot-ttl-ms`
 - `navigation.cache.mobility-availability-ttl-ms`
 - `navigation.cache.tmap-pedestrian-route-ttl-ms`
+- `navigation.cache.tmap-rate-limit-backoff-ms`
 
 캐시 효과는 `navigation.cache.total{cache=...,result=hit|miss}` metric으로 관찰할 수 있습니다.
+외부 API 예외 상황은 아래처럼 처리합니다.
+
+- `ODsay`: 짧은 구간(`<=700m`)은 `400 SHORT_DISTANCE` 응답으로 명시적으로 안내
+- `TMAP`: 429 발생 시 backoff 기간 동안 API 호출 생략
+- 두 경우 모두 엔진은 fallback 경로/시간 계산으로 동작을 유지
 
 ## 11. Tech Stack
 

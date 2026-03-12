@@ -72,7 +72,7 @@ export default function RouteListPage() {
       setRoutes(data)
       setSelectedRoute(data[0] ?? null)
     }).catch(err => {
-      setError('경로를 불러오지 못했습니다. 백엔드가 실행 중인지 확인하세요.')
+      setError(err?.message || '경로를 불러오지 못했습니다. 백엔드가 실행 중인지 확인하세요.')
       console.error(err)
     }).finally(() => setLoading(false))
   }, [originName, destName, mobilityParam, searchMode])
