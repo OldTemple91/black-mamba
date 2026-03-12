@@ -20,6 +20,7 @@ public class CandidatePointSelector {
     private static final double EARTH_RADIUS_METERS = 6_371_000;
     private static final double MIN_RATIO = 0.3;
     private static final double MAX_RATIO = 0.8;
+    private static final double DUPLICATE_STOP_THRESHOLD_METERS = 120.0;
 
     public List<Location> select(List<Leg> legs, MobilityConfig config) {
         List<Location> allStops = extractTransitStops(legs);
@@ -28,7 +29,7 @@ public class CandidatePointSelector {
         int from = (int) (allStops.size() * MIN_RATIO);
         int to   = (int) (allStops.size() * MAX_RATIO);
 
-        return allStops.subList(from, to);
+        return deduplicateNearby(allStops.subList(from, to));
     }
 
     public List<Location> filterByMobilityRange(List<Location> candidates,
@@ -104,5 +105,18 @@ public class CandidatePointSelector {
                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
                 * Math.sin(dLng / 2) * Math.sin(dLng / 2);
         return EARTH_RADIUS_METERS * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    private List<Location> deduplicateNearby(List<Location> candidates) {
+        List<Location> deduplicated = new ArrayList<>();
+        for (Location candidate : candidates) {
+            boolean duplicated = deduplicated.stream().anyMatch(existing ->
+                    distanceMeters(existing.lat(), existing.lng(), candidate.lat(), candidate.lng())
+                            <= DUPLICATE_STOP_THRESHOLD_METERS);
+            if (!duplicated) {
+                deduplicated.add(candidate);
+            }
+        }
+        return deduplicated;
     }
 }

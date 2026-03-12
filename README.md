@@ -179,7 +179,29 @@ flowchart TD
 - 도보/마이크로모빌리티 구간 좌표: TMAP
 - 공공자전거 정류소 및 대여 가능 정보: 서울시 따릉이 API
 
-## 10. Tech Stack
+## 10. API Call Optimization
+
+무료 외부 API의 호출 제한을 고려해 아래 최적화를 적용했습니다.
+
+- `ODsay`: 동일 출발/도착 쌍 route/time 재사용
+- `따릉이`: 전체 정류소 snapshot 캐시 후 반경 필터링만 재계산
+- `킥보드`: 전체 기기 snapshot 캐시 후 반경 필터링만 재계산
+- `TMAP`: 동일 보행 경로 캐시
+- `MobilityAvailability`: pickup/dropoff 조회 캐시
+- `Hub pruning`: 목적지 기준 이동수단 최대 범위를 벗어난 라스트마일 후보를 사전 제거
+- `Candidate deduplication`: 서로 매우 가까운 정류소 후보는 하나로 병합
+
+현재 TTL은 설정값으로 관리합니다.
+
+- `navigation.cache.odsay-route-ttl-ms`
+- `navigation.cache.ddareungi-snapshot-ttl-ms`
+- `navigation.cache.kickboard-snapshot-ttl-ms`
+- `navigation.cache.mobility-availability-ttl-ms`
+- `navigation.cache.tmap-pedestrian-route-ttl-ms`
+
+캐시 효과는 `navigation.cache.total{cache=...,result=hit|miss}` metric으로 관찰할 수 있습니다.
+
+## 11. Tech Stack
 
 ### Backend
 
@@ -200,7 +222,7 @@ flowchart TD
 - TMAP
 - 서울시 따릉이 API
 
-## 11. Run Locally
+## 12. Run Locally
 
 ### Backend
 
@@ -221,7 +243,7 @@ npm run dev
 - backend: `8081`
 - frontend: `5173`
 
-## 12. Current Implementation Status
+## 13. Current Implementation Status
 
 현재 구현된 핵심 사항:
 
@@ -233,7 +255,7 @@ npm run dev
 - 추천 이유/리스크를 API 응답에 포함
 - 지도/카드에서 설명 가능한 추천 UI 제공
 
-## 13. Evaluation Plan
+## 14. Evaluation Plan
 
 향후 아래 지표를 중심으로 평가할 예정입니다.
 
@@ -248,7 +270,9 @@ npm run dev
 
 - 최단시간 중심 추천 vs 신뢰도 중심 추천
 
-## 14. Limitations
+배치 실험 스크립트는 추천 결과뿐 아니라 cache hit/miss delta도 함께 기록합니다.
+
+## 15. Limitations
 
 현재 한계:
 
@@ -257,7 +281,7 @@ npm run dev
 - 점수 모델이 완전한 운영 리스크를 모두 반영하진 않음
 - 실험 데이터셋 기반 정량 평가가 아직 부족함
 
-## 15. Roadmap
+## 16. Roadmap
 
 다음 단계는 아래 방향으로 확장할 계획입니다.
 

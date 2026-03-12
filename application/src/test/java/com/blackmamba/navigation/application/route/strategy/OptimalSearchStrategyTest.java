@@ -63,7 +63,7 @@ class OptimalSearchStrategyTest {
 
     @Test
     void 대중교통_기본_경로는_항상_포함된다() {
-        when(hubSelector.selectLastMileHubs(any(), any())).thenReturn(List.of());
+        when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of());
         when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of());
         when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.empty()));
@@ -79,7 +79,7 @@ class OptimalSearchStrategyTest {
     @Test
     void 이동수단만_경로가_거리_범위_내이면_패턴E_포함된다() {
         // 강남→서울역 직선 약 7km → 킥보드(5km) 범위 초과, 따릉이(10km) 범위 이내
-        when(hubSelector.selectLastMileHubs(any(), any())).thenReturn(List.of());
+        when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of());
         when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of());
         when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.of(
@@ -100,7 +100,7 @@ class OptimalSearchStrategyTest {
     @Test
     void 최적_경로_1위에는_추천_표시가_붙는다() {
         // Pattern C (last-mile): select 가 candidate 반환, selectFirstMile 은 빈 리스트 → Pattern D 미실행
-        when(hubSelector.selectLastMileHubs(any(), any())).thenReturn(List.of(hub(candidate)));
+        when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of(hub(candidate)));
         when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of());
         when(mobilityTimePort.getMobilityRoute(any(), any(), any()))
                 .thenReturn(Mono.just(MobilityRouteResult.timeOnly(8)));
@@ -119,7 +119,7 @@ class OptimalSearchStrategyTest {
 
     @Test
     void 대중교통_점수가_더_높으면_대중교통이_추천된다() {
-        when(hubSelector.selectLastMileHubs(any(), any())).thenReturn(List.of(hub(candidate)));
+        when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of(hub(candidate)));
         when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of());
         when(mobilityTimePort.getMobilityRoute(any(), any(), any()))
                 .thenReturn(Mono.just(MobilityRouteResult.timeOnly(8)));
@@ -142,7 +142,7 @@ class OptimalSearchStrategyTest {
     @Test
     void ODsay_기본경로가_비어도_추천경로가_0분이_아니다() {
         when(transitRoutePort.getTransitRoute(any(), any())).thenReturn(Mono.just(List.of()));
-        when(hubSelector.selectLastMileHubs(any(), any())).thenReturn(List.of());
+        when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of());
         when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of());
         when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.empty()));

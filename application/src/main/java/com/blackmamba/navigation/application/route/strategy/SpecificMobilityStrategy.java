@@ -75,7 +75,9 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                 .flatMap(type -> {
                     MobilityConfig config = isKickboardType(type)
                             ? MobilityConfig.kickboard() : MobilityConfig.bike();
-                    List<Hub> candidateHubs = hubSelector.selectLastMileHubs(baseLegs, config);
+                    List<Hub> candidateHubs = hubSelector.selectLastMileHubs(baseLegs, destination, config).stream()
+                            .limit(3)
+                            .toList();
 
                     if (candidateHubs.isEmpty()) {
                         // 대중교통 경로 없음 → 출발지에서 목적지 직접 이동수단 경로로 폴백

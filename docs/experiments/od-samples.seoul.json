@@ -1,0 +1,42 @@
+[
+  {
+    "id": "seodaemun_res_to_yongsan_hill",
+    "origin": { "name": "서대문 주거지", "lat": 37.5738, "lng": 126.9474 },
+    "destination": { "name": "후암동 언덕", "lat": 37.5452, "lng": 126.9829 }
+  },
+  {
+    "id": "yaksu_res_to_hannam_shop",
+    "origin": { "name": "약수 주거지", "lat": 37.5530, "lng": 127.0136 },
+    "destination": { "name": "한남 상권", "lat": 37.5342, "lng": 127.0061 }
+  },
+  {
+    "id": "sangsu_res_to_yeonnam_cafe",
+    "origin": { "name": "상수 주거지", "lat": 37.5463, "lng": 126.9201 },
+    "destination": { "name": "연남 상권", "lat": 37.5634, "lng": 126.9258 }
+  },
+  {
+    "id": "mangwon_res_to_hapjeong_office",
+    "origin": { "name": "망원 주거지", "lat": 37.5585, "lng": 126.9038 },
+    "destination": { "name": "합정 오피스", "lat": 37.5480, "lng": 126.9149 }
+  },
+  {
+    "id": "seongsu_office_to_ttukseom_park",
+    "origin": { "name": "성수 오피스", "lat": 37.5413, "lng": 127.0576 },
+    "destination": { "name": "뚝섬한강공원", "lat": 37.5299, "lng": 127.0678 }
+  },
+  {
+    "id": "apgujeong_shop_to_seongsu_office",
+    "origin": { "name": "압구정 상권", "lat": 37.5287, "lng": 127.0326 },
+    "destination": { "name": "성수 오피스", "lat": 37.5420, "lng": 127.0568 }
+  },
+  {
+    "id": "gwanghwamun_office_to_yeouido_block",
+    "origin": { "name": "광화문 오피스", "lat": 37.5701, "lng": 126.9786 },
+    "destination": { "name": "여의도 업무지구", "lat": 37.5256, "lng": 126.9276 }
+  },
+  {
+    "id": "hongdae_res_to_sinchon_hospital",
+    "origin": { "name": "연희동 주거지", "lat": 37.5682, "lng": 126.9312 },
+    "destination": { "name": "신촌 병원", "lat": 37.5587, "lng": 126.9415 }
+  }
+]

@@ -27,3 +27,11 @@ management:
     web:
       exposure:
         include: health,info,metrics
+
+navigation:
+  cache:
+    odsay-route-ttl-ms: 30000
+    ddareungi-snapshot-ttl-ms: 30000
+    kickboard-snapshot-ttl-ms: 30000
+    mobility-availability-ttl-ms: 20000
+    tmap-pedestrian-route-ttl-ms: 300000

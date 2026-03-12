@@ -60,7 +60,7 @@ class RouteOptimizationServiceTest {
                     boolean recommended = invocation.getArgument(3);
                     return route.withScore(0.5, recommended);
                 });
-        when(hubSelector.selectLastMileHubs(any(), any())).thenReturn(List.of());
+        when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of());
         when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of());
         List<Route> routes = service.findRoutes(origin, dest, List.of(), SearchMode.OPTIMAL).block();
 
