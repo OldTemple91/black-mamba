@@ -35,7 +35,7 @@ class RouteOptimizationServiceTest {
     void SPECIFIC_모드_이동수단_없으면_대중교통만_반환한다() {
         Leg leg = new Leg(LegType.TRANSIT, "BUS", 45, 10000, origin, dest, null, null, null);
         when(transitRoutePort.getTransitRoute(any(), any())).thenReturn(Mono.just(List.of(leg)));
-        when(routeEvaluator.evaluate(any(Route.class), eq(true))).thenAnswer(invocation -> {
+        when(routeEvaluator.evaluate(any(Route.class), eq(true), eq(RecommendationPreference.RELIABILITY))).thenAnswer(invocation -> {
             Route route = invocation.getArgument(0);
             return route.withScore(0.5, true);
         });
@@ -54,7 +54,7 @@ class RouteOptimizationServiceTest {
                 .thenReturn(Mono.just(Optional.empty()));
         when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.empty()));
-        when(routeEvaluator.evaluate(any(Route.class), any(Route.class), anyInt(), anyBoolean()))
+        when(routeEvaluator.evaluate(any(Route.class), any(Route.class), anyInt(), anyBoolean(), eq(RecommendationPreference.RELIABILITY)))
                 .thenAnswer(invocation -> {
                     Route route = invocation.getArgument(0);
                     boolean recommended = invocation.getArgument(3);
@@ -66,5 +66,28 @@ class RouteOptimizationServiceTest {
 
         assertThat(routes).isNotEmpty();
         assertThat(routes.stream().anyMatch(r -> r.type() == RouteType.TRANSIT_ONLY)).isTrue();
+    }
+
+    @Test
+    void recommendationPreference가_TIME_PRIORITY여도_경로를_반환한다() {
+        Leg leg = new Leg(LegType.TRANSIT, "BUS", 40, 10000, origin, dest, null, null, null);
+        when(transitRoutePort.getTransitRoute(any(), any())).thenReturn(Mono.just(List.of(leg)));
+        when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(Optional.empty()));
+        when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(Optional.empty()));
+        when(routeEvaluator.evaluate(any(Route.class), any(Route.class), anyInt(), anyBoolean(), eq(RecommendationPreference.TIME_PRIORITY)))
+                .thenAnswer(invocation -> {
+                    Route route = invocation.getArgument(0);
+                    boolean recommended = invocation.getArgument(3);
+                    return route.withScore(0.7, recommended);
+                });
+        when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of());
+        when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of());
+
+        List<Route> routes = service.findRoutes(origin, dest, List.of(), SearchMode.OPTIMAL, RecommendationPreference.TIME_PRIORITY).block();
+
+        assertThat(routes).isNotEmpty();
+        assertThat(routes.getFirst().recommended()).isTrue();
     }
 }

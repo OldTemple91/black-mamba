@@ -28,6 +28,8 @@
 - 외부 API 호출 절감을 위한 `ODsay`, `따릉이`, `킥보드`, `TMAP`, `모빌리티 가용성 조회` TTL 캐시 도입
 - 캐시 TTL을 설정값으로 분리하고 batch 실험에서 cache metric delta 수집 가능
 - 목적지 기준 라스트마일 허브 pruning 및 근접 정류소 dedup 적용
+- `RecommendationPreference(RELIABILITY / TIME_PRIORITY)` 추가
+- API / 프론트 / 실험 스크립트에서 추천 성향 선택 가능
 
 ## 다음 우선순위
 
@@ -39,7 +41,7 @@
 ### 2. 평가 지표 실험화
 
 - `RouteEvaluation` 기반 batch 비교 리포트 생성 완료
-- 다음 단계는 샘플 세트 확장과 지표 해석 개선
+- 다음 단계는 `RELIABILITY`와 `TIME_PRIORITY` 비교 실험 정리
 
 ### 3. 호출 최적화 고도화
 
@@ -68,6 +70,7 @@
 - `Specific` 전략의 라스트마일 후보는 최대 3개로 제한
 - `navigation.cache.total{cache=...,result=hit|miss}` metric으로 캐시 효과 측정 가능
 - 실험 스크립트가 `cacheMetrics`를 JSON/Markdown 결과에 같이 저장
+- 현재 8081에서 떠 있는 서버가 이전 프로세스면 `recommendationPreference` 파라미터가 무시될 수 있어 재시작 확인이 필요함
 
 ## 바로 이어서 할 일
 

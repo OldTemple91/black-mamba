@@ -1,6 +1,7 @@
 package com.blackmamba.navigation.api.route;
 
 import com.blackmamba.navigation.application.route.RouteOptimizationService;
+import com.blackmamba.navigation.application.route.RecommendationPreference;
 import com.blackmamba.navigation.application.route.SearchMode;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.MobilityType;
@@ -35,7 +36,8 @@ public class RouteController {
             @RequestParam double destLat,
             @RequestParam double destLng,
             @RequestParam(defaultValue = "") List<String> mobility,
-            @RequestParam(defaultValue = "SPECIFIC") SearchMode searchMode
+            @RequestParam(defaultValue = "SPECIFIC") SearchMode searchMode,
+            @RequestParam(defaultValue = "RELIABILITY") RecommendationPreference recommendationPreference
     ) {
         Location origin      = new Location("출발지", originLat, originLng);
         Location destination = new Location("목적지", destLat, destLng);
@@ -53,7 +55,7 @@ public class RouteController {
                 .toList();
 
         List<Route> routes = routeOptimizationService
-                .findRoutes(origin, destination, mobilityTypes, searchMode)
+                .findRoutes(origin, destination, mobilityTypes, searchMode, recommendationPreference)
                 .block();
 
         return ResponseEntity.ok(Map.of("routes", routes));

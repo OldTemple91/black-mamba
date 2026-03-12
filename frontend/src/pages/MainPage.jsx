@@ -22,6 +22,7 @@ export default function MainPage() {
   const [destCoord, setDestCoord]         = useState(null)
   const [mobility, setMobility]       = useState([])
   const [searchMode, setSearchMode]   = useState('OPTIMAL')
+  const [recommendationPreference, setRecommendationPreference] = useState('RELIABILITY')
   const [mapMode, setMapMode]         = useState(null)  // 'origin' | 'destination' | null
 
   // 자동완성
@@ -114,7 +115,7 @@ export default function MainPage() {
 
     navigate(
       `/routes?origin=${encodeURIComponent(originParam)}&dest=${encodeURIComponent(destParam)}` +
-      `&mobility=${mobility.join(',')}&searchMode=${searchMode}`
+      `&mobility=${mobility.join(',')}&searchMode=${searchMode}&recommendationPreference=${recommendationPreference}`
     )
   }
 
@@ -205,6 +206,8 @@ export default function MainPage() {
             onChange={setMobility}
             searchMode={searchMode}
             onSearchModeChange={setSearchMode}
+            recommendationPreference={recommendationPreference}
+            onRecommendationPreferenceChange={setRecommendationPreference}
           />
           <button
             onClick={handleSearch}

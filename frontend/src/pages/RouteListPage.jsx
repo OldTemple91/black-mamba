@@ -54,6 +54,7 @@ export default function RouteListPage() {
   const destName   = searchParams.get('dest')   || ''
   const mobilityParam = searchParams.get('mobility') || ''
   const searchMode = searchParams.get('searchMode') || 'SPECIFIC'
+  const recommendationPreference = searchParams.get('recommendationPreference') || 'RELIABILITY'
 
   useEffect(() => {
     const mobility = mobilityParam.split(',').filter(Boolean)
@@ -66,7 +67,8 @@ export default function RouteListPage() {
         originLat: origin.lat, originLng: origin.lng,
         destLat:   dest.lat,   destLng:   dest.lng,
         mobility,
-        searchMode
+        searchMode,
+        recommendationPreference,
       })
     }).then(data => {
       setRoutes(data)
@@ -75,7 +77,7 @@ export default function RouteListPage() {
       setError(err?.message || '경로를 불러오지 못했습니다. 백엔드가 실행 중인지 확인하세요.')
       console.error(err)
     }).finally(() => setLoading(false))
-  }, [originName, destName, mobilityParam, searchMode])
+  }, [originName, destName, mobilityParam, searchMode, recommendationPreference])
 
   const baselineRoute = useMemo(() => findBaselineRoute(routes), [routes])
   const comparisonContext = useMemo(() => buildComparisonContext(routes), [routes])
@@ -88,8 +90,8 @@ export default function RouteListPage() {
     [selectedRoute]
   )
   const selectedDebugFacts = useMemo(
-    () => (selectedRoute ? getDebugFacts(selectedRoute, baselineRoute, searchMode) : []),
-    [selectedRoute, baselineRoute, searchMode]
+    () => (selectedRoute ? getDebugFacts(selectedRoute, baselineRoute, searchMode, recommendationPreference) : []),
+    [selectedRoute, baselineRoute, searchMode, recommendationPreference]
   )
 
   if (loading) return (
@@ -203,6 +205,7 @@ export default function RouteListPage() {
               baselineRoute={baselineRoute}
               comparisonContext={comparisonContext}
               searchMode={searchMode}
+              recommendationPreference={recommendationPreference}
               showDebug={showDebug}
             />
           ))

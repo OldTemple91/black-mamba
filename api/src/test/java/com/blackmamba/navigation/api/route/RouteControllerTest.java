@@ -1,6 +1,7 @@
 package com.blackmamba.navigation.api.route;
 
 import com.blackmamba.navigation.application.route.RouteOptimizationService;
+import com.blackmamba.navigation.application.route.RecommendationPreference;
 import com.blackmamba.navigation.application.route.SearchMode;
 import com.blackmamba.navigation.domain.route.*;
 import org.junit.jupiter.api.Test;
@@ -37,7 +38,7 @@ class RouteControllerTest {
         Route route = new Route("rt_001", RouteType.TRANSIT_ONLY, 45, 1250,
                 breakdown, List.of(), evaluation, 0.5, true, List.of(), new Comparison(45, 0), null);
 
-        when(routeOptimizationService.findRoutes(any(), any(), any(), any()))
+        when(routeOptimizationService.findRoutes(any(), any(), any(), any(), any()))
                 .thenReturn(Mono.just(List.of(route)));
 
         mockMvc.perform(get("/api/routes")
@@ -60,7 +61,7 @@ class RouteControllerTest {
         Route route = new Route("rt_002", RouteType.TRANSIT_ONLY, 30, 1250,
                 breakdown, List.of(), null, 0.6, true, List.of(), new Comparison(30, 0), null);
 
-        when(routeOptimizationService.findRoutes(any(), any(), any(), any()))
+        when(routeOptimizationService.findRoutes(any(), any(), any(), any(), any()))
                 .thenReturn(Mono.just(List.of(route)));
 
         mockMvc.perform(get("/api/routes")
@@ -78,7 +79,7 @@ class RouteControllerTest {
         Route route = new Route("rt_opt", RouteType.MOBILITY_ONLY, 20, 0,
                 breakdown, List.of(), null, 0.9, true, List.of(), null, null);
 
-        when(routeOptimizationService.findRoutes(any(), any(), any(), eq(SearchMode.OPTIMAL)))
+        when(routeOptimizationService.findRoutes(any(), any(), any(), eq(SearchMode.OPTIMAL), eq(RecommendationPreference.RELIABILITY)))
                 .thenReturn(Mono.just(List.of(route)));
 
         mockMvc.perform(get("/api/routes")
@@ -89,6 +90,26 @@ class RouteControllerTest {
                         .param("searchMode", "OPTIMAL"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.routes[0].routeId").value("rt_opt"));
+    }
+
+    @Test
+    void recommendationPreference_TIME_PRIORITY_파라미터로_경로를_탐색한다() throws Exception {
+        RouteCostBreakdown breakdown = new RouteCostBreakdown(List.of(), 0);
+        Route route = new Route("rt_pref", RouteType.TRANSIT_WITH_BIKE, 18, 1000,
+                breakdown, List.of(), null, 0.91, true, List.of(), null, null);
+
+        when(routeOptimizationService.findRoutes(any(), any(), any(), eq(SearchMode.OPTIMAL), eq(RecommendationPreference.TIME_PRIORITY)))
+                .thenReturn(Mono.just(List.of(route)));
+
+        mockMvc.perform(get("/api/routes")
+                        .param("originLat", "37.5547")
+                        .param("originLng", "126.9706")
+                        .param("destLat", "37.4979")
+                        .param("destLng", "127.0276")
+                        .param("searchMode", "OPTIMAL")
+                        .param("recommendationPreference", "TIME_PRIORITY"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.routes[0].routeId").value("rt_pref"));
     }
 
     @Test

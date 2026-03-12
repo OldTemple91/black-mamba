@@ -38,18 +38,21 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     private final MobilityAvailabilityPort mobilityAvailabilityPort;
     private final HubSelector hubSelector;
     private final RouteEvaluator routeEvaluator;
+    private final RecommendationPreference recommendationPreference;
     private final MobilitySegmentBuilder mobilitySegmentBuilder;
 
     public OptimalSearchStrategy(TransitRoutePort transitRoutePort,
                                   MobilityTimePort mobilityTimePort,
                                   MobilityAvailabilityPort mobilityAvailabilityPort,
                                   HubSelector hubSelector,
-                                  RouteEvaluator routeEvaluator) {
+                                  RouteEvaluator routeEvaluator,
+                                  RecommendationPreference recommendationPreference) {
         this.transitRoutePort = transitRoutePort;
         this.mobilityTimePort = mobilityTimePort;
         this.mobilityAvailabilityPort = mobilityAvailabilityPort;
         this.hubSelector = hubSelector;
         this.routeEvaluator = routeEvaluator;
+        this.recommendationPreference = recommendationPreference;
         this.mobilitySegmentBuilder = new MobilitySegmentBuilder(mobilityTimePort);
     }
 
@@ -312,7 +315,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
 
     private List<Route> rank(List<Route> candidates, int baseMinutes, Route baseRoute) {
         List<Route> evaluated = candidates.stream()
-                .map(route -> routeEvaluator.evaluate(route, baseRoute, baseMinutes, false))
+                .map(route -> routeEvaluator.evaluate(route, baseRoute, baseMinutes, false, recommendationPreference))
                 .sorted(Comparator.comparingDouble(Route::score).reversed())
                 .limit(5)
                 .toList();
@@ -323,7 +326,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
 
         List<Route> result = new ArrayList<>(evaluated);
         Route top = result.getFirst();
-        result.set(0, routeEvaluator.evaluate(top, baseRoute, baseMinutes, true));
+        result.set(0, routeEvaluator.evaluate(top, baseRoute, baseMinutes, true, recommendationPreference));
         return result;
     }
 

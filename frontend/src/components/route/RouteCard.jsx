@@ -46,6 +46,7 @@ export default function RouteCard({
   baselineRoute,
   comparisonContext,
   searchMode,
+  recommendationPreference,
   showDebug,
 }) {
   const [expanded, setExpanded] = useState(false)
@@ -59,7 +60,7 @@ export default function RouteCard({
   const hubs = getHubSummary(route)
   const comparisonBars = comparisonContext ? getComparisonBars(route, comparisonContext) : []
   const costBreakdown = getCostBreakdown(route)
-  const debugFacts = showDebug ? getDebugFacts(route, baselineRoute, searchMode) : []
+  const debugFacts = showDebug ? getDebugFacts(route, baselineRoute, searchMode, recommendationPreference) : []
 
   return (
     <div
