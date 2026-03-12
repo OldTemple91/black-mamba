@@ -4,12 +4,22 @@ import axios from 'axios'
 const BASE_URL = '/api'
 
 export const searchRoutes = async ({ originLat, originLng, destLat, destLng, mobility, searchMode = 'SPECIFIC' }) => {
-  const { data } = await axios.get(`${BASE_URL}/routes`, {
-    params: {
-      originLat, originLng, destLat, destLng,
-      mobility: mobility.join(','),
-      searchMode
+  try {
+    const { data } = await axios.get(`${BASE_URL}/routes`, {
+      params: {
+        originLat, originLng, destLat, destLng,
+        mobility: mobility.join(','),
+        searchMode
+      }
+    })
+    return data.routes
+  } catch (error) {
+    const message = error?.response?.data?.message
+    if (message) {
+      const apiError = new Error(message)
+      apiError.code = error?.response?.data?.code
+      throw apiError
     }
-  })
-  return data.routes
+    throw error
+  }
 }

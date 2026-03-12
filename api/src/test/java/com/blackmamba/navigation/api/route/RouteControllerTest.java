@@ -90,4 +90,16 @@ class RouteControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.routes[0].routeId").value("rt_opt"));
     }
+
+    @Test
+    void 출발지와_목적지가_700m_이내면_400을_반환한다() throws Exception {
+        mockMvc.perform(get("/api/routes")
+                        .param("originLat", "37.5665")
+                        .param("originLng", "126.9780")
+                        .param("destLat", "37.5680")
+                        .param("destLng", "126.9785"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SHORT_DISTANCE"))
+                .andExpect(jsonPath("$.message").exists());
+    }
 }
