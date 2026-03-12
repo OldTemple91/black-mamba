@@ -76,20 +76,20 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                     MobilityConfig config = isKickboardType(type)
                             ? MobilityConfig.kickboard() : MobilityConfig.bike();
                     List<Hub> candidateHubs = hubSelector.selectLastMileHubs(baseLegs, config);
-                    List<Location> candidates = candidateHubs.stream().map(Hub::location).toList();
 
-                    if (candidates.isEmpty()) {
+                    if (candidateHubs.isEmpty()) {
                         // 대중교통 경로 없음 → 출발지에서 목적지 직접 이동수단 경로로 폴백
                         return buildDirectRoute(origin, destination, type).flux();
                     }
-                    return Flux.fromIterable(candidates)
-                            .flatMap(candidate -> buildRoute(origin, candidate, destination, type, baseLegs));
+                    return Flux.fromIterable(candidateHubs)
+                            .flatMap(candidateHub -> buildRoute(origin, candidateHub, destination, type, baseLegs));
                 });
     }
 
-    private Mono<Route> buildRoute(Location origin, Location switchPoint,
+    private Mono<Route> buildRoute(Location origin, Hub candidateHub,
                                     Location destination, MobilityType type,
                                     List<Leg> baseLegs) {
+        Location switchPoint = candidateHub.location();
         Mono<List<Leg>>           transitLegs  = transitRoutePort.getTransitRoute(origin, switchPoint);
         Mono<Integer>             transitTime  = transitRoutePort.getTransitTimeMinutes(origin, switchPoint);
         Mono<java.util.Optional<MobilityInfo>> avail = mobilityInfoForSegment(switchPoint, destination, type);
@@ -105,7 +105,8 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                             : tuple.getT1();
                     List<Leg> legs = new ArrayList<>(partialTransit);
                     legs.addAll(mobilityLegs);
-                    return Route.of(legs, routeType);
+                    return Route.of(legs, routeType)
+                            .withSelectedHubs(List.of(RouteHubExtractor.fromSelectedHub(candidateHub, "LAST_MILE_CANDIDATE")));
                 }));
     }
 
@@ -136,7 +137,7 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                 .flatMap(l -> l.transitInfo().passThroughStations().stream())
                 .toList();
         TransitInfo transitInfo = lineName.isBlank() ? null
-                : new TransitInfo(lineName, lineColor, approxStations, passThroughStations);
+                : new TransitInfo(lineName, lineColor, approxStations, 0, passThroughStations);
         return new Leg(LegType.TRANSIT, "대중교통", minutes, 0, from, to, transitInfo, null, null);
     }
 

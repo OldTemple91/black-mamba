@@ -1,6 +1,6 @@
 # Current Focus
 
-> 마지막 업데이트: 2026-03-11
+> 마지막 업데이트: 2026-03-12
 
 ## 현재 목표
 
@@ -22,37 +22,41 @@
 - `Hub`, `HubType`, `HubSelector` 도입
 - `RouteReliabilityMetrics` 도입
 - `RouteEvaluator`로 점수/비교/인사이트 통합
+- 대중교통 요금 / 따릉이 추정 요금 계산 반영
+- `costBreakdown` 및 leg pricing policy 분리
+- `RouteEvaluation` / `RouteHub` 응답 노출
 
 ## 다음 우선순위
 
-### 1. Hub 노출 확장
+### 1. Hub 의미 고도화
 
-- API 응답 또는 디버그 정보에 허브 타입 노출
-- 프론트 경로 카드에서 `BUS_STOP`, `SUBWAY_STATION`, `BIKE_STATION`을 직접 보여주기
+- 현재 `selected-candidate` metadata까지 응답 노출 완료
+- 다음 단계는 허브 좌표/반경과 실제 경로 leg를 더 정교하게 연결
 
-### 2. RouteEvaluation 도메인화
+### 2. 평가 지표 실험화
 
-- 점수 세부 항목을 별도 객체로 저장
-- 실험 리포트, README, UI 디버그에 동일 데이터 재사용
+- `RouteEvaluation` 기반 batch 비교 리포트 생성
+- baseline 대비 시간/도보/비용/신뢰도 비교 자동화
 
-### 3. 실험 지표 수집
+### 3. README / 실험 문서 보강
 
-- baseline 대비 시간 절감
-- 도보 거리 변화
-- 접근 도보 평균
-- 반납 정류소 미존재 제외 비율
-- 공유수단 의존 비율
+- 비용 정책 가정 문서화
+- 허브/평가 도메인 구조 다이어그램 반영
+- 실제 응답 예시 JSON 추가
 
 ## 주의할 점
 
 - `OPTIMAL` 모드는 현재 따릉이 중심
 - 공유 킥보드 데이터는 메인 축에서 제외된 상태
-- 허브 구조는 도입됐지만 아직 후보점을 감싸는 수준
+- 허브 타입은 응답에 노출되고, 선택된 candidate metadata도 포함됨
+- 다만 현재 허브 추출은 `actual leg + selected candidate` 병합 수준
+- 따릉이 요금은 `1h/2h/3h + 초과 5분당 200원` 정책 기반의 추정치
+- 현재 비용 상세는 `대중교통`, `따릉이`만 분리됨
 
 ## 바로 이어서 할 일
 
 다음 작업 시작 시 먼저 확인할 파일:
 
 - `README.md`
+- `docs/progress/2026-03-12-daily-log.md`
 - `docs/plans/2026-03-11-hub-reliability-design.md`
-- `docs/progress/2026-03-11-daily-log.md`

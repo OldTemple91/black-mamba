@@ -99,14 +99,13 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     // 패턴 B: 이동수단으로 첫 정류장까지 → 대중교통으로 목적지
     private Flux<Route> patternB(Location origin, Location destination,
                                   List<Leg> baseLegs, MobilityType type, MobilityConfig config) {
-        List<Location> firstMile = hubSelector.selectFirstMileHubs(origin, baseLegs, config).stream()
-                .map(Hub::location)
+        List<Hub> firstMile = hubSelector.selectFirstMileHubs(origin, baseLegs, config).stream()
                 .limit(3)
                 .toList();
-        int baseMinutes = baseLegs.stream().mapToInt(Leg::durationMinutes).sum();
         return Flux.fromIterable(firstMile)
-                .flatMap(transitStart ->
-                        mobilityInfoForSegment(origin, transitStart, type)
+                .flatMap(firstHub -> {
+                    Location transitStart = firstHub.location();
+                    return mobilityInfoForSegment(origin, transitStart, type)
                                 .filter(Optional::isPresent)
                                 .flatMap(avail -> {
                                     MobilityInfo info = avail.get();
@@ -124,23 +123,23 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                                                 List<Leg> legs = new ArrayList<>();
                                                 legs.addAll(tuple.getT1());
                                                 legs.addAll(partialTransit);
-                                                return buildRoute(legs, RouteType.MOBILITY_FIRST_TRANSIT);
+                                                return buildRoute(legs, RouteType.MOBILITY_FIRST_TRANSIT,
+                                                        List.of(RouteHubExtractor.fromSelectedHub(firstHub, "FIRST_MILE_CANDIDATE")));
                                             });
-                                })
-                );
+                                });
+                });
     }
 
     // 패턴 C: 대중교통으로 환승점까지 → 이동수단으로 목적지
     private Flux<Route> patternC(Location origin, Location destination,
                                   List<Leg> baseLegs, MobilityType type, MobilityConfig config) {
-        List<Location> lastMile = hubSelector.selectLastMileHubs(baseLegs, config).stream()
-                .map(Hub::location)
+        List<Hub> lastMile = hubSelector.selectLastMileHubs(baseLegs, config).stream()
                 .limit(3)
                 .toList();
-        int baseMinutes = baseLegs.stream().mapToInt(Leg::durationMinutes).sum();
         return Flux.fromIterable(lastMile)
-                .flatMap(switchPoint ->
-                        mobilityInfoForSegment(switchPoint, destination, type)
+                .flatMap(lastHub -> {
+                    Location switchPoint = lastHub.location();
+                    return mobilityInfoForSegment(switchPoint, destination, type)
                                 .filter(Optional::isPresent)
                                 .flatMap(avail -> {
                                     MobilityInfo info = avail.get();
@@ -157,25 +156,24 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                                                         : tuple.getT1();
                                                 List<Leg> legs = new ArrayList<>(partialTransit);
                                                 legs.addAll(tuple.getT3());
-                                                return buildRoute(legs, routeTypeFor(type));
+                                                return buildRoute(legs, routeTypeFor(type),
+                                                        List.of(RouteHubExtractor.fromSelectedHub(lastHub, "LAST_MILE_CANDIDATE")));
                                             });
-                                })
-                );
+                                });
+                });
     }
 
     // 패턴 D: 이동수단→정류장 + 대중교통(중간) + 이동수단→목적지
     private Flux<Route> patternD(Location origin, Location destination,
                                   List<Leg> baseLegs, MobilityType type, MobilityConfig config) {
-        List<Location> firstMile = hubSelector.selectFirstMileHubs(origin, baseLegs, config).stream()
-                .map(Hub::location)
-                .toList();
-        List<Location> lastMile  = hubSelector.selectLastMileHubs(baseLegs, config).stream()
-                .map(Hub::location)
-                .toList();
+        List<Hub> firstMile = hubSelector.selectFirstMileHubs(origin, baseLegs, config);
+        List<Hub> lastMile  = hubSelector.selectLastMileHubs(baseLegs, config);
         if (firstMile.isEmpty() || lastMile.isEmpty()) return Flux.empty();
 
-        Location transitStart = firstMile.get(0);
-        Location transitEnd   = lastMile.get(lastMile.size() / 2);
+        Hub startHub = firstMile.get(0);
+        Hub endHub = lastMile.get(lastMile.size() / 2);
+        Location transitStart = startHub.location();
+        Location transitEnd   = endHub.location();
 
         Mono<Optional<MobilityInfo>> startInfo = mobilityInfoForSegment(origin, transitStart, type);
         Mono<Optional<MobilityInfo>> endInfo   = mobilityInfoForSegment(transitEnd, destination, type);
@@ -198,7 +196,11 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                                 legs.addAll(t.getT1());
                                 legs.addAll(middleTransit);
                                 legs.addAll(t.getT4());
-                                return buildRoute(legs, RouteType.MOBILITY_TRANSIT_MOBILITY);
+                                return buildRoute(legs, RouteType.MOBILITY_TRANSIT_MOBILITY,
+                                        List.of(
+                                                RouteHubExtractor.fromSelectedHub(startHub, "FIRST_MILE_CANDIDATE"),
+                                                RouteHubExtractor.fromSelectedHub(endHub, "LAST_MILE_CANDIDATE")
+                                        ));
                             })
                             .flux();
                 });
@@ -214,7 +216,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                 .filter(Optional::isPresent)
                 .flatMapMany(avail -> {
                     return mobilitySegmentBuilder.build(origin, destination, type, avail.get())
-                            .map(legs -> buildRoute(legs, RouteType.MOBILITY_ONLY))
+                            .map(legs -> buildRoute(legs, RouteType.MOBILITY_ONLY, List.of()))
                             .flux();
                 });
     }
@@ -243,8 +245,8 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
 
     // ── 헬퍼 ──────────────────────────────────────────────────────────────────
 
-    private Route buildRoute(List<Leg> legs, RouteType type) {
-        return Route.of(legs, type);
+    private Route buildRoute(List<Leg> legs, RouteType type, List<RouteHub> selectedHubs) {
+        return Route.of(legs, type).withSelectedHubs(selectedHubs);
     }
 
     /**
@@ -290,7 +292,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                 .toList();
 
         TransitInfo transitInfo = lineName.isBlank() ? null
-                : new TransitInfo(lineName, lineColor, approxStations, passThroughStations);
+                : new TransitInfo(lineName, lineColor, approxStations, 0, passThroughStations);
 
         return new Leg(LegType.TRANSIT, "대중교통", minutes, 0, from, to, transitInfo, null, null);
     }
@@ -309,33 +311,19 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     }
 
     private List<Route> rank(List<Route> candidates, int baseMinutes, Route baseRoute) {
-        // TRANSIT_ONLY는 항상 마지막에 고정 노출 — 점수와 무관하게 분리
-        Optional<Route> transitOnly = candidates.stream()
-                .filter(r -> r.type() == RouteType.TRANSIT_ONLY)
-                .findFirst();
-
-        List<Route> mixed = candidates.stream()
-                .filter(r -> r.type() != RouteType.TRANSIT_ONLY)
-                .toList();
-
-        List<Route> evaluatedMixed = mixed.stream()
+        List<Route> evaluated = candidates.stream()
                 .map(route -> routeEvaluator.evaluate(route, baseRoute, baseMinutes, false))
                 .sorted(Comparator.comparingDouble(Route::score).reversed())
-                .limit(4)
+                .limit(5)
                 .toList();
 
-        List<Route> result = new ArrayList<>();
-        if (!evaluatedMixed.isEmpty()) {
-            Route top = evaluatedMixed.getFirst();
-            result.add(routeEvaluator.evaluate(top, baseRoute, baseMinutes, true));
-            result.addAll(evaluatedMixed.stream().skip(1).toList());
+        if (evaluated.isEmpty()) {
+            return evaluated;
         }
 
-        // 대중교통 단독 옵션 항상 마지막에 추가
-        transitOnly.ifPresent(r -> {
-            result.add(routeEvaluator.evaluate(r, baseRoute, baseMinutes, result.isEmpty()));
-        });
-
+        List<Route> result = new ArrayList<>(evaluated);
+        Route top = result.getFirst();
+        result.set(0, routeEvaluator.evaluate(top, baseRoute, baseMinutes, true));
         return result;
     }
 

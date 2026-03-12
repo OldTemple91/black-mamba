@@ -2,7 +2,9 @@ import { useState } from 'react'
 import LegItem from './LegItem'
 import {
   getComparisonBars,
+  getCostBreakdown,
   getDebugFacts,
+  getHubSummary,
   getRecommendationReasons,
   getRiskBadges,
   getTransferSummary,
@@ -54,7 +56,9 @@ export default function RouteCard({
   const reasons = getRecommendationReasons(route, baselineRoute)
   const risks = getRiskBadges(route)
   const transfers = getTransferSummary(route)
+  const hubs = getHubSummary(route)
   const comparisonBars = comparisonContext ? getComparisonBars(route, comparisonContext) : []
+  const costBreakdown = getCostBreakdown(route)
   const debugFacts = showDebug ? getDebugFacts(route, baselineRoute, searchMode) : []
 
   return (
@@ -87,7 +91,14 @@ export default function RouteCard({
         <div className="text-right">
           <span className="text-xl font-bold text-gray-800">{route.totalMinutes}분</span>
           {route.totalCostWon > 0 && (
-            <p className="text-xs text-gray-400">{route.totalCostWon.toLocaleString()}원</p>
+            <>
+              <p className="text-xs text-gray-400">{route.totalCostWon.toLocaleString()}원</p>
+              {costBreakdown.length > 0 && (
+                <p className="mt-1 text-[11px] text-gray-400 max-w-[180px] text-right">
+                  {costBreakdown.map(item => `${item.label} ${item.amountWon.toLocaleString()}원`).join(' + ')}
+                </p>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -106,6 +117,22 @@ export default function RouteCard({
           </span>
         ))}
       </div>
+
+      {hubs.length > 0 && (
+        <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2">
+          <p className="text-[11px] font-semibold text-violet-700">경로 허브</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {hubs.map(hub => (
+              <span key={`${hub.label}-${hub.detail}`} className="text-[11px] px-2 py-1 rounded-full border border-violet-200 bg-white text-violet-700">
+                {hub.label} · {hub.detail}
+                {hub.source === 'selected-candidate' && (
+                  <> · {hub.metadata.selectionPhase === 'FIRST_MILE' ? '후보(출발)' : hub.metadata.selectionPhase === 'LAST_MILE' ? '후보(도착)' : '후보'}</>
+                )}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         {comparisonBars.map(bar => (

@@ -26,8 +26,16 @@ class RouteControllerTest {
 
     @Test
     void 경로_탐색_API가_200을_반환한다() throws Exception {
+        RouteCostBreakdown breakdown = new RouteCostBreakdown(List.of(new CostComponent("대중교통", 1250)), 1250);
+        RouteEvaluation evaluation = new RouteEvaluation(
+                0.8, 0.9, 0.7, 0.8, 0.9, 0.85, 0.82,
+                320, 1, 120,
+                false, false, false, false,
+                List.of(new RouteHub("서울역", com.blackmamba.navigation.domain.hub.HubType.SUBWAY_STATION,
+                        "TRANSIT_BOARDING", "actual", java.util.Map.of()))
+        );
         Route route = new Route("rt_001", RouteType.TRANSIT_ONLY, 45, 1250,
-                0.5, true, List.of(), new Comparison(45, 0), null);
+                breakdown, List.of(), evaluation, 0.5, true, List.of(), new Comparison(45, 0), null);
 
         when(routeOptimizationService.findRoutes(any(), any(), any(), any()))
                 .thenReturn(Mono.just(List.of(route)));
@@ -39,13 +47,18 @@ class RouteControllerTest {
                         .param("destLng", "127.0276"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.routes[0].routeId").value("rt_001"))
-                .andExpect(jsonPath("$.routes[0].totalMinutes").value(45));
+                .andExpect(jsonPath("$.routes[0].totalMinutes").value(45))
+                .andExpect(jsonPath("$.routes[0].costBreakdown.totalWon").value(1250))
+                .andExpect(jsonPath("$.routes[0].costBreakdown.items[0].label").value("대중교통"))
+                .andExpect(jsonPath("$.routes[0].evaluation.totalScore").value(0.82))
+                .andExpect(jsonPath("$.routes[0].evaluation.hubs[0].type").value("SUBWAY_STATION"));
     }
 
     @Test
     void mobility_파라미터_없이도_경로를_탐색한다() throws Exception {
+        RouteCostBreakdown breakdown = new RouteCostBreakdown(List.of(new CostComponent("대중교통", 1250)), 1250);
         Route route = new Route("rt_002", RouteType.TRANSIT_ONLY, 30, 1250,
-                0.6, true, List.of(), new Comparison(30, 0), null);
+                breakdown, List.of(), null, 0.6, true, List.of(), new Comparison(30, 0), null);
 
         when(routeOptimizationService.findRoutes(any(), any(), any(), any()))
                 .thenReturn(Mono.just(List.of(route)));
@@ -61,8 +74,9 @@ class RouteControllerTest {
 
     @Test
     void searchMode_OPTIMAL_파라미터로_경로를_탐색한다() throws Exception {
+        RouteCostBreakdown breakdown = new RouteCostBreakdown(List.of(), 0);
         Route route = new Route("rt_opt", RouteType.MOBILITY_ONLY, 20, 0,
-                0.9, true, List.of(), null, null);
+                breakdown, List.of(), null, 0.9, true, List.of(), null, null);
 
         when(routeOptimizationService.findRoutes(any(), any(), any(), eq(SearchMode.OPTIMAL)))
                 .thenReturn(Mono.just(List.of(route)));

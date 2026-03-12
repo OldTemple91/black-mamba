@@ -26,6 +26,33 @@ export function getMobilityDistance(route) {
     .reduce((total, leg) => total + (leg.distanceMeters || 0), 0)
 }
 
+export function getCostBreakdown(route) {
+  const items = route.costBreakdown?.items
+  if (Array.isArray(items) && items.length > 0) {
+    return items.filter(item => (item.amountWon || 0) > 0)
+  }
+
+  if ((route.totalCostWon || 0) <= 0) {
+    return []
+  }
+
+  return [{ label: '예상 비용', amountWon: route.totalCostWon }]
+}
+
+export function getHubSummary(route) {
+  const hubs = route.evaluation?.hubs
+  if (!Array.isArray(hubs) || hubs.length === 0) {
+    return []
+  }
+
+  return hubs.slice(0, 4).map(hub => ({
+    label: hubTypeLabel(hub.type),
+    detail: `${hub.name} · ${hubRoleLabel(hub.role)}`,
+    source: hub.source,
+    metadata: hub.metadata ?? {},
+  }))
+}
+
 export function findBaselineRoute(routes) {
   return routes.find(route => route.type === 'TRANSIT_ONLY') ?? routes[0] ?? null
 }
@@ -195,6 +222,21 @@ export function getDebugFacts(route, baselineRoute, searchMode) {
     `경로 타입: ${route.type}`,
     `총 구간 수: ${route.legs.length}개`,
     `대중교통 구간: ${transitLegs.length}개 / 환승 ${countTransfers(route)}회`,
+    `총 예상 비용: ${(route.totalCostWon || 0).toLocaleString()}원`,
+    getCostBreakdown(route).length > 0
+      ? `비용 구성: ${getCostBreakdown(route).map(item => `${item.label} ${item.amountWon.toLocaleString()}원`).join(' + ')}`
+      : '비용 구성: 없음',
+    route.evaluation ? `평가 점수: ${(route.evaluation.totalScore * 100).toFixed(1)} / 시간 ${(route.evaluation.timeScore * 100).toFixed(0)} / 신뢰도 ${(route.evaluation.reliabilityScore * 100).toFixed(0)}` : '평가 데이터 없음',
+    route.evaluation ? `접근 도보 최대: ${route.evaluation.maxAccessWalkDistanceMeters}m / 총 도보: ${route.evaluation.walkingDistanceMeters}m` : null,
+    route.evaluation?.hubs?.length > 0
+      ? `허브: ${route.evaluation.hubs.map(hub => `${hub.name}(${hub.type})`).join(', ')}`
+      : '허브 정보 없음',
+    route.evaluation?.hubs?.some(hub => hub.source === 'selected-candidate')
+      ? `선택 허브 metadata: ${route.evaluation.hubs
+        .filter(hub => hub.source === 'selected-candidate')
+        .map(hub => `${hub.name}[${hub.metadata?.selectionPhase ?? '-'} / ${hub.metadata?.preferredMobility ?? '-'}]`)
+        .join(', ')}`
+      : '선택 허브 metadata 없음',
     `도보 거리: ${getWalkingDistance(route)}m`,
     `마이크로모빌리티 거리: ${getMobilityDistance(route)}m`,
     bikeLegs.length > 0
@@ -204,5 +246,30 @@ export function getDebugFacts(route, baselineRoute, searchMode) {
       ? `킥보드 배터리: ${kickboardLegs.map(leg => `${leg.mobilityInfo?.batteryLevel ?? 0}%`).join(', ')}`
       : '킥보드 구간 없음',
     baselineRoute ? `기준 경로 시간: ${baselineRoute.totalMinutes}분` : '기준 경로 없음',
-  ]
+  ].filter(Boolean)
+}
+
+function hubTypeLabel(type) {
+  switch (type) {
+    case 'SUBWAY_STATION': return '지하철 허브'
+    case 'BUS_STOP': return '버스 허브'
+    case 'BIKE_STATION': return '자전거 허브'
+    case 'CARSHARE_ZONE': return '카셰어 존'
+    case 'CHARGING_STATION': return '충전 허브'
+    default: return '환승 허브'
+  }
+}
+
+function hubRoleLabel(role) {
+  switch (role) {
+    case 'TRANSIT_BOARDING': return '대중교통 승차'
+    case 'TRANSIT_ALIGHTING': return '대중교통 하차'
+    case 'BIKE_PICKUP': return '자전거 대여'
+    case 'BIKE_DROPOFF': return '자전거 반납'
+    case 'KICKBOARD_PICKUP': return '킥보드 탑승'
+    case 'KICKBOARD_DROPOFF': return '킥보드 하차'
+    case 'FIRST_MILE_CANDIDATE': return '퍼스트마일 후보'
+    case 'LAST_MILE_CANDIDATE': return '라스트마일 후보'
+    default: return '환승'
+  }
 }

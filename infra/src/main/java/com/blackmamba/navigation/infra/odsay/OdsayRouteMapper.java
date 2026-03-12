@@ -13,12 +13,21 @@ import java.util.List;
 public class OdsayRouteMapper {
 
     public List<Leg> toLegs(OdsayRouteResponse.Path path) {
-        return path.subPath().stream()
-                .map(this::toLeg)
-                .toList();
+        int totalFare = path.info() != null ? Math.max(path.info().payment(), 0) : 0;
+        boolean fareAssigned = false;
+        java.util.ArrayList<Leg> legs = new java.util.ArrayList<>();
+
+        for (OdsayRouteResponse.SubPath subPath : path.subPath()) {
+            boolean assignFare = !fareAssigned && (subPath.trafficType() == 1 || subPath.trafficType() == 2);
+            legs.add(toLeg(subPath, assignFare ? totalFare : 0));
+            if (assignFare) {
+                fareAssigned = true;
+            }
+        }
+        return legs;
     }
 
-    private Leg toLeg(OdsayRouteResponse.SubPath subPath) {
+    private Leg toLeg(OdsayRouteResponse.SubPath subPath, int fareWon) {
         LegType legType = switch (subPath.trafficType()) {
             case 1, 2 -> LegType.TRANSIT;
             default -> LegType.WALK;
@@ -51,11 +60,12 @@ public class OdsayRouteMapper {
                         lane.lineName(),   // 지하철: name, 버스: busNo+"번"
                         lane.busColor(),
                         stationCount,
+                        fareWon,
                         passThroughStations
                 );
             } else if (stationCount > 0) {
                 // lane 정보 없어도 정거장 수와 경유 정보는 유지
-                transitInfo = new TransitInfo(null, null, stationCount, passThroughStations);
+                transitInfo = new TransitInfo(null, null, stationCount, fareWon, passThroughStations);
             }
         }
 

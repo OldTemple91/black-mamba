@@ -1,6 +1,7 @@
 package com.blackmamba.navigation.application.route;
 
 import com.blackmamba.navigation.domain.route.Route;
+import com.blackmamba.navigation.domain.route.RouteEvaluation;
 import org.springframework.stereotype.Component;
 
 /**
@@ -27,33 +28,66 @@ public class RouteScoreCalculator {
     private static final int MAX_EXPECTED_ACCESS_WALK_METERS = 600;
 
     public double calculate(Route route) {
-        double timeScore        = 1.0 - normalize(route.totalMinutes(), MAX_EXPECTED_MINUTES);
-        double transferScore    = 1.0 - normalize(RouteReliabilityMetrics.transferCount(route), MAX_EXPECTED_TRANSFERS);
-        double costScore        = 1.0 - normalize(route.totalCostWon(), MAX_EXPECTED_COST);
-        double walkingScore     = 1.0 - normalize(RouteReliabilityMetrics.walkingDistance(route), MAX_EXPECTED_WALK_METERS);
-        double accessWalkScore  = 1.0 - normalize(RouteReliabilityMetrics.maxAccessWalkDistance(route), MAX_EXPECTED_ACCESS_WALK_METERS);
-        double reliabilityScore = reliabilityScore(route);
+        return evaluate(route).totalScore();
+    }
 
-        return (timeScore        * TIME_WEIGHT)
-             + (transferScore    * TRANSFER_WEIGHT)
-             + (costScore        * COST_WEIGHT)
-             + (walkingScore     * WALK_WEIGHT)
-             + (accessWalkScore  * ACCESS_WALK_WEIGHT)
-             + (reliabilityScore * RELIABILITY_WEIGHT);
+    public RouteEvaluation evaluate(Route route) {
+        double timeScore        = 1.0 - normalize(route.totalMinutes(), MAX_EXPECTED_MINUTES);
+        int transferCount       = RouteReliabilityMetrics.transferCount(route);
+        int walkingDistance     = RouteReliabilityMetrics.walkingDistance(route);
+        int accessWalkDistance  = RouteReliabilityMetrics.maxAccessWalkDistance(route);
+        boolean sharedMobility  = RouteReliabilityMetrics.hasSharedMobility(route);
+        boolean weakDropoff     = RouteReliabilityMetrics.hasWeakDropoff(route);
+        boolean lowAvailability = RouteReliabilityMetrics.hasLowAvailability(route);
+        boolean lowBattery      = RouteReliabilityMetrics.hasLowBattery(route);
+
+        double transferScore    = 1.0 - normalize(transferCount, MAX_EXPECTED_TRANSFERS);
+        double costScore        = 1.0 - normalize(route.totalCostWon(), MAX_EXPECTED_COST);
+        double walkingScore     = 1.0 - normalize(walkingDistance, MAX_EXPECTED_WALK_METERS);
+        double accessWalkScore  = 1.0 - normalize(accessWalkDistance, MAX_EXPECTED_ACCESS_WALK_METERS);
+        double reliabilityScore = reliabilityScore(sharedMobility, weakDropoff, lowAvailability, lowBattery, accessWalkDistance);
+        double totalScore = (timeScore        * TIME_WEIGHT)
+                + (transferScore    * TRANSFER_WEIGHT)
+                + (costScore        * COST_WEIGHT)
+                + (walkingScore     * WALK_WEIGHT)
+                + (accessWalkScore  * ACCESS_WALK_WEIGHT)
+                + (reliabilityScore * RELIABILITY_WEIGHT);
+
+        return new RouteEvaluation(
+                timeScore,
+                transferScore,
+                costScore,
+                walkingScore,
+                accessWalkScore,
+                reliabilityScore,
+                totalScore,
+                walkingDistance,
+                transferCount,
+                accessWalkDistance,
+                sharedMobility,
+                weakDropoff,
+                lowAvailability,
+                lowBattery,
+                RouteHubExtractor.extract(route)
+        );
     }
 
     private double normalize(double value, double max) {
         return Math.min(value / max, 1.0);
     }
 
-    private double reliabilityScore(Route route) {
+    private double reliabilityScore(boolean sharedMobility,
+                                    boolean weakDropoff,
+                                    boolean lowAvailability,
+                                    boolean lowBattery,
+                                    int accessWalkDistance) {
         double score = 1.0;
 
-        if (RouteReliabilityMetrics.hasWeakDropoff(route)) score -= 0.35;
-        if (RouteReliabilityMetrics.hasLowAvailability(route)) score -= 0.15;
-        if (RouteReliabilityMetrics.hasSharedMobility(route)) score -= 0.10;
-        if (RouteReliabilityMetrics.hasLowBattery(route)) score -= 0.15;
-        if (RouteReliabilityMetrics.maxAccessWalkDistance(route) >= 300) score -= 0.15;
+        if (weakDropoff) score -= 0.35;
+        if (lowAvailability) score -= 0.15;
+        if (sharedMobility) score -= 0.10;
+        if (lowBattery) score -= 0.15;
+        if (accessWalkDistance >= 300) score -= 0.15;
 
         return Math.max(score, 0.0);
     }
