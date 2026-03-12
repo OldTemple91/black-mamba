@@ -27,12 +27,15 @@ public class OdsayRouteClient {
     private static final Logger log = LoggerFactory.getLogger(OdsayRouteClient.class);
 
     private static final long RATE_INTERVAL_MS = 200L; // max 5 req/sec
+    private static final double ODSAY_MIN_TRANSIT_DISTANCE_METERS = 700.0;
     private final WebClient webClient;
     private final OdsayRouteMapper mapper;
     private final ObjectMapper objectMapper;
     private final String apiKey;
     private final Counter transitRouteErrorFallbackCounter;
     private final Counter transitTimeEstimateFallbackCounter;
+    private final Counter transitRouteShortDistanceSkipCounter;
+    private final Counter transitTimeShortDistanceSkipCounter;
     private final Counter routeCacheHitCounter;
     private final Counter routeCacheMissCounter;
     private final AtomicLong nextPermitMs = new AtomicLong(0);
@@ -61,6 +64,16 @@ public class OdsayRouteClient {
                 "navigation.odsay.fallback.total",
                 "type", "transit_time",
                 "reason", "empty_or_zero"
+        );
+        this.transitRouteShortDistanceSkipCounter = meterRegistry.counter(
+                "navigation.odsay.fallback.total",
+                "type", "transit_route",
+                "reason", "short_distance"
+        );
+        this.transitTimeShortDistanceSkipCounter = meterRegistry.counter(
+                "navigation.odsay.fallback.total",
+                "type", "transit_time",
+                "reason", "short_distance"
         );
         this.routeCacheHitCounter = meterRegistry.counter(
                 "navigation.cache.total",
@@ -91,6 +104,11 @@ public class OdsayRouteClient {
     }
 
     public Mono<List<Leg>> getTransitRoute(Location origin, Location destination) {
+        if (isTooShortForTransit(origin, destination)) {
+            transitRouteShortDistanceSkipCounter.increment();
+            log.info("[ODsay] 직선거리 700m 이하 구간은 호출 생략 ({} -> {})", origin.name(), destination.name());
+            return Mono.just(List.of());
+        }
         RouteKey key = new RouteKey(origin, destination);
         long now = System.currentTimeMillis();
         return routeCache.compute(key, (ignored, existing) -> {
@@ -207,6 +225,10 @@ public class OdsayRouteClient {
     }
 
     public Mono<Integer> getTransitTimeMinutes(Location origin, Location destination) {
+        if (isTooShortForTransit(origin, destination)) {
+            transitTimeShortDistanceSkipCounter.increment();
+            return Mono.just(haversineTransitEstimate(origin, destination));
+        }
         return getTransitRoute(origin, destination)
                 .map(legs -> {
                     int sum = legs.stream().mapToInt(Leg::durationMinutes).sum();
@@ -228,6 +250,19 @@ public class OdsayRouteClient {
                 * Math.sin(dLng / 2) * Math.sin(dLng / 2);
         double distKm = 6371.0 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
         return Math.max((int) Math.ceil(distKm * 1.4 / 25.0 * 60), 5);
+    }
+
+    private boolean isTooShortForTransit(Location origin, Location destination) {
+        return haversineMeters(origin, destination) <= ODSAY_MIN_TRANSIT_DISTANCE_METERS;
+    }
+
+    private double haversineMeters(Location a, Location b) {
+        double dLat = Math.toRadians(b.lat() - a.lat());
+        double dLng = Math.toRadians(b.lng() - a.lng());
+        double h = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(a.lat())) * Math.cos(Math.toRadians(b.lat()))
+                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        return 6_371_000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
     }
 
     private record RouteKey(double originLat, double originLng, double destinationLat, double destinationLng) {
