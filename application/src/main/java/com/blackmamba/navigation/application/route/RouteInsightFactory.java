@@ -2,6 +2,7 @@ package com.blackmamba.navigation.application.route;
 
 import com.blackmamba.navigation.domain.route.Leg;
 import com.blackmamba.navigation.domain.route.LegType;
+import com.blackmamba.navigation.domain.route.GenerationDiagnostic;
 import com.blackmamba.navigation.domain.route.Route;
 import com.blackmamba.navigation.domain.route.RouteInsights;
 import org.springframework.stereotype.Component;
@@ -18,7 +19,7 @@ public class RouteInsightFactory {
     private static final int TOTAL_WALK_WARNING_METERS = 800;
 
     public Route enrich(Route route, Route baselineRoute) {
-        List<String> generationDiagnostics = route.insights() != null
+        List<GenerationDiagnostic> generationDiagnostics = route.insights() != null
                 ? route.insights().generationDiagnostics()
                 : List.of();
         List<String> fallbackDiagnostics = route.insights() != null

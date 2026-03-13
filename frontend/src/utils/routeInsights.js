@@ -60,9 +60,13 @@ export function getGenerationDiagnostics(route) {
     return []
   }
 
-  return diagnostics.slice(0, 3).map(message => ({
-    message,
-    tone: inferDiagnosticTone(message),
+  return diagnostics.slice(0, 3).map(item => ({
+    phase: item.phase,
+    mobilityType: item.mobilityType,
+    reasonCode: item.reasonCode,
+    candidateCount: item.candidateCount,
+    message: item.message,
+    tone: inferDiagnosticTone(item.reasonCode, item.message),
   }))
 }
 
@@ -179,9 +183,11 @@ function inferRiskStyle(label) {
   return RISK_STYLES.info
 }
 
-function inferDiagnosticTone(message) {
-  if (message.includes('동일 정류소')) return 'risk'
-  if (message.includes('반납 가능한 정류소') || message.includes('대여 가능한 수단')) return 'caution'
+function inferDiagnosticTone(reasonCode, message) {
+  if (reasonCode === 'SAME_PICKUP_DROPOFF') return 'risk'
+  if (reasonCode === 'NO_DROPOFF' || reasonCode === 'NO_PICKUP' || reasonCode === 'DIRECT_DISTANCE_EXCEEDED') return 'caution'
+  if (message?.includes('동일 정류소')) return 'risk'
+  if (message?.includes('반납 가능한 정류소') || message?.includes('대여 가능한 수단')) return 'caution'
   return 'info'
 }
 
@@ -288,7 +294,7 @@ export function getDebugFacts(route, baselineRoute, searchMode, recommendationPr
       ? `킥보드 배터리: ${kickboardLegs.map(leg => `${leg.mobilityInfo?.batteryLevel ?? 0}%`).join(', ')}`
       : '킥보드 구간 없음',
     ...(Array.isArray(route.insights?.generationDiagnostics) && route.insights.generationDiagnostics.length > 0
-      ? route.insights.generationDiagnostics.map(reason => `혼합 경로 미생성: ${reason}`)
+      ? route.insights.generationDiagnostics.map(item => `혼합 경로 미생성 [${item.phase ?? '-'} / ${item.reasonCode ?? '-'}]: ${item.message}`)
       : []),
     baselineRoute ? `기준 경로 시간: ${baselineRoute.totalMinutes}분` : '기준 경로 없음',
   ].filter(Boolean)

@@ -350,19 +350,21 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
         return candidates.size() == 1 && candidates.getFirst().type() == RouteType.TRANSIT_ONLY;
     }
 
-    private Route withDiagnostics(Route route, List<String> diagnostics) {
+    private Route withDiagnostics(Route route, List<GenerationDiagnostic> diagnostics) {
         return route.withInsights(new RouteInsights(List.of(), List.of(), diagnostics, List.of()));
     }
 
-    private Mono<List<String>> buildNoMixedDiagnostics(Location origin, Location destination, List<Leg> baseLegs) {
+    private Mono<List<GenerationDiagnostic>> buildNoMixedDiagnostics(Location origin, Location destination, List<Leg> baseLegs) {
         return Flux.fromIterable(ALL_TYPES)
                 .flatMap(type -> diagnosticsForType(origin, destination, baseLegs, type))
                 .distinct()
                 .collectList()
-                .map(list -> list.isEmpty() ? List.of("혼합 경로 후보를 만들지 못했습니다.") : list);
+                .map(list -> list.isEmpty()
+                        ? List.of(diagnostic("ROUTE_COMPOSITION", null, "NO_MIXED_ROUTE", 0, "혼합 경로 후보를 만들지 못했습니다."))
+                        : list);
     }
 
-    private Flux<String> diagnosticsForType(Location origin, Location destination, List<Leg> baseLegs, MobilityType type) {
+    private Flux<GenerationDiagnostic> diagnosticsForType(Location origin, Location destination, List<Leg> baseLegs, MobilityType type) {
         MobilityConfig config = configFor(type);
         List<Hub> lastMileHubs = hubSelector.selectLastMileHubs(baseLegs, destination, config).stream()
                 .limit(MAX_CANDIDATE_HUBS)
@@ -371,68 +373,85 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                 .limit(MAX_CANDIDATE_HUBS)
                 .toList();
 
-        List<String> immediateReasons = new ArrayList<>();
-        if (firstMileHubs.isEmpty()) immediateReasons.add(labelFor(type) + " 퍼스트마일 후보 허브가 없습니다.");
-        if (lastMileHubs.isEmpty()) immediateReasons.add(labelFor(type) + " 라스트마일 후보 허브가 없습니다.");
+        List<GenerationDiagnostic> immediateReasons = new ArrayList<>();
+        if (firstMileHubs.isEmpty()) immediateReasons.add(
+                diagnostic("FIRST_MILE", type, "NO_CANDIDATE_HUB", 0, labelFor(type) + " 퍼스트마일 후보 허브가 없습니다."));
+        if (lastMileHubs.isEmpty()) immediateReasons.add(
+                diagnostic("LAST_MILE", type, "NO_CANDIDATE_HUB", 0, labelFor(type) + " 라스트마일 후보 허브가 없습니다."));
 
         double directDistance = haversineMeters(origin.lat(), origin.lng(), destination.lat(), destination.lng());
         if (directDistance > config.maxRangeMeters()) {
-            immediateReasons.add(labelFor(type) + " 직접 이동 가능 거리(" + config.maxRangeMeters() + "m)를 초과했습니다. 현재 직선거리 약 " + (int) directDistance + "m");
+            immediateReasons.add(diagnostic("DIRECT", type, "DIRECT_DISTANCE_EXCEEDED", 0,
+                    labelFor(type) + " 직접 이동 가능 거리(" + config.maxRangeMeters() + "m)를 초과했습니다. 현재 직선거리 약 " + (int) directDistance + "m"));
         }
 
-        Mono<Optional<String>> lastMileReason = diagnoseSegmentAvailability(
+        Mono<Optional<GenerationDiagnostic>> lastMileReason = diagnoseSegmentAvailability(
                 Flux.fromIterable(lastMileHubs)
                         .flatMap(hub -> diagnoseSegment(origin, hub.location(), destination, type, false)),
                 labelFor(type),
                 "라스트마일",
+                "LAST_MILE",
+                type,
                 lastMileHubs.size()
         );
 
-        Mono<Optional<String>> firstMileReason = diagnoseSegmentAvailability(
+        Mono<Optional<GenerationDiagnostic>> firstMileReason = diagnoseSegmentAvailability(
                 Flux.fromIterable(firstMileHubs)
                         .flatMap(hub -> diagnoseSegment(origin, hub.location(), destination, type, true)),
                 labelFor(type),
                 "퍼스트마일",
+                "FIRST_MILE",
+                type,
                 firstMileHubs.size()
         );
 
         return Mono.zip(firstMileReason, lastMileReason)
                 .flatMapMany(tuple -> {
-                    List<String> reasons = new ArrayList<>(immediateReasons);
+                    List<GenerationDiagnostic> reasons = new ArrayList<>(immediateReasons);
                     tuple.getT1().ifPresent(reasons::add);
                     tuple.getT2().ifPresent(reasons::add);
                     return Flux.fromIterable(reasons);
                 });
     }
 
-    private Mono<Optional<String>> diagnoseSegmentAvailability(Flux<SegmentDiagnostic> diagnostics,
+    private Mono<Optional<GenerationDiagnostic>> diagnoseSegmentAvailability(Flux<SegmentDiagnostic> diagnostics,
                                                                String label,
-                                                               String phase,
+                                                               String phaseLabel,
+                                                               String phaseCode,
+                                                               MobilityType mobilityType,
                                                                int hubCount) {
         return diagnostics.collectList()
                 .map(items -> {
                     if (hubCount == 0 || items.isEmpty()) {
-                        return Optional.<String>empty();
+                        return Optional.<GenerationDiagnostic>empty();
                     }
                     long validCount = items.stream().filter(SegmentDiagnostic::isValid).count();
                     if (validCount > 0) {
-                        return Optional.<String>empty();
+                        return Optional.<GenerationDiagnostic>empty();
                     }
                     long noPickup = items.stream().filter(item -> item.reason() == DiagnosticReason.NO_PICKUP).count();
                     long noDropoff = items.stream().filter(item -> item.reason() == DiagnosticReason.NO_DROPOFF).count();
                     long sameStation = items.stream().filter(item -> item.reason() == DiagnosticReason.SAME_STATION).count();
 
                     if (sameStation > 0) {
-                        return Optional.of(label + " " + phase + " 후보 " + hubCount + "개를 확인했지만 동일 정류소 대여/반납 조합만 발견되어 제외했습니다.");
+                        return Optional.of(diagnostic(phaseCode, mobilityType, "SAME_PICKUP_DROPOFF", hubCount,
+                                label + " " + phaseLabel + " 후보 " + hubCount + "개를 확인했지만 동일 정류소 대여/반납 조합만 발견되어 제외했습니다."));
                     }
                     if (noDropoff > 0 && noPickup == 0) {
-                        return Optional.of(label + " " + phase + " 후보 " + hubCount + "개를 확인했지만 반납 가능한 정류소를 찾지 못했습니다.");
+                        return Optional.of(diagnostic(phaseCode, mobilityType, "NO_DROPOFF", hubCount,
+                                label + " " + phaseLabel + " 후보 " + hubCount + "개를 확인했지만 반납 가능한 정류소를 찾지 못했습니다."));
                     }
                     if (noPickup > 0 && noDropoff == 0) {
-                        return Optional.of(label + " " + phase + " 후보 " + hubCount + "개를 확인했지만 반경 내 대여 가능한 수단을 찾지 못했습니다.");
+                        return Optional.of(diagnostic(phaseCode, mobilityType, "NO_PICKUP", hubCount,
+                                label + " " + phaseLabel + " 후보 " + hubCount + "개를 확인했지만 반경 내 대여 가능한 수단을 찾지 못했습니다."));
                     }
-                    return Optional.of(label + " " + phase + " 후보 " + hubCount + "개를 확인했지만 대여/반납 가능한 수단을 찾지 못했습니다.");
+                    return Optional.of(diagnostic(phaseCode, mobilityType, "NO_VALID_COMBINATION", hubCount,
+                            label + " " + phaseLabel + " 후보 " + hubCount + "개를 확인했지만 대여/반납 가능한 수단을 찾지 못했습니다."));
                 });
+    }
+
+    private GenerationDiagnostic diagnostic(String phase, MobilityType type, String reasonCode, int candidateCount, String message) {
+        return new GenerationDiagnostic(phase, type != null ? type.name() : null, reasonCode, candidateCount, message);
     }
 
     private Mono<SegmentDiagnostic> diagnoseSegment(Location origin,

@@ -215,26 +215,29 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
         return result;
     }
 
-    private Route withDiagnostics(Route route, List<String> diagnostics) {
+    private Route withDiagnostics(Route route, List<GenerationDiagnostic> diagnostics) {
         return route.withInsights(new RouteInsights(List.of(), List.of(), diagnostics, List.of()));
     }
 
-    private Mono<List<String>> buildNoMixedDiagnostics(List<Leg> baseLegs, Location origin, Location destination) {
+    private Mono<List<GenerationDiagnostic>> buildNoMixedDiagnostics(List<Leg> baseLegs, Location origin, Location destination) {
         return Flux.fromIterable(mobilityTypes)
                 .flatMap(type -> diagnosticsForType(baseLegs, origin, destination, type))
                 .distinct()
                 .collectList()
-                .map(list -> list.isEmpty() ? List.of("혼합 경로 후보를 만들지 못했습니다.") : list);
+                .map(list -> list.isEmpty()
+                        ? List.of(diagnostic("ROUTE_COMPOSITION", null, "NO_MIXED_ROUTE", 0, "혼합 경로 후보를 만들지 못했습니다."))
+                        : list);
     }
 
-    private Flux<String> diagnosticsForType(List<Leg> baseLegs, Location origin, Location destination, MobilityType type) {
+    private Flux<GenerationDiagnostic> diagnosticsForType(List<Leg> baseLegs, Location origin, Location destination, MobilityType type) {
         MobilityConfig config = isKickboardType(type) ? personalAwareConfig(type) : MobilityConfig.bike();
         List<Hub> candidateHubs = hubSelector.selectLastMileHubs(baseLegs, destination, config).stream()
                 .limit(MAX_CANDIDATE_HUBS)
                 .toList();
 
         if (candidateHubs.isEmpty()) {
-            return Flux.just(labelFor(type) + " 라스트마일 후보 허브가 없습니다.");
+            return Flux.just(diagnostic("LAST_MILE", type, "NO_CANDIDATE_HUB", 0,
+                    labelFor(type) + " 라스트마일 후보 허브가 없습니다."));
         }
 
         return Flux.fromIterable(candidateHubs)
@@ -251,16 +254,24 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                     long sameStation = items.stream().filter(item -> item.reason() == DiagnosticReason.SAME_STATION).count();
 
                     if (sameStation > 0) {
-                        return Flux.just(labelFor(type) + " 라스트마일 후보 " + candidateHubs.size() + "개를 확인했지만 동일 정류소 대여/반납 조합만 발견되어 제외했습니다.");
+                        return Flux.just(diagnostic("LAST_MILE", type, "SAME_PICKUP_DROPOFF", candidateHubs.size(),
+                                labelFor(type) + " 라스트마일 후보 " + candidateHubs.size() + "개를 확인했지만 동일 정류소 대여/반납 조합만 발견되어 제외했습니다."));
                     }
                     if (noDropoff > 0 && noPickup == 0) {
-                        return Flux.just(labelFor(type) + " 라스트마일 후보 " + candidateHubs.size() + "개를 확인했지만 반납 가능한 정류소를 찾지 못했습니다.");
+                        return Flux.just(diagnostic("LAST_MILE", type, "NO_DROPOFF", candidateHubs.size(),
+                                labelFor(type) + " 라스트마일 후보 " + candidateHubs.size() + "개를 확인했지만 반납 가능한 정류소를 찾지 못했습니다."));
                     }
                     if (noPickup > 0 && noDropoff == 0) {
-                        return Flux.just(labelFor(type) + " 라스트마일 후보 " + candidateHubs.size() + "개를 확인했지만 반경 내 대여 가능한 수단을 찾지 못했습니다.");
+                        return Flux.just(diagnostic("LAST_MILE", type, "NO_PICKUP", candidateHubs.size(),
+                                labelFor(type) + " 라스트마일 후보 " + candidateHubs.size() + "개를 확인했지만 반경 내 대여 가능한 수단을 찾지 못했습니다."));
                     }
-                    return Flux.just(labelFor(type) + " 라스트마일 후보 " + candidateHubs.size() + "개를 확인했지만 대여/반납 가능한 수단을 찾지 못했습니다.");
+                    return Flux.just(diagnostic("LAST_MILE", type, "NO_VALID_COMBINATION", candidateHubs.size(),
+                            labelFor(type) + " 라스트마일 후보 " + candidateHubs.size() + "개를 확인했지만 대여/반납 가능한 수단을 찾지 못했습니다."));
                 });
+    }
+
+    private GenerationDiagnostic diagnostic(String phase, MobilityType type, String reasonCode, int candidateCount, String message) {
+        return new GenerationDiagnostic(phase, type != null ? type.name() : null, reasonCode, candidateCount, message);
     }
 
     private Mono<SegmentDiagnostic> diagnoseSegment(Location switchPoint, Location destination, MobilityType type) {
