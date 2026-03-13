@@ -5,7 +5,7 @@ import java.util.List;
 public record RouteInsights(
         List<String> recommendationReasons,
         List<String> riskBadges,
-        List<String> generationDiagnostics,
+        List<GenerationDiagnostic> generationDiagnostics,
         List<String> fallbackDiagnostics
 ) {
     public RouteInsights {
