@@ -213,6 +213,17 @@ def mean(values: list[float]) -> float:
     return round(sum(values) / len(values), 3) if values else 0.0
 
 
+def aggregate_generation_reason_counts(results: list[dict], key: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for result in results:
+        insights = result.get(key) or {}
+        diagnostics = insights.get("generationDiagnostics") or []
+        for diagnostic in diagnostics:
+            reason_code = diagnostic.get("reasonCode") or "UNKNOWN"
+            counts[reason_code] = counts.get(reason_code, 0) + 1
+    return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+
 def build_summary(results: list[dict]) -> dict:
     valid = [result for result in results if "error" not in result]
     if not valid:
@@ -255,6 +266,8 @@ def build_summary(results: list[dict]) -> dict:
         "avgMixedWalkingDeltaMeters": mean(mixed_walk_deltas),
         "avgMixedCostDeltaWon": mean(mixed_cost_deltas),
         "avgMixedScoreDelta": mean(mixed_score_deltas),
+        "recommendedGenerationReasonCounts": aggregate_generation_reason_counts(valid, "recommendedInsights"),
+        "bestMixedGenerationReasonCounts": aggregate_generation_reason_counts(mixed, "bestMixedInsights"),
     }
 
 
@@ -299,6 +312,19 @@ def render_markdown(summary: dict, results: list[dict], input_path: Path, base_u
             lines.append(
                 f"- `{cache}`: hit Δ `{values['hitDelta']}`, miss Δ `{values['missDelta']}`"
             )
+
+    recommended_reason_counts = summary.get("recommendedGenerationReasonCounts") or {}
+    best_mixed_reason_counts = summary.get("bestMixedGenerationReasonCounts") or {}
+    if recommended_reason_counts or best_mixed_reason_counts:
+        lines.extend(["", "## Generation Diagnostics", ""])
+        if recommended_reason_counts:
+            lines.append("- Recommended routes")
+            for reason_code, count in recommended_reason_counts.items():
+                lines.append(f"  - `{reason_code}`: `{count}`")
+        if best_mixed_reason_counts:
+            lines.append("- Best mixed alternatives")
+            for reason_code, count in best_mixed_reason_counts.items():
+                lines.append(f"  - `{reason_code}`: `{count}`")
 
     lines.extend([
         "",

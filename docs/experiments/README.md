@@ -68,6 +68,8 @@ mixed 경로가 유리할 가능성이 있는 목적지 세트:
 - 추천 경로 접근 도보
 - best mixed alternative 기준 시간/도보/비용/점수 차이
 - `navigation.cache.total` 기준 cache hit/miss delta
+- `generationDiagnostics.reasonCode` 집계
+  - 예: `NO_PICKUP`, `NO_DROPOFF`, `SAME_PICKUP_DROPOFF`
 
 ## 캐시 메트릭
 
