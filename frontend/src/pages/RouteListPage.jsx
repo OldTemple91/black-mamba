@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { searchRoutes } from '../api/routeApi'
 import RouteCard from '../components/route/RouteCard'
 import NaverMap from '../components/map/NaverMap'
-import { buildComparisonContext, findBaselineRoute, getDebugFacts, getRecommendationReasons, getRiskBadges } from '../utils/routeInsights'
+import { buildComparisonContext, countTransfers, findBaselineRoute, getDebugFacts, getRecommendationReasons, getRiskBadges, getWalkingDistance } from '../utils/routeInsights'
 
 // 장소명 → 좌표 변환
 // 우선순위: 1) "lat,lng" 좌표 문자열 직접 파싱  2) 네이버 지역 검색 API (POI 키워드)  3) 백엔드 NCP 지오코딩 폴백
@@ -49,6 +49,9 @@ export default function RouteListPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [showDebug, setShowDebug] = useState(false)
+  const [comparisonRoutes, setComparisonRoutes] = useState([])
+  const [comparisonLoading, setComparisonLoading] = useState(false)
+  const [comparisonError, setComparisonError] = useState(null)
 
   const originName = searchParams.get('origin') || ''
   const destName   = searchParams.get('dest')   || ''
@@ -81,6 +84,7 @@ export default function RouteListPage() {
 
   const baselineRoute = useMemo(() => findBaselineRoute(routes), [routes])
   const comparisonContext = useMemo(() => buildComparisonContext(routes), [routes])
+  const comparisonSelectedRoute = useMemo(() => comparisonRoutes[0] ?? null, [comparisonRoutes])
   const selectedReasons = useMemo(
     () => (selectedRoute ? getRecommendationReasons(selectedRoute, baselineRoute) : []),
     [selectedRoute, baselineRoute]
@@ -93,6 +97,41 @@ export default function RouteListPage() {
     () => (selectedRoute ? getDebugFacts(selectedRoute, baselineRoute, searchMode, recommendationPreference) : []),
     [selectedRoute, baselineRoute, searchMode, recommendationPreference]
   )
+  const comparePreference = recommendationPreference === 'TIME_PRIORITY' ? 'RELIABILITY' : 'TIME_PRIORITY'
+  const comparePreferenceLabel = comparePreference === 'TIME_PRIORITY' ? '시간 우선' : '신뢰도 우선'
+
+  const handleLoadComparison = async () => {
+    const mobility = mobilityParam.split(',').filter(Boolean)
+    setComparisonLoading(true)
+    setComparisonError(null)
+    try {
+      const [originCoord, destCoord] = await Promise.all([geocode(originName), geocode(destName)])
+      const origin = originCoord ?? SEOUL_CITY_HALL
+      const dest = destCoord ?? { lat: 37.4979, lng: 127.0276 }
+      const data = await searchRoutes({
+        originLat: origin.lat, originLng: origin.lng,
+        destLat: dest.lat, destLng: dest.lng,
+        mobility,
+        searchMode,
+        recommendationPreference: comparePreference,
+      })
+      setComparisonRoutes(data)
+    } catch (err) {
+      setComparisonError(err?.message || '비교 경로를 불러오지 못했습니다.')
+    } finally {
+      setComparisonLoading(false)
+    }
+  }
+
+  const comparisonSummary = useMemo(() => {
+    if (!selectedRoute || !comparisonSelectedRoute) return null
+    return {
+      minuteDelta: comparisonSelectedRoute.totalMinutes - selectedRoute.totalMinutes,
+      walkDelta: getWalkingDistance(comparisonSelectedRoute) - getWalkingDistance(selectedRoute),
+      transferDelta: countTransfers(comparisonSelectedRoute) - countTransfers(selectedRoute),
+      recommendedType: comparisonSelectedRoute.type,
+    }
+  }, [selectedRoute, comparisonSelectedRoute])
 
   if (loading) return (
     <div className="flex justify-center items-center h-screen">
@@ -191,6 +230,90 @@ export default function RouteListPage() {
           )}
         </div>
       )}
+
+      <div className="mb-4 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Preference Compare</p>
+            <h3 className="mt-1 text-base font-semibold text-slate-800">
+              {recommendationPreference === 'TIME_PRIORITY' ? '시간 우선' : '신뢰도 우선'} 결과를 기준으로 비교
+            </h3>
+            <p className="mt-1 text-xs text-slate-500">
+              반대 추천 성향 결과를 필요할 때만 조회합니다.
+            </p>
+          </div>
+          <button
+            onClick={handleLoadComparison}
+            disabled={comparisonLoading}
+            className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+              comparisonLoading
+                ? 'bg-slate-200 text-slate-500'
+                : 'bg-slate-900 text-white hover:bg-slate-800'
+            }`}
+          >
+            {comparisonLoading ? '비교 불러오는 중...' : `${comparePreferenceLabel}와 비교`}
+          </button>
+        </div>
+
+        {comparisonError && (
+          <p className="mt-3 text-sm text-rose-600">{comparisonError}</p>
+        )}
+
+        {comparisonSelectedRoute && comparisonSummary && (
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold text-slate-700">{comparePreferenceLabel} 대표 추천</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {comparisonSelectedRoute.type} · {comparisonSelectedRoute.totalMinutes}분
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span className={`text-xs px-2 py-1 rounded-full border ${
+                  comparisonSummary.minuteDelta < 0
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : comparisonSummary.minuteDelta > 0
+                      ? 'border-amber-200 bg-amber-50 text-amber-700'
+                      : 'border-slate-200 bg-white text-slate-600'
+                }`}>
+                  시간 {comparisonSummary.minuteDelta === 0 ? '동일' : `${Math.abs(comparisonSummary.minuteDelta)}분 ${comparisonSummary.minuteDelta < 0 ? '빠름' : '느림'}`}
+                </span>
+                <span className={`text-xs px-2 py-1 rounded-full border ${
+                  comparisonSummary.walkDelta < 0
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : comparisonSummary.walkDelta > 0
+                      ? 'border-amber-200 bg-amber-50 text-amber-700'
+                      : 'border-slate-200 bg-white text-slate-600'
+                }`}>
+                  도보 {comparisonSummary.walkDelta === 0 ? '동일' : `${Math.abs(comparisonSummary.walkDelta)}m ${comparisonSummary.walkDelta < 0 ? '적음' : '많음'}`}
+                </span>
+                <span className={`text-xs px-2 py-1 rounded-full border ${
+                  comparisonSummary.transferDelta < 0
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : comparisonSummary.transferDelta > 0
+                      ? 'border-amber-200 bg-amber-50 text-amber-700'
+                      : 'border-slate-200 bg-white text-slate-600'
+                }`}>
+                  환승 {comparisonSummary.transferDelta === 0 ? '동일' : `${Math.abs(comparisonSummary.transferDelta)}회 ${comparisonSummary.transferDelta < 0 ? '적음' : '많음'}`}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">현재 추천 성향</p>
+                <p className="mt-2 text-sm font-semibold text-slate-800">{recommendationPreference === 'TIME_PRIORITY' ? '시간 우선' : '신뢰도 우선'}</p>
+                <p className="mt-1 text-sm text-slate-600">{selectedRoute.type} · {selectedRoute.totalMinutes}분</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">비교 성향</p>
+                <p className="mt-2 text-sm font-semibold text-slate-800">{comparePreferenceLabel}</p>
+                <p className="mt-1 text-sm text-slate-600">{comparisonSelectedRoute.type} · {comparisonSelectedRoute.totalMinutes}분</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* 경로 카드 목록 */}
       <div className="space-y-3 mb-4">
