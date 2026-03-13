@@ -95,7 +95,8 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                                     null,
                                     null,
                                     0.0,
-                                    0.0
+                                    0.0,
+                                    ddareungiClient.currentSnapshotMode()
                             )))
                     .onErrorResume(ex -> {
                         log.error("[따릉이] 반납 정류소 조회 오류: {}", ex.getMessage());
@@ -145,7 +146,8 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                                         null,
                                         null,
                                         0.0,
-                                        0.0
+                                        0.0,
+                                        ddareungiClient.currentSnapshotMode()
                                 );
                             });
                     if (result.isEmpty()) {
@@ -190,7 +192,8 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                                         null,
                                         null,
                                         0.0,
-                                        0.0
+                                        0.0,
+                                        "LIVE"
                                 );
                             });
                 })
@@ -213,11 +216,12 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                 lat,
                 lng,
                 1,
-                0,
-                null,
-                null,
-                0.0,
-                0.0
+            0,
+            null,
+            null,
+            0.0,
+            0.0,
+            "OWNED"
         );
     }
 
@@ -234,11 +238,12 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                 lat,
                 lng,
                 1,
-                0,
-                null,
-                null,
-                0.0,
-                0.0
+            0,
+            null,
+            null,
+            0.0,
+            0.0,
+            "ESTIMATED"
         );
     }
 

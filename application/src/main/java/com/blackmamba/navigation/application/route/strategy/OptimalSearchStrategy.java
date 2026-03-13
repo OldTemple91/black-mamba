@@ -351,7 +351,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     }
 
     private Route withDiagnostics(Route route, List<String> diagnostics) {
-        return route.withInsights(new RouteInsights(List.of(), List.of(), diagnostics));
+        return route.withInsights(new RouteInsights(List.of(), List.of(), diagnostics, List.of()));
     }
 
     private Mono<List<String>> buildNoMixedDiagnostics(Location origin, Location destination, List<Leg> baseLegs) {

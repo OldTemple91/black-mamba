@@ -21,10 +21,14 @@ public class RouteInsightFactory {
         List<String> generationDiagnostics = route.insights() != null
                 ? route.insights().generationDiagnostics()
                 : List.of();
+        List<String> fallbackDiagnostics = route.insights() != null
+                ? route.insights().fallbackDiagnostics()
+                : List.of();
         return route.withInsights(new RouteInsights(
                 recommendationReasons(route, baselineRoute),
                 riskBadges(route),
-                generationDiagnostics
+                generationDiagnostics,
+                mergeFallbackDiagnostics(route, fallbackDiagnostics)
         ));
     }
 
@@ -91,5 +95,54 @@ public class RouteInsightFactory {
         }
 
         return badges.stream().limit(3).toList();
+    }
+
+    private List<String> mergeFallbackDiagnostics(Route route, List<String> existingDiagnostics) {
+        Set<String> diagnostics = new LinkedHashSet<>(existingDiagnostics);
+
+        boolean walkingFallback = route.legs().stream()
+                .anyMatch(leg -> leg.type() == LegType.WALK
+                        && leg.distanceMeters() > 0
+                        && (leg.routeCoordinates() == null || leg.routeCoordinates().isEmpty()));
+        if (walkingFallback) {
+            diagnostics.add("일부 도보 구간은 TMAP 대신 직선거리 기반 추정으로 계산되었습니다.");
+        }
+
+        boolean mobilityFallback = route.legs().stream()
+                .anyMatch(leg -> (leg.type() == LegType.BIKE || leg.type() == LegType.KICKBOARD)
+                        && leg.distanceMeters() > 0
+                        && (leg.routeCoordinates() == null || leg.routeCoordinates().isEmpty()));
+        if (mobilityFallback) {
+            diagnostics.add("일부 이동수단 구간은 TMAP 대신 직선거리 기반 추정으로 계산되었습니다.");
+        }
+
+        boolean ddareungiStale = route.legs().stream()
+                .map(Leg::mobilityInfo)
+                .filter(java.util.Objects::nonNull)
+                .anyMatch(info -> info.mobilityType() == com.blackmamba.navigation.domain.route.MobilityType.DDAREUNGI
+                        && "STALE".equals(info.availabilitySource()));
+        if (ddareungiStale) {
+            diagnostics.add("따릉이 정류소 정보는 최근 snapshot 재사용 결과입니다.");
+        }
+
+        boolean ddareungiEmpty = route.legs().stream()
+                .map(Leg::mobilityInfo)
+                .filter(java.util.Objects::nonNull)
+                .anyMatch(info -> info.mobilityType() == com.blackmamba.navigation.domain.route.MobilityType.DDAREUNGI
+                        && "EMPTY".equals(info.availabilitySource()));
+        if (ddareungiEmpty) {
+            diagnostics.add("따릉이 실시간 정류소 정보를 확보하지 못해 빈 결과 기준으로 계산되었습니다.");
+        }
+
+        boolean kickboardEstimated = route.legs().stream()
+                .map(Leg::mobilityInfo)
+                .filter(java.util.Objects::nonNull)
+                .anyMatch(info -> info.mobilityType() == com.blackmamba.navigation.domain.route.MobilityType.KICKBOARD_SHARED
+                        && "ESTIMATED".equals(info.availabilitySource()));
+        if (kickboardEstimated) {
+            diagnostics.add("킥보드 가용성은 실시간 데이터 대신 추정값을 사용했습니다.");
+        }
+
+        return diagnostics.stream().limit(4).toList();
     }
 }

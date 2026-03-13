@@ -29,6 +29,7 @@ public class DdareungiApiClient {
     private final DdareungiStationFilter filter;
     private final AtomicReference<SnapshotCache> stationSnapshot = new AtomicReference<>();
     private final AtomicReference<Mono<List<DdareungiStation>>> refreshInFlight = new AtomicReference<>();
+    private final AtomicReference<String> snapshotMode = new AtomicReference<>("LIVE");
     private final AtomicLong refreshBlockedUntilMs = new AtomicLong(0L);
     private final Counter snapshotCacheHitCounter;
     private final Counter snapshotCacheMissCounter;
@@ -151,6 +152,7 @@ public class DdareungiApiClient {
                     .map(DdareungiStationResponse::toStations)
                     .doOnNext(stations -> {
                         log.info("[따릉이 API] 서울시 전체 정류소 {}개 snapshot 갱신", stations.size());
+                        snapshotMode.set("LIVE");
                         stationSnapshot.set(new SnapshotCache(Mono.just(stations).cache(), System.currentTimeMillis() + snapshotCacheTtlMs));
                     })
                     .onErrorResume(ex -> {
@@ -171,12 +173,18 @@ public class DdareungiApiClient {
     private Mono<List<DdareungiStation>> staleOrEmptySnapshot(SnapshotCache cached, String reason) {
         if (cached != null) {
             staleFallbackCounter.increment();
+            snapshotMode.set("STALE");
             log.warn("[따릉이 API] stale snapshot 재사용 (reason={})", reason);
             return cached.stationsMono();
         }
         emptyFallbackCounter.increment();
+        snapshotMode.set("EMPTY");
         log.warn("[따릉이 API] 사용 가능한 snapshot 없음 -> 빈 결과 반환 (reason={})", reason);
         return Mono.just(List.of());
+    }
+
+    public String currentSnapshotMode() {
+        return snapshotMode.get();
     }
 
     private record SnapshotCache(Mono<List<DdareungiStation>> stationsMono, long expiresAtMs) {

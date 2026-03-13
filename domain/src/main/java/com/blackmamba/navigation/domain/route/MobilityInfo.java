@@ -15,7 +15,8 @@ public record MobilityInfo(
         String dropoffStationId,
         String dropoffStationName,
         double dropoffLat,
-        double dropoffLng
+        double dropoffLng,
+        String availabilitySource
 ) {
     public MobilityInfo(MobilityType mobilityType,
                         String operatorName,
@@ -41,7 +42,8 @@ public record MobilityInfo(
                 null,
                 null,
                 0.0,
-                0.0
+                0.0,
+                null
         );
     }
 
@@ -61,7 +63,8 @@ public record MobilityInfo(
                 stationId,
                 stationName,
                 lat,
-                lng
+                lng,
+                availabilitySource
         );
     }
 

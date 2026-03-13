@@ -4,6 +4,7 @@ import {
   getComparisonBars,
   getCostBreakdown,
   getDebugFacts,
+  getFallbackDiagnostics,
   getGenerationDiagnostics,
   getHubSummary,
   getRecommendationReasons,
@@ -60,6 +61,7 @@ export default function RouteCard({
   const transfers = getTransferSummary(route)
   const hubs = getHubSummary(route)
   const diagnostics = getGenerationDiagnostics(route)
+  const fallbackDiagnostics = getFallbackDiagnostics(route)
   const comparisonBars = comparisonContext ? getComparisonBars(route, comparisonContext) : []
   const costBreakdown = getCostBreakdown(route)
   const debugFacts = showDebug ? getDebugFacts(route, baselineRoute, searchMode, recommendationPreference) : []
@@ -149,6 +151,28 @@ export default function RouteCard({
           <p className="text-[11px] font-semibold text-amber-700">혼합 경로 진단</p>
           <div className="mt-2 space-y-1">
             {diagnostics.map(item => (
+              <p
+                key={item.message}
+                className={`text-xs ${
+                  item.tone === 'risk'
+                    ? 'text-rose-700'
+                    : item.tone === 'caution'
+                      ? 'text-amber-800'
+                      : 'text-slate-600'
+                }`}
+              >
+                {item.message}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {fallbackDiagnostics.length > 0 && (
+        <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+          <p className="text-[11px] font-semibold text-slate-700">Fallback / 추정 정보</p>
+          <div className="mt-2 space-y-1">
+            {fallbackDiagnostics.map(item => (
               <p
                 key={item.message}
                 className={`text-xs ${
