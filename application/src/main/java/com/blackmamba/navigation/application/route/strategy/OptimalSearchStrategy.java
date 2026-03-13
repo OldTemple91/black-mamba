@@ -377,30 +377,123 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
 
         double directDistance = haversineMeters(origin.lat(), origin.lng(), destination.lat(), destination.lng());
         if (directDistance > config.maxRangeMeters()) {
-            immediateReasons.add(labelFor(type) + " 직접 이동 가능 거리(" + config.maxRangeMeters() + "m)를 초과했습니다.");
+            immediateReasons.add(labelFor(type) + " 직접 이동 가능 거리(" + config.maxRangeMeters() + "m)를 초과했습니다. 현재 직선거리 약 " + (int) directDistance + "m");
         }
 
-        Mono<Boolean> anyLastMileAvailable = Flux.fromIterable(lastMileHubs)
-                .flatMap(hub -> mobilityInfoForSegment(hub.location(), destination, type))
-                .any(Optional::isPresent)
-                .defaultIfEmpty(false);
+        Mono<Optional<String>> lastMileReason = diagnoseSegmentAvailability(
+                Flux.fromIterable(lastMileHubs)
+                        .flatMap(hub -> diagnoseSegment(origin, hub.location(), destination, type, false)),
+                labelFor(type),
+                "라스트마일",
+                lastMileHubs.size()
+        );
 
-        Mono<Boolean> anyFirstMileAvailable = Flux.fromIterable(firstMileHubs)
-                .flatMap(hub -> mobilityInfoForSegment(origin, hub.location(), type))
-                .any(Optional::isPresent)
-                .defaultIfEmpty(false);
+        Mono<Optional<String>> firstMileReason = diagnoseSegmentAvailability(
+                Flux.fromIterable(firstMileHubs)
+                        .flatMap(hub -> diagnoseSegment(origin, hub.location(), destination, type, true)),
+                labelFor(type),
+                "퍼스트마일",
+                firstMileHubs.size()
+        );
 
-        return Mono.zip(anyFirstMileAvailable, anyLastMileAvailable)
+        return Mono.zip(firstMileReason, lastMileReason)
                 .flatMapMany(tuple -> {
                     List<String> reasons = new ArrayList<>(immediateReasons);
-                    if (!tuple.getT1() && !firstMileHubs.isEmpty()) {
-                        reasons.add(labelFor(type) + " 퍼스트마일 구간에서 반경 내 대여 가능 수단을 찾지 못했습니다.");
-                    }
-                    if (!tuple.getT2() && !lastMileHubs.isEmpty()) {
-                        reasons.add(labelFor(type) + " 라스트마일 구간에서 대여/반납 가능한 수단을 찾지 못했습니다.");
-                    }
+                    tuple.getT1().ifPresent(reasons::add);
+                    tuple.getT2().ifPresent(reasons::add);
                     return Flux.fromIterable(reasons);
                 });
+    }
+
+    private Mono<Optional<String>> diagnoseSegmentAvailability(Flux<SegmentDiagnostic> diagnostics,
+                                                               String label,
+                                                               String phase,
+                                                               int hubCount) {
+        return diagnostics.collectList()
+                .map(items -> {
+                    if (hubCount == 0 || items.isEmpty()) {
+                        return Optional.<String>empty();
+                    }
+                    long validCount = items.stream().filter(SegmentDiagnostic::isValid).count();
+                    if (validCount > 0) {
+                        return Optional.<String>empty();
+                    }
+                    long noPickup = items.stream().filter(item -> item.reason() == DiagnosticReason.NO_PICKUP).count();
+                    long noDropoff = items.stream().filter(item -> item.reason() == DiagnosticReason.NO_DROPOFF).count();
+                    long sameStation = items.stream().filter(item -> item.reason() == DiagnosticReason.SAME_STATION).count();
+
+                    if (sameStation > 0) {
+                        return Optional.of(label + " " + phase + " 후보 " + hubCount + "개를 확인했지만 동일 정류소 대여/반납 조합만 발견되어 제외했습니다.");
+                    }
+                    if (noDropoff > 0 && noPickup == 0) {
+                        return Optional.of(label + " " + phase + " 후보 " + hubCount + "개를 확인했지만 반납 가능한 정류소를 찾지 못했습니다.");
+                    }
+                    if (noPickup > 0 && noDropoff == 0) {
+                        return Optional.of(label + " " + phase + " 후보 " + hubCount + "개를 확인했지만 반경 내 대여 가능한 수단을 찾지 못했습니다.");
+                    }
+                    return Optional.of(label + " " + phase + " 후보 " + hubCount + "개를 확인했지만 대여/반납 가능한 수단을 찾지 못했습니다.");
+                });
+    }
+
+    private Mono<SegmentDiagnostic> diagnoseSegment(Location origin,
+                                                    Location switchPoint,
+                                                    Location destination,
+                                                    MobilityType type,
+                                                    boolean firstMile) {
+        Location start = firstMile ? origin : switchPoint;
+        Location end = firstMile ? switchPoint : destination;
+
+        Mono<Optional<MobilityInfo>> pickup = mobilityAvailabilityPort.findNearbyMobility(start.lat(), start.lng(), type);
+
+        if (type != MobilityType.DDAREUNGI) {
+            return pickup.map(result -> result.isPresent()
+                    ? SegmentDiagnostic.success()
+                    : SegmentDiagnostic.of(DiagnosticReason.NO_PICKUP));
+        }
+
+        Mono<Optional<MobilityInfo>> dropoff = mobilityAvailabilityPort.findNearbyDropoff(end.lat(), end.lng(), type);
+        return Mono.zip(pickup, dropoff)
+                .map(tuple -> {
+                    Optional<MobilityInfo> pickupInfo = tuple.getT1();
+                    Optional<MobilityInfo> dropoffInfo = tuple.getT2();
+                    if (pickupInfo.isEmpty()) {
+                        return SegmentDiagnostic.of(DiagnosticReason.NO_PICKUP);
+                    }
+                    if (dropoffInfo.isEmpty()) {
+                        return SegmentDiagnostic.of(DiagnosticReason.NO_DROPOFF);
+                    }
+                    MobilityInfo enriched = pickupInfo.get().withDropoffStation(
+                            dropoffInfo.get().stationId(),
+                            dropoffInfo.get().stationName(),
+                            dropoffInfo.get().lat(),
+                            dropoffInfo.get().lng()
+                    );
+                    if (enriched.hasSamePickupAndDropoffStation()) {
+                        return SegmentDiagnostic.of(DiagnosticReason.SAME_STATION);
+                    }
+                        return SegmentDiagnostic.success();
+                });
+    }
+
+    private record SegmentDiagnostic(boolean valid, DiagnosticReason reason) {
+        private boolean isValid() {
+            return valid;
+        }
+
+        private static SegmentDiagnostic success() {
+            return new SegmentDiagnostic(true, DiagnosticReason.VALID);
+        }
+
+        private static SegmentDiagnostic of(DiagnosticReason reason) {
+            return new SegmentDiagnostic(false, reason);
+        }
+    }
+
+    private enum DiagnosticReason {
+        VALID,
+        NO_PICKUP,
+        NO_DROPOFF,
+        SAME_STATION
     }
 
     private String labelFor(MobilityType type) {
