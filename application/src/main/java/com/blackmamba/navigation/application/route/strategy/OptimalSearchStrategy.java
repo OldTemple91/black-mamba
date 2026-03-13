@@ -15,9 +15,10 @@ import java.util.stream.Collectors;
 import java.util.Optional;
 
 /**
- * 모든수단 최적탐색 전략.
+ * 기본 MaaS 최적탐색 전략.
  *
- * 3가지 수단(따릉이/킥보드/개인) × 4가지 패턴(B,C,D,E) + 패턴A(대중교통만) = 최대 13개 후보 병렬 탐색.
+ * 공유/공공 이동수단을 기준으로 4가지 패턴(B,C,D,E) + 패턴A(대중교통만)를 조합한다.
+ * 개인 이동수단은 사용자 명시 선택 시 SPECIFIC 모드에서만 탐색한다.
  *
  * 패턴 B: 퍼스트마일  — 이동수단(출발→정류장) + 대중교통(정류장→목적지)
  * 패턴 C: 라스트마일  — 대중교통(출발→환승점) + 이동수단(환승점→목적지)
@@ -28,8 +29,9 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
 
     private static final Logger log = LoggerFactory.getLogger(OptimalSearchStrategy.class);
     private static final double EARTH_RADIUS_METERS = 6_371_000;
+    private static final int MAX_CANDIDATE_HUBS = 5;
     // KICKBOARD_SHARED 제외: TAGO API 서울 데이터 미제공으로 가상 경로만 생성됨 (B-1)
-    // 향후 PERSONAL_KICKBOARD 또는 MobilityHub 모델 도입 시 재추가
+    // PERSONAL 제외: 사용자 보유 여부가 전제이므로 OPTIMAL 기본 추천에는 포함하지 않음
     private static final List<MobilityType> ALL_TYPES =
             List.of(MobilityType.DDAREUNGI);
 
@@ -75,9 +77,9 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                     }
 
                     // 후보 지점 진단
-                    MobilityConfig diagConfig = MobilityConfig.kickboard();
+                    MobilityConfig diagConfig = MobilityConfig.bike();
                     List<Hub> diagHubs = hubSelector.selectLastMileHubs(baseLegs, destination, diagConfig);
-                    log.info("[OPTIMAL] lastMile 허브={}개 (kickboard 기준)", diagHubs.size());
+                    log.info("[OPTIMAL] lastMile 허브={}개 (ddareungi 기준)", diagHubs.size());
 
                     Route baseRoute = Route.of(baseRouteLegs, RouteType.TRANSIT_ONLY);
 
@@ -112,7 +114,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     private Flux<Route> patternB(Location origin, Location destination,
                                   List<Leg> baseLegs, MobilityType type, MobilityConfig config) {
         List<Hub> firstMile = hubSelector.selectFirstMileHubs(origin, baseLegs, config).stream()
-                .limit(3)
+                .limit(MAX_CANDIDATE_HUBS)
                 .toList();
         return Flux.fromIterable(firstMile)
                 .flatMap(firstHub -> {
@@ -146,7 +148,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     private Flux<Route> patternC(Location origin, Location destination,
                                   List<Leg> baseLegs, MobilityType type, MobilityConfig config) {
         List<Hub> lastMile = hubSelector.selectLastMileHubs(baseLegs, destination, config).stream()
-                .limit(3)
+                .limit(MAX_CANDIDATE_HUBS)
                 .toList();
         return Flux.fromIterable(lastMile)
                 .flatMap(lastHub -> {
@@ -311,7 +313,11 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     }
 
     private MobilityConfig configFor(MobilityType type) {
-        return isKickboardType(type) ? MobilityConfig.kickboard() : MobilityConfig.bike();
+        return switch (type) {
+            case PERSONAL -> MobilityConfig.personal();
+            case KICKBOARD_SHARED -> MobilityConfig.kickboard();
+            case DDAREUNGI -> MobilityConfig.bike();
+        };
     }
 
     private RouteType routeTypeFor(MobilityType type) {
@@ -359,10 +365,10 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     private Flux<String> diagnosticsForType(Location origin, Location destination, List<Leg> baseLegs, MobilityType type) {
         MobilityConfig config = configFor(type);
         List<Hub> lastMileHubs = hubSelector.selectLastMileHubs(baseLegs, destination, config).stream()
-                .limit(3)
+                .limit(MAX_CANDIDATE_HUBS)
                 .toList();
         List<Hub> firstMileHubs = hubSelector.selectFirstMileHubs(origin, baseLegs, config).stream()
-                .limit(3)
+                .limit(MAX_CANDIDATE_HUBS)
                 .toList();
 
         List<String> immediateReasons = new ArrayList<>();
@@ -401,7 +407,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
         return switch (type) {
             case DDAREUNGI -> "따릉이";
             case KICKBOARD_SHARED -> "공유 킥보드";
-            case PERSONAL -> "개인 킥보드";
+            case PERSONAL -> "개인 이동수단";
         };
     }
 

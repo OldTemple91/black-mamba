@@ -1,6 +1,6 @@
 # Hub-Based Reliability-Aware MaaS Routing Engine
 
-대중교통, 공공자전거, 개인 이동수단을 결합해 도착 성공 가능성이 높은 경로를 추천하는 도시형 멀티모달 라우팅 엔진입니다.
+대중교통, 공공자전거, 개인 이동수단을 결합해 도착 성공 가능성이 높은 경로를 추천하는 도시형 멀티모달 라우팅 엔진입니다. 기본 `OPTIMAL` 추천은 MaaS 시나리오에 맞춰 대중교통과 공공/공유 수단 중심으로 구성하고, 개인 이동수단은 사용자가 명시적으로 선택한 경우에만 탐색합니다.
 
 ## Screenshots
 
@@ -304,6 +304,24 @@ npm run dev
 - 최단시간 중심 추천 vs 신뢰도 중심 추천
 
 배치 실험 스크립트는 추천 결과뿐 아니라 cache hit/miss delta도 함께 기록합니다.
+
+현재까지 확인된 대표 결과:
+
+- `RELIABILITY`에서는 같은 mixed-opportunity 샘플 세트에서도 추천이 모두 `TRANSIT_ONLY`
+- `TIME_PRIORITY`에서는 stronger mixed-winning 샘플 4건이 모두 mixed 추천으로 전환
+  - 평균 `3.25분` 단축
+  - 평균 비용 변화 `-125원`
+  - `MOBILITY_ONLY`, `TRANSIT_WITH_BIKE` 두 유형 모두 포함
+- warm cache 기준 mixed-winning 샘플 2건 실험에서는 다음 캐시 miss가 `0`으로 관찰됨
+  - `mobility_availability`
+  - `odsay_route`
+  - `tmap_pedestrian_route`
+
+즉 현재 엔진은
+- `RELIABILITY`: 대중교통 유지
+- `TIME_PRIORITY`: 시간 절감이 실제로 있는 mixed 경로 추천
+
+이라는 정책 차이를 실제 결과로 보여줄 수 있다.
 
 ## 15. Limitations
 

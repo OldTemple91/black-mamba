@@ -19,7 +19,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
 
     private static final Logger log = LoggerFactory.getLogger(MobilityAvailabilityAdapter.class);
-    private static final int SEARCH_RADIUS_METERS = 500;
     private final DdareungiApiClient ddareungiClient;
     private final KickboardApiClient kickboardClient;
     private final Counter ddareungiFallbackErrorCounter;
@@ -29,13 +28,16 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
     private final Counter availabilityCacheMissCounter;
     private final ConcurrentHashMap<AvailabilityKey, CacheEntry<Optional<MobilityInfo>>> availabilityCache = new ConcurrentHashMap<>();
     private final long availabilityCacheTtlMs;
+    private final int searchRadiusMeters;
 
     public MobilityAvailabilityAdapter(DdareungiApiClient ddareungiClient,
                                        KickboardApiClient kickboardClient,
+                                       @org.springframework.beans.factory.annotation.Value("${navigation.mobility.search-radius-meters:700}") int searchRadiusMeters,
                                        @org.springframework.beans.factory.annotation.Value("${navigation.cache.mobility-availability-ttl-ms:20000}") long availabilityCacheTtlMs,
                                        MeterRegistry meterRegistry) {
         this.ddareungiClient = ddareungiClient;
         this.kickboardClient = kickboardClient;
+        this.searchRadiusMeters = searchRadiusMeters;
         this.availabilityCacheTtlMs = availabilityCacheTtlMs;
         this.ddareungiFallbackErrorCounter = meterRegistry.counter(
                 "navigation.mobility.fallback.total",
@@ -76,7 +78,7 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
     @Override
     public Mono<Optional<MobilityInfo>> findNearbyDropoff(double lat, double lng, MobilityType type) {
         return cachedLookup(lat, lng, type, true, () -> switch (type) {
-            case DDAREUNGI -> ddareungiClient.getNearbyStations(lat, lng, SEARCH_RADIUS_METERS, false)
+            case DDAREUNGI -> ddareungiClient.getNearbyStations(lat, lng, searchRadiusMeters, false)
                     .map(stations -> stations.stream().findFirst()
                             .map(s -> new MobilityInfo(
                                     MobilityType.DDAREUNGI,
@@ -119,10 +121,10 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
     }
 
     private Mono<Optional<MobilityInfo>> findNearbyDdareungi(double lat, double lng) {
-        return ddareungiClient.getNearbyStations(lat, lng, SEARCH_RADIUS_METERS)
+        return ddareungiClient.getNearbyStations(lat, lng, searchRadiusMeters)
                 .map(stations -> {
                     log.info("[따릉이] 검색 lat={}, lng={}, 반경={}m → 반경 내 대여가능 정류소 {}개",
-                            lat, lng, SEARCH_RADIUS_METERS, stations.size());
+                            lat, lng, searchRadiusMeters, stations.size());
                     Optional<MobilityInfo> result = stations.stream().findFirst()
                             .map(s -> {
                                 int dist = distanceMeters(lat, lng, s.lat(), s.lng());
@@ -159,10 +161,10 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
     }
 
     private Mono<Optional<MobilityInfo>> findNearbyKickboard(double lat, double lng) {
-        return kickboardClient.getNearbyDevices(lat, lng, SEARCH_RADIUS_METERS)
+        return kickboardClient.getNearbyDevices(lat, lng, searchRadiusMeters)
                 .map(devices -> {
                     log.info("[킥보드] 검색 lat={}, lng={}, 반경={}m → 반경 내 배터리≥20% 기기 {}개",
-                            lat, lng, SEARCH_RADIUS_METERS, devices.size());
+                            lat, lng, searchRadiusMeters, devices.size());
                     if (devices.isEmpty()) {
                         kickboardFallbackEmptyCounter.increment();
                         log.info("[킥보드] 반경 내 기기 없음 → 가상 킥보드(추정)로 폴백");

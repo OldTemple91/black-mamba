@@ -3,6 +3,7 @@ import argparse
 import json
 import math
 import os
+import re
 import sys
 import urllib.parse
 import urllib.request
@@ -27,6 +28,11 @@ def load_samples(path: Path):
         return json.load(fp)
 
 
+def slugify(value: str) -> str:
+    normalized = re.sub(r"[^a-zA-Z0-9]+", "-", value.strip().lower()).strip("-")
+    return normalized or "default"
+
+
 def fetch_routes(base_url: str, sample: dict, search_mode: str, recommendation_preference: str):
     params = {
         "originLat": sample["origin"]["lat"],
@@ -35,6 +41,19 @@ def fetch_routes(base_url: str, sample: dict, search_mode: str, recommendation_p
         "destLng": sample["destination"]["lng"],
         "searchMode": search_mode,
         "recommendationPreference": recommendation_preference,
+    }
+    url = f"{base_url.rstrip('/')}/api/routes?{urllib.parse.urlencode(params)}"
+    with urllib.request.urlopen(url, timeout=30) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def fetch_transit_baseline(base_url: str, sample: dict):
+    params = {
+        "originLat": sample["origin"]["lat"],
+        "originLng": sample["origin"]["lng"],
+        "destLat": sample["destination"]["lat"],
+        "destLng": sample["destination"]["lng"],
+        "searchMode": "SPECIFIC",
     }
     url = f"{base_url.rstrip('/')}/api/routes?{urllib.parse.urlencode(params)}"
     with urllib.request.urlopen(url, timeout=30) as response:
@@ -106,7 +125,7 @@ def transfer_count(route: dict) -> int:
 
 
 def baseline_route(routes: list[dict]) -> dict | None:
-    return next((route for route in routes if route.get("type") == "TRANSIT_ONLY"), routes[0] if routes else None)
+    return next((route for route in routes if route.get("type") == "TRANSIT_ONLY"), None)
 
 
 def recommended_route(routes: list[dict]) -> dict | None:
@@ -144,9 +163,9 @@ def route_summary(route: dict) -> dict:
     }
 
 
-def evaluate_sample(sample: dict, payload: dict) -> dict:
+def evaluate_sample(sample: dict, payload: dict, baseline_payload: dict) -> dict:
     routes = payload.get("routes") or []
-    baseline = baseline_route(routes)
+    baseline = baseline_route(baseline_payload.get("routes") or [])
     recommended = recommended_route(routes)
     mixed = best_mixed_route(routes)
 
@@ -327,11 +346,13 @@ def render_markdown(summary: dict, results: list[dict], input_path: Path, base_u
     return "\n".join(lines) + "\n"
 
 
-def write_outputs(output_dir: Path, payload: dict, markdown: str):
+def write_outputs(output_dir: Path, payload: dict, markdown: str, input_path: Path, recommendation_preference: str):
     output_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    json_path = output_dir / f"route-eval-{timestamp}.json"
-    md_path = output_dir / f"route-eval-{timestamp}.md"
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    input_slug = slugify(input_path.stem)
+    preference_slug = slugify(recommendation_preference)
+    json_path = output_dir / f"route-eval-{timestamp}-{input_slug}-{preference_slug}.json"
+    md_path = output_dir / f"route-eval-{timestamp}-{input_slug}-{preference_slug}.md"
     latest_json = output_dir / "latest-route-eval.json"
     latest_md = output_dir / "latest-route-eval.md"
 
@@ -362,7 +383,8 @@ def main():
     for sample in samples:
         try:
             payload = fetch_routes(args.base_url, sample, args.search_mode, args.recommendation_preference)
-            results.append(evaluate_sample(sample, payload))
+            baseline_payload = fetch_transit_baseline(args.base_url, sample)
+            results.append(evaluate_sample(sample, payload, baseline_payload))
         except Exception as exc:  # noqa: BLE001
             results.append({
                 "id": sample["id"],
@@ -385,7 +407,7 @@ def main():
         "results": results,
     }
     markdown = render_markdown(summary, results, input_path, args.base_url, args.search_mode, args.recommendation_preference, cache_metrics)
-    json_path, md_path = write_outputs(output_dir, report_payload, markdown)
+    json_path, md_path = write_outputs(output_dir, report_payload, markdown, input_path, args.recommendation_preference)
 
     print(f"Wrote JSON report: {json_path}")
     print(f"Wrote Markdown report: {md_path}")

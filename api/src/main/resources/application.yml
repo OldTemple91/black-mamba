@@ -10,6 +10,8 @@ odsay:
 
 ddareungi:
   api-key: ${DDAREUNGI_API_KEY}
+  request-timeout-ms: 5000
+  refresh-backoff-ms: 30000
 
 tago:
   api-key: ${TAGO_API_KEY}
@@ -29,6 +31,8 @@ management:
         include: health,info,metrics
 
 navigation:
+  mobility:
+    search-radius-meters: 700
   cache:
     odsay-route-ttl-ms: 30000
     ddareungi-snapshot-ttl-ms: 30000
