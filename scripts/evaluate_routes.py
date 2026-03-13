@@ -209,6 +209,13 @@ def evaluate_sample(sample: dict, payload: dict, baseline_payload: dict) -> dict
     }
 
 
+def safe_fetch_transit_baseline(base_url: str, sample: dict, optimal_payload: dict) -> tuple[dict, str]:
+    try:
+        return fetch_transit_baseline(base_url, sample), "SPECIFIC_BASELINE"
+    except Exception:
+        return optimal_payload, "OPTIMAL_FALLBACK_BASELINE"
+
+
 def mean(values: list[float]) -> float:
     return round(sum(values) / len(values), 3) if values else 0.0
 
@@ -409,8 +416,10 @@ def main():
     for sample in samples:
         try:
             payload = fetch_routes(args.base_url, sample, args.search_mode, args.recommendation_preference)
-            baseline_payload = fetch_transit_baseline(args.base_url, sample)
-            results.append(evaluate_sample(sample, payload, baseline_payload))
+            baseline_payload, baseline_source = safe_fetch_transit_baseline(args.base_url, sample, payload)
+            result = evaluate_sample(sample, payload, baseline_payload)
+            result["baselineSource"] = baseline_source
+            results.append(result)
         except Exception as exc:  # noqa: BLE001
             results.append({
                 "id": sample["id"],
