@@ -66,6 +66,18 @@ export function getGenerationDiagnostics(route) {
   }))
 }
 
+export function getFallbackDiagnostics(route) {
+  const diagnostics = route.insights?.fallbackDiagnostics
+  if (!Array.isArray(diagnostics) || diagnostics.length === 0) {
+    return []
+  }
+
+  return diagnostics.slice(0, 3).map(message => ({
+    message,
+    tone: inferFallbackTone(message),
+  }))
+}
+
 export function findBaselineRoute(routes) {
   return routes.find(route => route.type === 'TRANSIT_ONLY') ?? routes[0] ?? null
 }
@@ -173,6 +185,13 @@ function inferDiagnosticTone(message) {
   return 'info'
 }
 
+function inferFallbackTone(message) {
+  if (message.includes('추정값')) return 'caution'
+  if (message.includes('빈 결과')) return 'risk'
+  if (message.includes('stale snapshot')) return 'caution'
+  return 'info'
+}
+
 export function getTransferSummary(route) {
   return route.legs
     .map((leg, index) => {
@@ -257,6 +276,9 @@ export function getDebugFacts(route, baselineRoute, searchMode, recommendationPr
         .map(hub => `${hub.name}[${hub.metadata?.selectionPhase ?? '-'} / ${hub.metadata?.preferredMobility ?? '-'}]`)
         .join(', ')}`
       : '선택 허브 metadata 없음',
+    Array.isArray(route.insights?.fallbackDiagnostics) && route.insights.fallbackDiagnostics.length > 0
+      ? `fallback: ${route.insights.fallbackDiagnostics.join(' / ')}`
+      : 'fallback 진단 없음',
     `도보 거리: ${getWalkingDistance(route)}m`,
     `마이크로모빌리티 거리: ${getMobilityDistance(route)}m`,
     bikeLegs.length > 0
