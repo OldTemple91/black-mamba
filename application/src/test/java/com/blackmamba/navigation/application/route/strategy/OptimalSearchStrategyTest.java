@@ -52,6 +52,12 @@ class OptimalSearchStrategyTest {
                 .thenReturn(Mono.just(20));
         lenient().when(mobilityTimePort.getWalkingRoute(any(), any()))
                 .thenReturn(Mono.just(MobilityRouteResult.timeOnly(3)));
+        lenient().when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of());
+        lenient().when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of());
+        lenient().when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(Optional.empty()));
+        lenient().when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(Optional.empty()));
         lenient().when(routeEvaluator.evaluate(any(Route.class), any(Route.class), anyInt(), anyBoolean(), eq(RecommendationPreference.RELIABILITY)))
                 .thenAnswer(invocation -> {
                     Route route = invocation.getArgument(0);

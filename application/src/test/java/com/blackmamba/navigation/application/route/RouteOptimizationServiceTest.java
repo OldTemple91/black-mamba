@@ -4,10 +4,13 @@ import com.blackmamba.navigation.application.route.port.*;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -18,6 +21,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class RouteOptimizationServiceTest {
 
     @Mock TransitRoutePort transitRoutePort;
@@ -30,6 +34,16 @@ class RouteOptimizationServiceTest {
 
     Location origin = new Location("서울역", 37.5547, 126.9706);
     Location dest   = new Location("강남역", 37.4979, 127.0276);
+
+    @BeforeEach
+    void setUp() {
+        when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of());
+        when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of());
+        when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(Optional.empty()));
+        when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(Optional.empty()));
+    }
 
     @Test
     void SPECIFIC_모드_이동수단_없으면_대중교통만_반환한다() {

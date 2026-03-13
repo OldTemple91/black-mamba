@@ -50,6 +50,19 @@ export function getHubSummary(route) {
     detail: `${hub.name} · ${hubRoleLabel(hub.role)}`,
     source: hub.source,
     metadata: hub.metadata ?? {},
+    tone: hub.source === 'selected-candidate' ? 'candidate' : 'actual',
+  }))
+}
+
+export function getGenerationDiagnostics(route) {
+  const diagnostics = route.insights?.generationDiagnostics
+  if (!Array.isArray(diagnostics) || diagnostics.length === 0) {
+    return []
+  }
+
+  return diagnostics.slice(0, 3).map(message => ({
+    message,
+    tone: inferDiagnosticTone(message),
   }))
 }
 
@@ -152,6 +165,12 @@ function inferRiskStyle(label) {
     return RISK_STYLES.caution
   }
   return RISK_STYLES.info
+}
+
+function inferDiagnosticTone(message) {
+  if (message.includes('동일 정류소')) return 'risk'
+  if (message.includes('반납 가능한 정류소') || message.includes('대여 가능한 수단')) return 'caution'
+  return 'info'
 }
 
 export function getTransferSummary(route) {
