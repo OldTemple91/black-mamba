@@ -10,6 +10,10 @@ public record MobilityConfig(
         return new MobilityConfig(MobilityType.KICKBOARD_SHARED, 5000);
     }
 
+    public static MobilityConfig personal() {
+        return new MobilityConfig(MobilityType.PERSONAL, 8000);
+    }
+
     public static MobilityConfig bike() {
         return new MobilityConfig(MobilityType.DDAREUNGI, 10000);
     }

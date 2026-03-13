@@ -139,6 +139,8 @@ class RouteScoreCalculatorTest {
         assertThat(reliabilityScoreTransit).isGreaterThan(reliabilityScoreMixed);
         assertThat(timePriorityScoreTransit).isLessThan(reliabilityScoreTransit);
         assertThat(timePriorityScoreMixed).isGreaterThan(timePriorityScoreTransit);
+        assertThat(timePriorityScoreMixed).isGreaterThan(reliabilityScoreMixed);
+        assertThat(timePriorityScoreMixed).isGreaterThan(timePriorityScoreTransit);
     }
 
     // -----------------------------------------------------------------

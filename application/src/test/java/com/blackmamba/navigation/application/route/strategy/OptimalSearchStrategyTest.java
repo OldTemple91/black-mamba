@@ -143,15 +143,19 @@ class OptimalSearchStrategyTest {
     void 같은_따릉이_정류소_대여반납_조합은_혼합경로에서_제외된다() {
         when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of(hub(candidate)));
         when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of(hub(candidate)));
-        when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
+        when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), eq(MobilityType.DDAREUNGI)))
                 .thenReturn(Mono.just(Optional.of(
                         new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
                                 null, 100, "142. 아현역 4번출구 앞", 37.52, 127.0, 5, 20)
                                 .withDropoffStation("S-142", "142. 아현역 4번출구 앞", 37.52, 127.0))));
-        when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
+        when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), eq(MobilityType.DDAREUNGI)))
                 .thenReturn(Mono.just(Optional.of(
                         new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
                                 null, 100, "142. 아현역 4번출구 앞", 37.52, 127.0, 5, 20))));
+        when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), eq(MobilityType.PERSONAL)))
+                .thenReturn(Mono.just(Optional.empty()));
+        when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), eq(MobilityType.PERSONAL)))
+                .thenReturn(Mono.just(Optional.empty()));
 
         List<Route> routes = strategy.search(origin, destination).block();
 

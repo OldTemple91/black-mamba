@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
  */
 public class SpecificMobilityStrategy implements RouteSearchStrategy {
 
+    private static final int MAX_CANDIDATE_HUBS = 5;
     private final List<MobilityType> mobilityTypes;
     private final TransitRoutePort transitRoutePort;
     private final MobilityTimePort mobilityTimePort;
@@ -84,9 +85,9 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
         return Flux.fromIterable(mobilityTypes)
                 .flatMap(type -> {
                     MobilityConfig config = isKickboardType(type)
-                            ? MobilityConfig.kickboard() : MobilityConfig.bike();
+                            ? personalAwareConfig(type) : MobilityConfig.bike();
                     List<Hub> candidateHubs = hubSelector.selectLastMileHubs(baseLegs, destination, config).stream()
-                            .limit(3)
+                            .limit(MAX_CANDIDATE_HUBS)
                             .toList();
 
                     if (candidateHubs.isEmpty()) {
@@ -191,6 +192,10 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
         return type == MobilityType.KICKBOARD_SHARED || type == MobilityType.PERSONAL;
     }
 
+    private MobilityConfig personalAwareConfig(MobilityType type) {
+        return type == MobilityType.PERSONAL ? MobilityConfig.personal() : MobilityConfig.kickboard();
+    }
+
     private List<Route> rank(Route base, List<Route> combined, int baseMinutes) {
         List<Route> all = new ArrayList<>(combined);
         all.add(base);
@@ -223,9 +228,9 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
     }
 
     private Flux<String> diagnosticsForType(List<Leg> baseLegs, Location origin, Location destination, MobilityType type) {
-        MobilityConfig config = isKickboardType(type) ? MobilityConfig.kickboard() : MobilityConfig.bike();
+        MobilityConfig config = isKickboardType(type) ? personalAwareConfig(type) : MobilityConfig.bike();
         List<Hub> candidateHubs = hubSelector.selectLastMileHubs(baseLegs, destination, config).stream()
-                .limit(3)
+                .limit(MAX_CANDIDATE_HUBS)
                 .toList();
 
         if (candidateHubs.isEmpty()) {
@@ -247,7 +252,7 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
         return switch (type) {
             case DDAREUNGI -> "따릉이";
             case KICKBOARD_SHARED -> "공유 킥보드";
-            case PERSONAL -> "개인 킥보드";
+            case PERSONAL -> "개인 이동수단";
         };
     }
 

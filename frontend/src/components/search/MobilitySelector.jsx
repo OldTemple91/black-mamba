@@ -3,7 +3,7 @@
 const MOBILITY_OPTIONS = [
   { id: 'DDAREUNGI',        label: '🚲 따릉이',    unavailable: false },
   { id: 'KICKBOARD_SHARED', label: '🛴 공유킥보드', unavailable: true  },
-  { id: 'PERSONAL',         label: '🛴 개인킥보드', unavailable: false },
+  { id: 'PERSONAL',         label: '🛴 개인 이동수단', unavailable: false },
 ]
 
 const OPTIMAL_ID = 'OPTIMAL'
