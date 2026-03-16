@@ -36,13 +36,25 @@ class CandidatePointSelectorTest {
     @Test
     void 목적지까지_거리가_범위_초과인_정류장은_제외한다() {
         Location farStop = new Location("먼정류장", 37.6000, 127.0000);
-        Location nearStop = new Location("가까운정류장", 37.5050, 127.0100);
+        Location nearStop = new Location("가까운정류장", 37.5090, 127.0100);
         Location dest = new Location("목적지", 37.5040, 127.0050);
 
         List<Location> candidates = selector.filterByMobilityRange(
                 List.of(farStop, nearStop), dest, MobilityType.KICKBOARD_SHARED);
 
         assertThat(candidates).containsOnly(nearStop);
+    }
+
+    @Test
+    void 목적지와_너무_가까운_정류장은_후보에서_제외한다() {
+        Location tooCloseStop = new Location("너무가까운정류장", 37.5042, 127.0052);
+        Location validStop = new Location("유효정류장", 37.5090, 127.0100);
+        Location dest = new Location("목적지", 37.5040, 127.0050);
+
+        List<Location> candidates = selector.filterByMobilityFeasibility(
+                List.of(tooCloseStop, validStop), dest, MobilityConfig.bike());
+
+        assertThat(candidates).containsOnly(validStop);
     }
 
     @Test
@@ -64,6 +76,7 @@ class CandidatePointSelectorTest {
         candidates.forEach(c -> {
             double dist = haversineMeters(origin.lat(), origin.lng(), c.lat(), c.lng());
             assertThat(dist).isLessThanOrEqualTo(5000.0);
+            assertThat(dist).isGreaterThanOrEqualTo(500.0);
         });
     }
 

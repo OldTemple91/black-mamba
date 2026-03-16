@@ -36,11 +36,15 @@ public class CandidatePointSelector {
                                                  Location destination,
                                                  MobilityType mobilityType) {
         int maxRange = mobilityType == MobilityType.KICKBOARD_SHARED ? 5000 : 10000;
+        int minRange = mobilityType == MobilityType.KICKBOARD_SHARED ? 500 : 700;
 
         return candidates.stream()
-                .filter(stop -> distanceMeters(
-                        stop.lat(), stop.lng(),
-                        destination.lat(), destination.lng()) <= maxRange)
+                .filter(stop -> {
+                    double distance = distanceMeters(
+                            stop.lat(), stop.lng(),
+                            destination.lat(), destination.lng());
+                    return distance <= maxRange && distance >= minRange;
+                })
                 .toList();
     }
 
@@ -55,9 +59,27 @@ public class CandidatePointSelector {
         List<Location> firstSegment = allStops.subList(0, Math.min(to, allStops.size()));
 
         return firstSegment.stream()
-                .filter(stop -> distanceMeters(
-                        origin.lat(), origin.lng(),
-                        stop.lat(), stop.lng()) <= config.maxRangeMeters())
+                .filter(stop -> {
+                    double distance = distanceMeters(
+                            origin.lat(), origin.lng(),
+                            stop.lat(), stop.lng());
+                    return distance <= config.maxRangeMeters()
+                            && distance >= config.minEffectiveDistanceMeters();
+                })
+                .toList();
+    }
+
+    public List<Location> filterByMobilityFeasibility(List<Location> candidates,
+                                                      Location destination,
+                                                      MobilityConfig config) {
+        return candidates.stream()
+                .filter(stop -> {
+                    double distance = distanceMeters(
+                            stop.lat(), stop.lng(),
+                            destination.lat(), destination.lng());
+                    return distance <= config.maxRangeMeters()
+                            && distance >= config.minEffectiveDistanceMeters();
+                })
                 .toList();
     }
 

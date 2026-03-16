@@ -314,11 +314,11 @@ npm run dev
   - 평균 `3.857분` 단축
   - 평균 비용 변화 `-271원`
   - `MOBILITY_ONLY`, `TRANSIT_WITH_BIKE` 두 유형 모두 포함
-- warm cache 기준 mixed-winning 샘플 2건 실험에서는 다음 캐시 miss가 `0`으로 관찰됨
-  - `mobility_availability`
-  - `mobility_segment` (서버 재시작 후 측정 예정)
-  - `odsay_route`
-  - `tmap_pedestrian_route`
+- 최신 `no-mixed` 샘플 4건에서는 `SAME_PICKUP_DROPOFF`가 사라지고, 진단 코드가 아래처럼 수렴
+  - `NO_CANDIDATE_HUB: 6`
+  - `NO_PICKUP: 1`
+  - `NO_DROPOFF: 1`
+- warm second-pass 기준으로는 `TMAP` miss가 `0`으로 떨어졌고, `mobility_availability`/`mobility_segment`는 세그먼트 조합 다양성 때문에 miss가 일부 남음
 
 즉 현재 엔진은
 - `RELIABILITY`: 대중교통 유지

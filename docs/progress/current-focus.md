@@ -58,11 +58,18 @@
   - `NO_CANDIDATE_HUB`
   - `NO_PICKUP`
   - `NO_DROPOFF`
-  - `SAME_PICKUP_DROPOFF`
   진단 코드를 실제로 수집 가능
 - `mobility_segment` 캐시 추가:
   - 동일 start/end 세그먼트의 pickup/dropoff 조합 재사용
   - `SAME_PICKUP_DROPOFF`를 실제 route build 전에 더 일찍 제외
+- 최신 `no-mixed` 재검증에서는 `SAME_PICKUP_DROPOFF`가 사라지고
+  - `NO_CANDIDATE_HUB: 6`
+  - `NO_PICKUP: 1`
+  - `NO_DROPOFF: 1`
+  로 reasonCode가 재분류됨
+- 최신 코드가 반영된 8082 서버 재실행 기준
+  - `tmap_pedestrian_route`는 warm second-pass에서 `0 miss`
+  - `mobility_availability` / `mobility_segment`는 허브·세그먼트 조합 다양성 때문에 miss가 일부 유지됨
 - 다음 단계는 `mixed-winning`의 목적지 유형 다양화와 `no-mixed` 표본 4~6건 확장
 
 ### 3. 호출 최적화 고도화
