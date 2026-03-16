@@ -15,6 +15,7 @@
 - [od-samples.seoul.json](<project-root>/docs/experiments/od-samples.seoul.json)
 - [od-samples.mixed-opportunity.json](<project-root>/docs/experiments/od-samples.mixed-opportunity.json)
 - [od-samples.mixed-winning.json](<project-root>/docs/experiments/od-samples.mixed-winning.json)
+- [od-samples.no-mixed.json](<project-root>/docs/experiments/od-samples.no-mixed.json)
 - mixed-winning 해석/확장 전략:
   - [2026-03-16-mixed-winning-playbook.md](<project-root>/docs/experiments/2026-03-16-mixed-winning-playbook.md)
 
@@ -54,6 +55,16 @@ mixed 경로가 유리할 가능성이 있는 목적지 세트:
   --search-mode OPTIMAL \
   --recommendation-preference TIME_PRIORITY \
   --input <project-root>/docs/experiments/od-samples.mixed-winning.json
+```
+
+mixed 자체가 생성되지 않는 케이스와 `reasonCode`를 보고 싶다면:
+
+```bash
+<project-root>/scripts/evaluate_routes.py \
+  --base-url http://localhost:8081 \
+  --search-mode OPTIMAL \
+  --recommendation-preference RELIABILITY \
+  --input <project-root>/docs/experiments/od-samples.no-mixed.json
 ```
 
 ## 출력
@@ -110,4 +121,5 @@ mixed 경로가 유리할 가능성이 있는 목적지 세트:
   - `MOBILITY_ONLY`와 `TRANSIT_WITH_BIKE` 두 유형을 모두 포함
   - warm cache 상태에서는 `mobility_availability`, `odsay_route`, `tmap_pedestrian_route` miss가 `0`
 - mixed-winning 표본 수는 목표 범위의 하한선(`7건`)에 도달했지만, 아직 목적지 유형이 `북한산/월드컵공원` 축에 몰려 있어 데이터 다양성은 더 보강해야 한다.
+- `od-samples.no-mixed.json` 4건에서는 `NO_CANDIDATE_HUB`, `NO_PICKUP`, `NO_DROPOFF`, `SAME_PICKUP_DROPOFF` 진단이 실제로 수집됨
 - 따라서 포트폴리오에서는 `mixed가 실제로 이기는 사례를 확보했다` 수준으로 표현하고, 일반성을 주장하기보다 샘플 확장 계획을 함께 제시하는 것이 좋다.

@@ -54,7 +54,13 @@
   - `RELIABILITY`는 대중교통 7/7 유지
   - 평균 `3.857분` 단축, 평균 비용 `-271원`
 - mixed-winning 표본 수는 목표 범위 하한선에 도달했지만, 아직 목적지 유형 다양성은 더 보강해야 함
-- 다음 단계는 `mixed-winning / mixed-opportunity / no-mixed` 3카테고리 샘플셋을 분리해 실험 체계를 완성하는 것
+- `no-mixed` 샘플 4건도 확보:
+  - `NO_CANDIDATE_HUB`
+  - `NO_PICKUP`
+  - `NO_DROPOFF`
+  - `SAME_PICKUP_DROPOFF`
+  진단 코드를 실제로 수집 가능
+- 다음 단계는 `mixed-winning`의 목적지 유형 다양화와 `no-mixed` 표본 4~6건 확장
 
 ### 3. 호출 최적화 고도화
 

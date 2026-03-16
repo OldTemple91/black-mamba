@@ -1,0 +1,22 @@
+[
+  {
+    "id": "seodaemun_res_to_yonsei_campus_no_mixed",
+    "origin": { "name": "서대문 주거지", "lat": 37.5662, "lng": 126.9496 },
+    "destination": { "name": "연세대 캠퍼스 내부", "lat": 37.5668, "lng": 126.9398 }
+  },
+  {
+    "id": "jamsil_res_to_olympic_park_inner_no_mixed",
+    "origin": { "name": "잠실 주거지", "lat": 37.5113, "lng": 127.0907 },
+    "destination": { "name": "올림픽공원 내부", "lat": 37.5207, "lng": 127.1210 }
+  },
+  {
+    "id": "banpo_res_to_hangang_park_no_mixed",
+    "origin": { "name": "반포 주거지", "lat": 37.5038, "lng": 127.0118 },
+    "destination": { "name": "반포한강공원", "lat": 37.5129, "lng": 126.9958 }
+  },
+  {
+    "id": "seodaemun_res_to_yonsei_no_mixed_far",
+    "origin": { "name": "서대문 주거지 B", "lat": 37.5695, "lng": 126.9470 },
+    "destination": { "name": "연세대 캠퍼스 내부 B", "lat": 37.5668, "lng": 126.9398 }
+  }
+]
