@@ -138,7 +138,11 @@ export default function RouteCard({
               >
                 {hub.label} · {hub.detail}
                 {hub.source === 'selected-candidate' && (
-                  <> · {hub.metadata.selectionPhase === 'FIRST_MILE' ? '후보(출발)' : hub.metadata.selectionPhase === 'LAST_MILE' ? '후보(도착)' : '후보'}</>
+                  <>
+                    {' · '}
+                    {hub.metadata.selectionPhase === 'FIRST_MILE' ? '후보(출발)' : hub.metadata.selectionPhase === 'LAST_MILE' ? '후보(도착)' : '후보'}
+                    {hub.strategyLabel && <> · {hub.strategyLabel}</>}
+                  </>
                 )}
               </span>
             ))}

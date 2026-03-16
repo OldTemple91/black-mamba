@@ -51,6 +51,7 @@ export function getHubSummary(route) {
     source: hub.source,
     metadata: hub.metadata ?? {},
     tone: hub.source === 'selected-candidate' ? 'candidate' : 'actual',
+    strategyLabel: hubSelectionStrategyLabel(hub.metadata?.selectionStrategy),
   }))
 }
 
@@ -279,7 +280,7 @@ export function getDebugFacts(route, baselineRoute, searchMode, recommendationPr
     route.evaluation?.hubs?.some(hub => hub.source === 'selected-candidate')
       ? `선택 허브 metadata: ${route.evaluation.hubs
         .filter(hub => hub.source === 'selected-candidate')
-        .map(hub => `${hub.name}[${hub.metadata?.selectionPhase ?? '-'} / ${hub.metadata?.preferredMobility ?? '-'}]`)
+        .map(hub => `${hub.name}[${hub.metadata?.selectionPhase ?? '-'} / ${hub.metadata?.preferredMobility ?? '-'} / ${hubSelectionStrategyLabel(hub.metadata?.selectionStrategy)}]`)
         .join(', ')}`
       : '선택 허브 metadata 없음',
     Array.isArray(route.insights?.fallbackDiagnostics) && route.insights.fallbackDiagnostics.length > 0
@@ -322,5 +323,13 @@ function hubRoleLabel(role) {
     case 'FIRST_MILE_CANDIDATE': return '퍼스트마일 후보'
     case 'LAST_MILE_CANDIDATE': return '라스트마일 후보'
     default: return '환승'
+  }
+}
+
+function hubSelectionStrategyLabel(strategy) {
+  switch (strategy) {
+    case 'PRIMARY': return '기본 후보'
+    case 'FALLBACK_NEAREST': return '근접 fallback'
+    default: return strategy ?? '전략 없음'
   }
 }
