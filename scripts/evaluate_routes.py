@@ -19,6 +19,7 @@ CACHE_NAMES = [
     "ddareungi_snapshot",
     "kickboard_snapshot",
     "mobility_availability",
+    "mobility_segment",
     "tmap_pedestrian_route",
 ]
 

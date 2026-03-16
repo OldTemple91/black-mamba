@@ -316,6 +316,7 @@ npm run dev
   - `MOBILITY_ONLY`, `TRANSIT_WITH_BIKE` 두 유형 모두 포함
 - warm cache 기준 mixed-winning 샘플 2건 실험에서는 다음 캐시 miss가 `0`으로 관찰됨
   - `mobility_availability`
+  - `mobility_segment` (서버 재시작 후 측정 예정)
   - `odsay_route`
   - `tmap_pedestrian_route`
 

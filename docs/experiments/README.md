@@ -92,6 +92,7 @@ mixed 자체가 생성되지 않는 케이스와 `reasonCode`를 보고 싶다�
 - `ddareungi_snapshot`
 - `kickboard_snapshot`
 - `mobility_availability`
+- `mobility_segment`
 - `tmap_pedestrian_route`
 
 백엔드가 최신 코드로 재시작되어 있어야 metric이 반영된다.
@@ -119,7 +120,7 @@ mixed 자체가 생성되지 않는 케이스와 `reasonCode`를 보고 싶다�
   - 평균 비용 변화 `-271원`
   - `RELIABILITY`는 같은 샘플에서 `TRANSIT_ONLY 7/7` 유지
   - `MOBILITY_ONLY`와 `TRANSIT_WITH_BIKE` 두 유형을 모두 포함
-  - warm cache 상태에서는 `mobility_availability`, `odsay_route`, `tmap_pedestrian_route` miss가 `0`
+  - warm cache 상태에서는 `mobility_availability`, `mobility_segment`, `odsay_route`, `tmap_pedestrian_route` miss가 낮거나 `0`에 수렴하는지 확인
 - mixed-winning 표본 수는 목표 범위의 하한선(`7건`)에 도달했지만, 아직 목적지 유형이 `북한산/월드컵공원` 축에 몰려 있어 데이터 다양성은 더 보강해야 한다.
 - `od-samples.no-mixed.json` 4건에서는 `NO_CANDIDATE_HUB`, `NO_PICKUP`, `NO_DROPOFF`, `SAME_PICKUP_DROPOFF` 진단이 실제로 수집됨
 - 따라서 포트폴리오에서는 `mixed가 실제로 이기는 사례를 확보했다` 수준으로 표현하고, 일반성을 주장하기보다 샘플 확장 계획을 함께 제시하는 것이 좋다.
