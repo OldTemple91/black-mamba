@@ -15,6 +15,8 @@
 - [od-samples.seoul.json](<project-root>/docs/experiments/od-samples.seoul.json)
 - [od-samples.mixed-opportunity.json](<project-root>/docs/experiments/od-samples.mixed-opportunity.json)
 - [od-samples.mixed-winning.json](<project-root>/docs/experiments/od-samples.mixed-winning.json)
+- mixed-winning 해석/확장 전략:
+  - [2026-03-16-mixed-winning-playbook.md](<project-root>/docs/experiments/2026-03-16-mixed-winning-playbook.md)
 
 ## 실행 방법
 
@@ -104,3 +106,5 @@ mixed 경로가 유리할 가능성이 있는 목적지 세트:
   - `RELIABILITY`는 같은 샘플에서 `TRANSIT_ONLY 4/4` 유지
   - `MOBILITY_ONLY`와 `TRANSIT_WITH_BIKE` 두 유형을 모두 포함
   - warm cache 상태에서는 `mobility_availability`, `odsay_route`, `tmap_pedestrian_route` miss가 `0`
+- 현재 mixed-winning 데이터는 `대표 사례` 수준으로는 의미가 있지만, 아직 `충분한 데이터셋`이라고 보긴 어렵다.
+- 따라서 포트폴리오에서는 `mixed가 실제로 이기는 사례를 확보했다` 수준으로 표현하고, 일반성을 주장하기보다 샘플 확장 계획을 함께 제시하는 것이 좋다.

@@ -30,6 +30,7 @@
 - 목적지 기준 라스트마일 허브 pruning 및 근접 정류소 dedup 적용
 - `RecommendationPreference(RELIABILITY / TIME_PRIORITY)` 추가
 - API / 프론트 / 실험 스크립트에서 추천 성향 선택 가능
+- mixed-winning 해석/확장 전략 문서 초안 추가
 
 ## 다음 우선순위
 
@@ -51,6 +52,8 @@
 - stronger mixed-winning 샘플 4건 기준:
   - `TIME_PRIORITY`는 mixed 4/4 추천
   - `RELIABILITY`는 대중교통 4/4 유지
+- 다만 mixed-winning 데이터는 아직 `대표 사례` 수준이며, `충분한 데이터셋`으로 보긴 어려움
+- 다음 단계는 `mixed-winning / mixed-opportunity / no-mixed` 3카테고리 샘플셋을 분리해 실험 체계를 완성하는 것
 
 ### 3. 호출 최적화 고도화
 
@@ -90,6 +93,7 @@
 
 - `README.md`
 - `docs/experiments/README.md`
+- `docs/experiments/2026-03-16-mixed-winning-playbook.md`
 - `docs/experiments/od-samples.mixed-winning.json`
 - `scripts/evaluate_routes.py`
 - `output/experiments/latest-route-eval.md`
