@@ -232,6 +232,17 @@ def aggregate_generation_reason_counts(results: list[dict], key: str) -> dict[st
     return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
 
 
+def aggregate_generation_phase_counts(results: list[dict], key: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for result in results:
+        insights = result.get(key) or {}
+        diagnostics = insights.get("generationDiagnostics") or []
+        for diagnostic in diagnostics:
+            phase = diagnostic.get("phase") or "UNKNOWN"
+            counts[phase] = counts.get(phase, 0) + 1
+    return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+
 def build_summary(results: list[dict]) -> dict:
     valid = [result for result in results if "error" not in result]
     if not valid:
@@ -275,7 +286,9 @@ def build_summary(results: list[dict]) -> dict:
         "avgMixedCostDeltaWon": mean(mixed_cost_deltas),
         "avgMixedScoreDelta": mean(mixed_score_deltas),
         "recommendedGenerationReasonCounts": aggregate_generation_reason_counts(valid, "recommendedInsights"),
+        "recommendedGenerationPhaseCounts": aggregate_generation_phase_counts(valid, "recommendedInsights"),
         "bestMixedGenerationReasonCounts": aggregate_generation_reason_counts(mixed, "bestMixedInsights"),
+        "bestMixedGenerationPhaseCounts": aggregate_generation_phase_counts(mixed, "bestMixedInsights"),
     }
 
 
@@ -322,17 +335,27 @@ def render_markdown(summary: dict, results: list[dict], input_path: Path, base_u
             )
 
     recommended_reason_counts = summary.get("recommendedGenerationReasonCounts") or {}
+    recommended_phase_counts = summary.get("recommendedGenerationPhaseCounts") or {}
     best_mixed_reason_counts = summary.get("bestMixedGenerationReasonCounts") or {}
-    if recommended_reason_counts or best_mixed_reason_counts:
+    best_mixed_phase_counts = summary.get("bestMixedGenerationPhaseCounts") or {}
+    if recommended_reason_counts or best_mixed_reason_counts or recommended_phase_counts or best_mixed_phase_counts:
         lines.extend(["", "## Generation Diagnostics", ""])
         if recommended_reason_counts:
             lines.append("- Recommended routes")
             for reason_code, count in recommended_reason_counts.items():
                 lines.append(f"  - `{reason_code}`: `{count}`")
+            if recommended_phase_counts:
+                lines.append("  - by phase")
+                for phase, count in recommended_phase_counts.items():
+                    lines.append(f"    - `{phase}`: `{count}`")
         if best_mixed_reason_counts:
             lines.append("- Best mixed alternatives")
             for reason_code, count in best_mixed_reason_counts.items():
                 lines.append(f"  - `{reason_code}`: `{count}`")
+            if best_mixed_phase_counts:
+                lines.append("  - by phase")
+                for phase, count in best_mixed_phase_counts.items():
+                    lines.append(f"    - `{phase}`: `{count}`")
 
     lines.extend([
         "",

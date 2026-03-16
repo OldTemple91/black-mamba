@@ -83,6 +83,8 @@ mixed 자체가 생성되지 않는 케이스와 `reasonCode`를 보고 싶다�
 - `navigation.cache.total` 기준 cache hit/miss delta
 - `generationDiagnostics.reasonCode` 집계
   - 예: `NO_PICKUP`, `NO_DROPOFF`, `SAME_PICKUP_DROPOFF`
+- `generationDiagnostics.phase` 집계
+  - 예: `FIRST_MILE`, `LAST_MILE`, `DIRECT`
 
 ## 캐시 메트릭
 
@@ -123,4 +125,10 @@ mixed 자체가 생성되지 않는 케이스와 `reasonCode`를 보고 싶다�
   - warm cache 상태에서는 `mobility_availability`, `mobility_segment`, `odsay_route`, `tmap_pedestrian_route` miss가 낮거나 `0`에 수렴하는지 확인
 - mixed-winning 표본 수는 목표 범위의 하한선(`7건`)에 도달했지만, 아직 목적지 유형이 `북한산/월드컵공원` 축에 몰려 있어 데이터 다양성은 더 보강해야 한다.
 - `od-samples.no-mixed.json` 4건에서는 `NO_CANDIDATE_HUB`, `NO_PICKUP`, `NO_DROPOFF`, `SAME_PICKUP_DROPOFF` 진단이 실제로 수집됨
+- 같은 `no-mixed` 세트에서 `recommendedGenerationPhaseCounts`는 `FIRST_MILE 4`, `LAST_MILE 4`로 집계되어 어느 구간에서 병목이 큰지 바로 확인 가능
+- 최신 코드(`mobility_segment` 캐시 포함) 기준 warm second-pass 실험에서는 아래 miss가 모두 `0`으로 관찰됨
+  - `mobility_availability`
+  - `mobility_segment`
+  - `odsay_route`
+  - `tmap_pedestrian_route`
 - 따라서 포트폴리오에서는 `mixed가 실제로 이기는 사례를 확보했다` 수준으로 표현하고, 일반성을 주장하기보다 샘플 확장 계획을 함께 제시하는 것이 좋다.
