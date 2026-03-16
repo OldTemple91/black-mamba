@@ -62,10 +62,10 @@
 - `mobility_segment` 캐시 추가:
   - 동일 start/end 세그먼트의 pickup/dropoff 조합 재사용
   - `SAME_PICKUP_DROPOFF`를 실제 route build 전에 더 일찍 제외
+- 기본 후보 구간이 비면 nearest feasible stop을 허브 fallback으로 선택
 - 최신 `no-mixed` 재검증에서는 `SAME_PICKUP_DROPOFF`가 사라지고
-  - `NO_CANDIDATE_HUB: 6`
-  - `NO_PICKUP: 1`
-  - `NO_DROPOFF: 1`
+  - `NO_PICKUP: 6`
+  - `NO_CANDIDATE_HUB: 2`
   로 reasonCode가 재분류됨
 - 최신 코드가 반영된 8082 서버 재실행 기준
   - `tmap_pedestrian_route`는 warm second-pass에서 `0 miss`

@@ -218,6 +218,7 @@ flowchart TD
 - `Hub pruning`: 목적지 기준 이동수단 최대 범위를 벗어난 라스트마일 후보를 사전 제거
 - `Candidate deduplication`: 서로 매우 가까운 정류소 후보는 하나로 병합
 - `Same-station pruning`: 동일 정류소 대여/반납 조합은 경로 생성 전에 조기 제외
+- `Fallback hub selection`: 기본 후보 구간이 비면 가장 가까운 feasible 정류소를 보조 허브로 사용
 
 현재 TTL은 설정값으로 관리합니다.
 
@@ -315,9 +316,8 @@ npm run dev
   - 평균 비용 변화 `-271원`
   - `MOBILITY_ONLY`, `TRANSIT_WITH_BIKE` 두 유형 모두 포함
 - 최신 `no-mixed` 샘플 4건에서는 `SAME_PICKUP_DROPOFF`가 사라지고, 진단 코드가 아래처럼 수렴
-  - `NO_CANDIDATE_HUB: 6`
-  - `NO_PICKUP: 1`
-  - `NO_DROPOFF: 1`
+  - `NO_PICKUP: 6`
+  - `NO_CANDIDATE_HUB: 2`
 - warm second-pass 기준으로는 `TMAP` miss가 `0`으로 떨어졌고, `mobility_availability`/`mobility_segment`는 세그먼트 조합 다양성 때문에 miss가 일부 남음
 
 즉 현재 엔진은

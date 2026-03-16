@@ -23,18 +23,32 @@ public class HubSelector {
     }
 
     public List<Hub> selectLastMileHubs(List<Leg> legs, Location destination, MobilityConfig config) {
-        return candidatePointSelector.filterByMobilityFeasibility(
-                        candidatePointSelector.select(legs, config),
-                        destination,
-                        config
-                ).stream()
-                .map(location -> toTransitHub(location, legs, config, "LAST_MILE"))
+        List<Location> primaryCandidates = candidatePointSelector.filterByMobilityFeasibility(
+                candidatePointSelector.select(legs, config),
+                destination,
+                config
+        );
+        if (!primaryCandidates.isEmpty()) {
+            return primaryCandidates.stream()
+                    .map(location -> toTransitHub(location, legs, config, "LAST_MILE", "PRIMARY"))
+                    .toList();
+        }
+
+        return candidatePointSelector.selectLastMileFallback(destination, legs, config).stream()
+                .map(location -> toTransitHub(location, legs, config, "LAST_MILE", "FALLBACK_NEAREST"))
                 .toList();
     }
 
     public List<Hub> selectFirstMileHubs(Location origin, List<Leg> legs, MobilityConfig config) {
-        return candidatePointSelector.selectFirstMile(origin, legs, config).stream()
-                .map(location -> toTransitHub(location, legs, config, "FIRST_MILE"))
+        List<Location> primaryCandidates = candidatePointSelector.selectFirstMile(origin, legs, config);
+        if (!primaryCandidates.isEmpty()) {
+            return primaryCandidates.stream()
+                    .map(location -> toTransitHub(location, legs, config, "FIRST_MILE", "PRIMARY"))
+                    .toList();
+        }
+
+        return candidatePointSelector.selectFirstMileFallback(origin, legs, config).stream()
+                .map(location -> toTransitHub(location, legs, config, "FIRST_MILE", "FALLBACK_NEAREST"))
                 .toList();
     }
 
@@ -49,7 +63,7 @@ public class HubSelector {
         );
     }
 
-    private Hub toTransitHub(Location location, List<Leg> legs, MobilityConfig config, String selectionPhase) {
+    private Hub toTransitHub(Location location, List<Leg> legs, MobilityConfig config, String selectionPhase, String selectionStrategy) {
         HubType type = inferTransitHubType(location, legs);
         return new Hub(
                 hubId(location),
@@ -61,6 +75,7 @@ public class HubSelector {
                         "source", "baseline-transit-candidate",
                         "preferredMobility", config.mobilityType().name(),
                         "selectionPhase", selectionPhase,
+                        "selectionStrategy", selectionStrategy,
                         "transitHubType", type.name()
                 )
         );

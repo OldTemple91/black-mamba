@@ -80,6 +80,31 @@ class CandidatePointSelectorTest {
         });
     }
 
+    @Test
+    void 라스트마일_기본_후보가_없으면_가장_가까운_feasible_정류소를_fallback으로_선택한다() {
+        Location destination = new Location("목적지", 37.5040, 127.0050);
+        Leg leg = new Leg(
+                LegType.TRANSIT,
+                "BUS",
+                20,
+                5000,
+                new Location("시작", 37.4950, 127.0000),
+                new Location("끝", 37.5250, 127.0000),
+                TransitInfo.of("140", "#0052A4", 10),
+                null,
+                null
+        );
+
+        List<Location> fallback = selector.selectLastMileFallback(destination, List.of(leg), MobilityConfig.bike());
+
+        assertThat(fallback).isNotEmpty();
+        fallback.forEach(stop -> {
+            double dist = haversineMeters(stop.lat(), stop.lng(), destination.lat(), destination.lng());
+            assertThat(dist).isLessThanOrEqualTo(10_000.0);
+            assertThat(dist).isGreaterThanOrEqualTo(700.0);
+        });
+    }
+
     // -----------------------------------------------------------------
     // helpers
     // -----------------------------------------------------------------

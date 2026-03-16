@@ -7,6 +7,7 @@ import com.blackmamba.navigation.domain.route.MobilityType;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -21,6 +22,7 @@ public class CandidatePointSelector {
     private static final double MIN_RATIO = 0.3;
     private static final double MAX_RATIO = 0.8;
     private static final double DUPLICATE_STOP_THRESHOLD_METERS = 120.0;
+    private static final int FALLBACK_CANDIDATE_LIMIT = 5;
 
     public List<Location> select(List<Leg> legs, MobilityConfig config) {
         List<Location> allStops = extractTransitStops(legs);
@@ -83,6 +85,24 @@ public class CandidatePointSelector {
                 .toList();
     }
 
+    public List<Location> selectLastMileFallback(Location destination, List<Leg> legs, MobilityConfig config) {
+        return deduplicateNearby(extractTransitStops(legs)).stream()
+                .filter(stop -> isFeasible(stop, destination, config))
+                .sorted(Comparator.comparingDouble(stop ->
+                        distanceMeters(stop.lat(), stop.lng(), destination.lat(), destination.lng())))
+                .limit(FALLBACK_CANDIDATE_LIMIT)
+                .toList();
+    }
+
+    public List<Location> selectFirstMileFallback(Location origin, List<Leg> legs, MobilityConfig config) {
+        return deduplicateNearby(extractTransitStops(legs)).stream()
+                .filter(stop -> isFeasible(origin, stop, config))
+                .sorted(Comparator.comparingDouble(stop ->
+                        distanceMeters(origin.lat(), origin.lng(), stop.lat(), stop.lng())))
+                .limit(FALLBACK_CANDIDATE_LIMIT)
+                .toList();
+    }
+
     /**
      * TRANSIT Leg에서 정류장 목록을 추출.
      * ODsay passStopList에서 받은 실제 좌표(passThroughStations)를 우선 사용.
@@ -127,6 +147,12 @@ public class CandidatePointSelector {
                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
                 * Math.sin(dLng / 2) * Math.sin(dLng / 2);
         return EARTH_RADIUS_METERS * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    private boolean isFeasible(Location from, Location to, MobilityConfig config) {
+        double distance = distanceMeters(from.lat(), from.lng(), to.lat(), to.lng());
+        return distance <= config.maxRangeMeters()
+                && distance >= config.minEffectiveDistanceMeters();
     }
 
     private List<Location> deduplicateNearby(List<Location> candidates) {

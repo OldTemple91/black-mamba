@@ -5,9 +5,9 @@
     "destination": { "name": "연세대 캠퍼스 내부", "lat": 37.5668, "lng": 126.9398 }
   },
   {
-    "id": "jamsil_res_to_olympic_park_inner_no_mixed",
-    "origin": { "name": "잠실 주거지", "lat": 37.5113, "lng": 127.0907 },
-    "destination": { "name": "올림픽공원 내부", "lat": 37.5207, "lng": 127.1210 }
+    "id": "gwanak_edge_to_hangang_no_mixed",
+    "origin": { "name": "관악 외곽 주거지", "lat": 37.4457, "lng": 126.9608 },
+    "destination": { "name": "반포한강공원 깊은 내부", "lat": 37.5187, "lng": 126.9940 }
   },
   {
     "id": "banpo_res_to_hangang_park_no_mixed",
@@ -15,8 +15,8 @@
     "destination": { "name": "반포한강공원", "lat": 37.5129, "lng": 126.9958 }
   },
   {
-    "id": "seodaemun_res_to_yonsei_no_mixed_far",
-    "origin": { "name": "서대문 주거지 B", "lat": 37.5695, "lng": 126.9470 },
-    "destination": { "name": "연세대 캠퍼스 내부 B", "lat": 37.5668, "lng": 126.9398 }
+    "id": "gwanak_edge_to_yeouido_no_mixed",
+    "origin": { "name": "관악 외곽 주거지 B", "lat": 37.4457, "lng": 126.9608 },
+    "destination": { "name": "여의도공원 내부", "lat": 37.5252, "lng": 126.9217 }
   }
 ]
