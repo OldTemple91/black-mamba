@@ -14,7 +14,7 @@
 
 - `mixed가 실제로 이기는 대표 사례를 확보했다`
 - `추천 성향(RELIABILITY / TIME_PRIORITY)에 따라 추천 결과가 달라지는 것을 확인했다`
-- `하지만 mixed-winning 데이터셋이 충분히 풍부하다고 보긴 아직 어렵다`
+- `mixed-winning 표본 수는 7건까지 확보했지만, 아직 목적지 유형 다양성은 더 필요하다`
 
 포트폴리오/발표에서 권장하는 표현:
 
@@ -39,13 +39,13 @@
 
 아래 세 가지가 더 확보돼야 `데이터가 충분하다`고 말하기 쉽다.
 
-1. mixed-winning 샘플 수 확대
+1. mixed-winning 샘플 유형 확대
 2. 샘플 유형 다양화
 3. no-mixed 샘플 분리
 
 권장 목표:
 
-- mixed-winning: `5~8건`
+- mixed-winning: `5~8건` 확보 완료, 다음은 유형 다양화
 - mixed-opportunity: `8~12건`
 - no-mixed: `4~6건`
 

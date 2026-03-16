@@ -307,10 +307,10 @@ npm run dev
 
 현재까지 확인된 대표 결과:
 
-- `RELIABILITY`에서는 같은 mixed-opportunity 샘플 세트에서도 추천이 모두 `TRANSIT_ONLY`
-- `TIME_PRIORITY`에서는 stronger mixed-winning 샘플 4건이 모두 mixed 추천으로 전환
-  - 평균 `3.25분` 단축
-  - 평균 비용 변화 `-125원`
+- `RELIABILITY`에서는 같은 mixed-winning 샘플 세트에서도 추천이 모두 `TRANSIT_ONLY`
+- `TIME_PRIORITY`에서는 mixed-winning 샘플 7건이 모두 mixed 추천으로 전환
+  - 평균 `3.857분` 단축
+  - 평균 비용 변화 `-271원`
   - `MOBILITY_ONLY`, `TRANSIT_WITH_BIKE` 두 유형 모두 포함
 - warm cache 기준 mixed-winning 샘플 2건 실험에서는 다음 캐시 miss가 `0`으로 관찰됨
   - `mobility_availability`

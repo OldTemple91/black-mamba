@@ -48,11 +48,12 @@
   - `gupabal_res_to_bukhan_entrance_fast_2`
   - `hapjeong_res_to_worldcup_park_fast_mobility`
   - `hapjeong_res_to_worldcup_park_fast_bike`
-- mixed-winning 샘플은 현재 `3~4분` 단축 케이스까지 확보
-- stronger mixed-winning 샘플 4건 기준:
-  - `TIME_PRIORITY`는 mixed 4/4 추천
-  - `RELIABILITY`는 대중교통 4/4 유지
-- 다만 mixed-winning 데이터는 아직 `대표 사례` 수준이며, `충분한 데이터셋`으로 보긴 어려움
+- mixed-winning 샘플은 현재 `3~5분` 단축 케이스까지 확보
+- mixed-winning 샘플 7건 기준:
+  - `TIME_PRIORITY`는 mixed 7/7 추천
+  - `RELIABILITY`는 대중교통 7/7 유지
+  - 평균 `3.857분` 단축, 평균 비용 `-271원`
+- mixed-winning 표본 수는 목표 범위 하한선에 도달했지만, 아직 목적지 유형 다양성은 더 보강해야 함
 - 다음 단계는 `mixed-winning / mixed-opportunity / no-mixed` 3카테고리 샘플셋을 분리해 실험 체계를 완성하는 것
 
 ### 3. 호출 최적화 고도화

@@ -95,16 +95,19 @@ mixed 경로가 유리할 가능성이 있는 목적지 세트:
 - 예를 들어 `hapjeong_res_to_worldcup_park`는 mixed가 시간 기준 `2분` 더 빠르지만,
   접근 도보(`369m`), 공유수단 의존, 비용 증가 때문에 총점은 baseline보다 낮았다.
 - `--recommendation-preference` 옵션으로 `RELIABILITY`와 `TIME_PRIORITY`를 나눠 비교할 수 있다.
-- 2026-03-13 기준 `OPTIMAL`은 MaaS 추천 의미를 유지하기 위해 `PERSONAL`을 제외했고, `TIME_PRIORITY`에서는 아래 케이스가 mixed 추천으로 확인됐다.
+- 2026-03-16 기준 `OPTIMAL`은 MaaS 추천 의미를 유지하기 위해 `PERSONAL`을 제외했고, `TIME_PRIORITY`에서는 아래 케이스들이 mixed 추천으로 확인됐다.
   - `gupabal_res_to_bukhan_entrance_fast_1` -> `MOBILITY_ONLY` (`3분` 단축)
   - `gupabal_res_to_bukhan_entrance_fast_2` -> `MOBILITY_ONLY` (`3분` 단축)
   - `hapjeong_res_to_worldcup_park_fast_mobility` -> `MOBILITY_ONLY` (`4분` 단축)
   - `hapjeong_res_to_worldcup_park_fast_bike` -> `TRANSIT_WITH_BIKE` (`3분` 단축)
-- mixed-winning 샘플 4건 기준 요약:
-  - `TIME_PRIORITY` 평균 `3.25분` 단축
-  - 평균 비용 변화 `-125원`
-  - `RELIABILITY`는 같은 샘플에서 `TRANSIT_ONLY 4/4` 유지
+- `mangwon_res_to_worldcup_park_fast_2` -> `MOBILITY_ONLY` (`5분` 단축)
+- `mangwon_res_to_worldcup_park_fast_4` -> `MOBILITY_ONLY` (`4분` 단축)
+- `mangwon_res_to_worldcup_park_fast_5` -> `TRANSIT_WITH_BIKE` (`5분` 단축)
+- mixed-winning 샘플 7건 기준 요약:
+  - `TIME_PRIORITY` 평균 `3.857분` 단축
+  - 평균 비용 변화 `-271원`
+  - `RELIABILITY`는 같은 샘플에서 `TRANSIT_ONLY 7/7` 유지
   - `MOBILITY_ONLY`와 `TRANSIT_WITH_BIKE` 두 유형을 모두 포함
   - warm cache 상태에서는 `mobility_availability`, `odsay_route`, `tmap_pedestrian_route` miss가 `0`
-- 현재 mixed-winning 데이터는 `대표 사례` 수준으로는 의미가 있지만, 아직 `충분한 데이터셋`이라고 보긴 어렵다.
+- mixed-winning 표본 수는 목표 범위의 하한선(`7건`)에 도달했지만, 아직 목적지 유형이 `북한산/월드컵공원` 축에 몰려 있어 데이터 다양성은 더 보강해야 한다.
 - 따라서 포트폴리오에서는 `mixed가 실제로 이기는 사례를 확보했다` 수준으로 표현하고, 일반성을 주장하기보다 샘플 확장 계획을 함께 제시하는 것이 좋다.

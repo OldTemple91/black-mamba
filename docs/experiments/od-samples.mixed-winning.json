@@ -18,5 +18,20 @@
     "id": "hapjeong_res_to_worldcup_park_fast_bike",
     "origin": { "name": "합정 주거지 B", "lat": 37.5511, "lng": 126.9085 },
     "destination": { "name": "월드컵공원 내부", "lat": 37.5676, "lng": 126.8786 }
+  },
+  {
+    "id": "mangwon_res_to_worldcup_park_fast_2",
+    "origin": { "name": "망원 주거지 A", "lat": 37.5584, "lng": 126.9002 },
+    "destination": { "name": "월드컵공원 북측", "lat": 37.5698, "lng": 126.8787 }
+  },
+  {
+    "id": "mangwon_res_to_worldcup_park_fast_4",
+    "origin": { "name": "망원 주거지 B", "lat": 37.5612, "lng": 126.8965 },
+    "destination": { "name": "월드컵공원 북측", "lat": 37.5698, "lng": 126.8787 }
+  },
+  {
+    "id": "mangwon_res_to_worldcup_park_fast_5",
+    "origin": { "name": "망원 주거지 C", "lat": 37.5549, "lng": 126.9044 },
+    "destination": { "name": "월드컵공원 북측", "lat": 37.5698, "lng": 126.8787 }
   }
 ]
