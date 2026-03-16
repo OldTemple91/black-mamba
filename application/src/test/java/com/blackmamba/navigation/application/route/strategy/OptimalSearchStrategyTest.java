@@ -58,6 +58,8 @@ class OptimalSearchStrategyTest {
                 .thenReturn(Mono.just(Optional.empty()));
         lenient().when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.empty()));
+        lenient().when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(Optional.empty()));
         lenient().when(routeEvaluator.evaluate(any(Route.class), any(Route.class), anyInt(), anyBoolean(), eq(RecommendationPreference.RELIABILITY)))
                 .thenAnswer(invocation -> {
                     Route route = invocation.getArgument(0);
@@ -87,14 +89,10 @@ class OptimalSearchStrategyTest {
         // 강남→서울역 직선 약 7km → 킥보드(5km) 범위 초과, 따릉이(10km) 범위 이내
         when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of());
         when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of());
-        when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
+        when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.of(
                         new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
                                 null, 100, "서울역", 37.5547, 126.9706, 5, 0))));
-        when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
-                .thenReturn(Mono.just(Optional.of(
-                        new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
-                                null, 100, "강남역", 37.4979, 127.0276, 3, 0))));
         when(mobilityTimePort.getMobilityRoute(any(), any(), any()))
                 .thenReturn(Mono.just(MobilityRouteResult.timeOnly(30)));
 
@@ -110,12 +108,10 @@ class OptimalSearchStrategyTest {
         when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of());
         when(mobilityTimePort.getMobilityRoute(any(), any(), any()))
                 .thenReturn(Mono.just(MobilityRouteResult.timeOnly(8)));
-        when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
+        when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.of(
                         new MobilityInfo(MobilityType.KICKBOARD_SHARED, "씽씽",
                                 "K001", 80, null, 37.52, 127.0, 1, 100))));
-        lenient().when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
-                .thenReturn(Mono.just(Optional.empty()));
 
         List<Route> routes = strategy.search(origin, destination).block();
 
@@ -129,14 +125,10 @@ class OptimalSearchStrategyTest {
         when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of());
         when(mobilityTimePort.getMobilityRoute(any(), any(), any()))
                 .thenReturn(Mono.just(MobilityRouteResult.timeOnly(8)));
-        when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
+        when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.of(
                         new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
                                 null, 100, "정류소", 37.52, 127.0, 5, 100))));
-        when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
-                .thenReturn(Mono.just(Optional.of(
-                        new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
-                                null, 100, "반납", 37.50, 127.02, 5, 100))));
 
         List<Route> routes = strategy.search(origin, destination).block();
 
@@ -149,18 +141,13 @@ class OptimalSearchStrategyTest {
     void 같은_따릉이_정류소_대여반납_조합은_혼합경로에서_제외된다() {
         when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of(hub(candidate)));
         when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of(hub(candidate)));
-        when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), eq(MobilityType.DDAREUNGI)))
+        when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), eq(MobilityType.DDAREUNGI)))
                 .thenReturn(Mono.just(Optional.of(
                         new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
                                 null, 100, "142. 아현역 4번출구 앞", 37.52, 127.0, 5, 20)
-                                .withDropoffStation("S-142", "142. 아현역 4번출구 앞", 37.52, 127.0))));
-        when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), eq(MobilityType.DDAREUNGI)))
-                .thenReturn(Mono.just(Optional.of(
-                        new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
-                                null, 100, "142. 아현역 4번출구 앞", 37.52, 127.0, 5, 20))));
-        when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), eq(MobilityType.PERSONAL)))
-                .thenReturn(Mono.just(Optional.empty()));
-        when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), eq(MobilityType.PERSONAL)))
+                                .withDropoffStation("S-142", "142. 아현역 4번출구 앞", 37.52, 127.0))
+                        .filter(info -> !info.hasSamePickupAndDropoffStation())));
+        when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), eq(MobilityType.PERSONAL)))
                 .thenReturn(Mono.just(Optional.empty()));
 
         List<Route> routes = strategy.search(origin, destination).block();

@@ -1,6 +1,6 @@
 # Current Focus
 
-> 마지막 업데이트: 2026-03-13
+> 마지막 업데이트: 2026-03-16
 
 ## 현재 목표
 
@@ -60,11 +60,15 @@
   - `NO_DROPOFF`
   - `SAME_PICKUP_DROPOFF`
   진단 코드를 실제로 수집 가능
+- `mobility_segment` 캐시 추가:
+  - 동일 start/end 세그먼트의 pickup/dropoff 조합 재사용
+  - `SAME_PICKUP_DROPOFF`를 실제 route build 전에 더 일찍 제외
 - 다음 단계는 `mixed-winning`의 목적지 유형 다양화와 `no-mixed` 표본 4~6건 확장
 
 ### 3. 호출 최적화 고도화
 
 - 현재는 TTL 캐시로 중복 호출을 줄인 상태
+- `mobility_segment` 캐시까지 추가해 same-station 판단의 중복 조회를 줄인 상태
 - 다음 단계는 후보 허브 pruning과 부분 경로 재사용으로 총 호출 수 자체를 더 줄이기
 
 ### 4. README / 실험 문서 보강

@@ -26,7 +26,10 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
     private final Counter kickboardFallbackEmptyCounter;
     private final Counter availabilityCacheHitCounter;
     private final Counter availabilityCacheMissCounter;
+    private final Counter segmentCacheHitCounter;
+    private final Counter segmentCacheMissCounter;
     private final ConcurrentHashMap<AvailabilityKey, CacheEntry<Optional<MobilityInfo>>> availabilityCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<SegmentAvailabilityKey, CacheEntry<Optional<MobilityInfo>>> segmentAvailabilityCache = new ConcurrentHashMap<>();
     private final long availabilityCacheTtlMs;
     private final int searchRadiusMeters;
 
@@ -62,6 +65,16 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
         this.availabilityCacheMissCounter = meterRegistry.counter(
                 "navigation.cache.total",
                 "cache", "mobility_availability",
+                "result", "miss"
+        );
+        this.segmentCacheHitCounter = meterRegistry.counter(
+                "navigation.cache.total",
+                "cache", "mobility_segment",
+                "result", "hit"
+        );
+        this.segmentCacheMissCounter = meterRegistry.counter(
+                "navigation.cache.total",
+                "cache", "mobility_segment",
                 "result", "miss"
         );
     }
@@ -105,6 +118,40 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                     });
             case KICKBOARD_SHARED, PERSONAL -> findNearbyMobility(lat, lng, type);
         });
+    }
+
+    @Override
+    public Mono<Optional<MobilityInfo>> findSegmentMobility(double startLat, double startLng, double endLat, double endLng, MobilityType type) {
+        long now = System.currentTimeMillis();
+        SegmentAvailabilityKey key = SegmentAvailabilityKey.of(startLat, startLng, endLat, endLng, type);
+        return segmentAvailabilityCache.compute(key, (ignored, existing) -> {
+            if (existing != null && !existing.isExpired(now)) {
+                segmentCacheHitCounter.increment();
+                return existing;
+            }
+            segmentCacheMissCounter.increment();
+            return new CacheEntry<>(loadSegmentMobility(startLat, startLng, endLat, endLng, type).cache(), now + availabilityCacheTtlMs);
+        }).value();
+    }
+
+    private Mono<Optional<MobilityInfo>> loadSegmentMobility(double startLat, double startLng, double endLat, double endLng, MobilityType type) {
+        Mono<Optional<MobilityInfo>> pickup = findNearbyMobility(startLat, startLng, type);
+
+        if (type != MobilityType.DDAREUNGI) {
+            return pickup;
+        }
+
+        Mono<Optional<MobilityInfo>> dropoff = findNearbyDropoff(endLat, endLng, type);
+        return Mono.zip(pickup, dropoff)
+                .map(tuple -> tuple.getT1()
+                        .flatMap(pickupInfo -> tuple.getT2()
+                                .map(dropoffInfo -> pickupInfo.withDropoffStation(
+                                        dropoffInfo.stationId(),
+                                        dropoffInfo.stationName(),
+                                        dropoffInfo.lat(),
+                                        dropoffInfo.lng()
+                                ))
+                                .filter(info -> !info.hasSamePickupAndDropoffStation())));
     }
 
     private Mono<Optional<MobilityInfo>> cachedLookup(double lat, double lng, MobilityType type, boolean dropoff,
@@ -256,13 +303,29 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
         return (int) (6_371_000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
     }
 
+    private static double roundCoordinate(double value) {
+        return Math.round(value * 10_000d) / 10_000d;
+    }
+
     private record AvailabilityKey(double latBucket, double lngBucket, MobilityType type, boolean dropoff) {
         private static AvailabilityKey of(double lat, double lng, MobilityType type, boolean dropoff) {
-            return new AvailabilityKey(round(lat), round(lng), type, dropoff);
+            return new AvailabilityKey(roundCoordinate(lat), roundCoordinate(lng), type, dropoff);
         }
+    }
 
-        private static double round(double value) {
-            return Math.round(value * 10_000d) / 10_000d;
+    private record SegmentAvailabilityKey(double startLatBucket,
+                                          double startLngBucket,
+                                          double endLatBucket,
+                                          double endLngBucket,
+                                          MobilityType type) {
+        private static SegmentAvailabilityKey of(double startLat, double startLng, double endLat, double endLng, MobilityType type) {
+            return new SegmentAvailabilityKey(
+                    roundCoordinate(startLat),
+                    roundCoordinate(startLng),
+                    roundCoordinate(endLat),
+                    roundCoordinate(endLng),
+                    type
+            );
         }
     }
 

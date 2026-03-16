@@ -214,8 +214,10 @@ flowchart TD
 - `TMAP`: 동일 보행 경로 캐시
 - `TMAP`: 429 quota 초과 발생 시 일정 시간 외부 호출을 차단하고 haversine fallback
 - `MobilityAvailability`: pickup/dropoff 조회 캐시
+- `MobilityAvailability`: start/end 세그먼트 단위 캐시로 동일 pickup/dropoff 판단 재사용
 - `Hub pruning`: 목적지 기준 이동수단 최대 범위를 벗어난 라스트마일 후보를 사전 제거
 - `Candidate deduplication`: 서로 매우 가까운 정류소 후보는 하나로 병합
+- `Same-station pruning`: 동일 정류소 대여/반납 조합은 경로 생성 전에 조기 제외
 
 현재 TTL은 설정값으로 관리합니다.
 

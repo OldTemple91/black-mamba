@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -25,6 +27,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class SpecificMobilityStrategyTest {
 
     @Mock TransitRoutePort transitRoutePort;
@@ -72,7 +75,7 @@ class SpecificMobilityStrategyTest {
         when(transitRoutePort.getTransitTimeMinutes(any(), any())).thenReturn(Mono.just(18));
         when(mobilityTimePort.getMobilityRoute(any(), any(), any()))
                 .thenReturn(Mono.just(MobilityRouteResult.timeOnly(9)));
-        when(mobilityAvailabilityPort.findNearbyMobility(any(Double.class), any(Double.class), any()))
+        when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.of(
                         new MobilityInfo(MobilityType.KICKBOARD_SHARED, "씽씽",
                                 "DEV_001", 85, null, 37.52, 127.0, 0, 120))));
@@ -103,6 +106,8 @@ class SpecificMobilityStrategyTest {
         when(transitRoutePort.getTransitRoute(any(), any()))
                 .thenReturn(Mono.just(List.of(leg)));
         when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of());
+        when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(Optional.empty()));
         when(mobilityAvailabilityPort.findNearbyMobility(any(Double.class), any(Double.class), any()))
                 .thenReturn(Mono.just(Optional.empty()));
         when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
@@ -137,11 +142,16 @@ class SpecificMobilityStrategyTest {
                 .thenReturn(Mono.just(List.of(baseLeg)));
         when(transitRoutePort.getTransitTimeMinutes(any(), any())).thenReturn(Mono.just(18));
         when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of(hub(candidate)));
-        when(mobilityAvailabilityPort.findNearbyMobility(any(Double.class), any(Double.class), any()))
+        when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.of(
                         new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
                                 null, 100, "142. 아현역 4번출구 앞", 37.52, 127.0, 5, 20)
-                                .withDropoffStation("S-142", "142. 아현역 4번출구 앞", 37.52, 127.0))));
+                                .withDropoffStation("S-142", "142. 아현역 4번출구 앞", 37.52, 127.0))
+                        .filter(info -> !info.hasSamePickupAndDropoffStation())));
+        when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.just(Optional.of(
+                        new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
+                                null, 100, "142. 아현역 4번출구 앞", 37.52, 127.0, 5, 20))));
         when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.of(
                         new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",

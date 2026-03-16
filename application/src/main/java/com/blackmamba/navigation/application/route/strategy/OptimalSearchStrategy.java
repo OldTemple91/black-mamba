@@ -236,26 +236,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     }
 
     private Mono<Optional<MobilityInfo>> mobilityInfoForSegment(Location start, Location end, MobilityType type) {
-        Mono<Optional<MobilityInfo>> pickup = mobilityAvailabilityPort
-                .findNearbyMobility(start.lat(), start.lng(), type);
-
-        if (type != MobilityType.DDAREUNGI) {
-            return pickup;
-        }
-
-        Mono<Optional<MobilityInfo>> dropoff = mobilityAvailabilityPort
-                .findNearbyDropoff(end.lat(), end.lng(), type);
-
-        return Mono.zip(pickup, dropoff)
-                .map(tuple -> tuple.getT1()
-                        .flatMap(pickupInfo -> tuple.getT2()
-                                .map(dropoffInfo -> pickupInfo.withDropoffStation(
-                                        dropoffInfo.stationId(),
-                                        dropoffInfo.stationName(),
-                                        dropoffInfo.lat(),
-                                        dropoffInfo.lng()
-                                ))
-                                .filter(info -> !info.hasSamePickupAndDropoffStation())));
+        return mobilityAvailabilityPort.findSegmentMobility(start.lat(), start.lng(), end.lat(), end.lng(), type);
     }
 
     // ── 헬퍼 ──────────────────────────────────────────────────────────────────
