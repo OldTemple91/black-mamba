@@ -373,7 +373,8 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                 "라스트마일",
                 "LAST_MILE",
                 type,
-                lastMileHubs.size()
+                lastMileHubs.size(),
+                candidateSummary(lastMileHubs)
         );
 
         Mono<Optional<GenerationDiagnostic>> firstMileReason = diagnoseSegmentAvailability(
@@ -383,7 +384,8 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                 "퍼스트마일",
                 "FIRST_MILE",
                 type,
-                firstMileHubs.size()
+                firstMileHubs.size(),
+                candidateSummary(firstMileHubs)
         );
 
         return Mono.zip(firstMileReason, lastMileReason)
@@ -400,7 +402,8 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                                                                String phaseLabel,
                                                                String phaseCode,
                                                                MobilityType mobilityType,
-                                                               int hubCount) {
+                                                               int hubCount,
+                                                               String hubSummary) {
         return diagnostics.collectList()
                 .map(items -> {
                     if (hubCount == 0 || items.isEmpty()) {
@@ -416,19 +419,32 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
 
                     if (sameStation > 0) {
                         return Optional.of(diagnostic(phaseCode, mobilityType, "SAME_PICKUP_DROPOFF", hubCount,
-                                label + " " + phaseLabel + " 후보 " + hubCount + "개를 확인했지만 동일 정류소 대여/반납 조합만 발견되어 제외했습니다."));
+                                label + " " + phaseLabel + " 후보 " + hubSummary + "를 확인했지만 동일 정류소 대여/반납 조합만 발견되어 제외했습니다."));
                     }
                     if (noDropoff > 0 && noPickup == 0) {
                         return Optional.of(diagnostic(phaseCode, mobilityType, "NO_DROPOFF", hubCount,
-                                label + " " + phaseLabel + " 후보 " + hubCount + "개를 확인했지만 반납 가능한 정류소를 찾지 못했습니다."));
+                                label + " " + phaseLabel + " 후보 " + hubSummary + "를 확인했지만 반납 가능한 정류소를 찾지 못했습니다."));
                     }
                     if (noPickup > 0 && noDropoff == 0) {
                         return Optional.of(diagnostic(phaseCode, mobilityType, "NO_PICKUP", hubCount,
-                                label + " " + phaseLabel + " 후보 " + hubCount + "개를 확인했지만 반경 내 대여 가능한 수단을 찾지 못했습니다."));
+                                label + " " + phaseLabel + " 후보 " + hubSummary + "를 확인했지만 반경 내 대여 가능한 수단을 찾지 못했습니다."));
                     }
                     return Optional.of(diagnostic(phaseCode, mobilityType, "NO_VALID_COMBINATION", hubCount,
-                            label + " " + phaseLabel + " 후보 " + hubCount + "개를 확인했지만 대여/반납 가능한 수단을 찾지 못했습니다."));
+                            label + " " + phaseLabel + " 후보 " + hubSummary + "를 확인했지만 대여/반납 가능한 수단을 찾지 못했습니다."));
                 });
+    }
+
+    private String candidateSummary(List<Hub> hubs) {
+        long primaryCount = hubs.stream()
+                .filter(hub -> "PRIMARY".equals(hub.metadata().get("selectionStrategy")))
+                .count();
+        long fallbackCount = hubs.stream()
+                .filter(hub -> "FALLBACK_NEAREST".equals(hub.metadata().get("selectionStrategy")))
+                .count();
+        if (fallbackCount == 0) {
+            return hubs.size() + "개";
+        }
+        return hubs.size() + "개(기본 " + primaryCount + ", fallback " + fallbackCount + ")";
     }
 
     private GenerationDiagnostic diagnostic(String phase, MobilityType type, String reasonCode, int candidateCount, String message) {

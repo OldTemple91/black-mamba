@@ -1,6 +1,6 @@
 # Current Focus
 
-> 마지막 업데이트: 2026-03-16
+> 마지막 업데이트: 2026-03-17
 
 ## 현재 목표
 
@@ -67,10 +67,14 @@
   - `NO_PICKUP: 6`
   - `NO_CANDIDATE_HUB: 2`
   로 reasonCode가 재분류됨
+- 2026-03-17 기준:
+  - pickup/dropoff 반경 분리(`850m / 700m`)는 실험했지만 `mixed-winning` 성능을 악화시켜 원복
+  - selected candidate 허브에 `selectionStrategy(PRIMARY / FALLBACK_NEAREST)` 노출
+  - 진단 메시지에 후보 구성(`기본 n, fallback n`)이 포함되도록 보강
 - 최신 코드가 반영된 8082 서버 재실행 기준
   - `tmap_pedestrian_route`는 warm second-pass에서 `0 miss`
   - `mobility_availability` / `mobility_segment`는 허브·세그먼트 조합 다양성 때문에 miss가 일부 유지됨
-- 다음 단계는 `mixed-winning`의 목적지 유형 다양화와 `no-mixed` 표본 4~6건 확장
+- 다음 단계는 `NO_PICKUP` 진단의 설명력을 더 높이고, 캠퍼스/박물관/업무지구 내부에서 허브 선택 규칙을 더 다듬는 것
 
 ### 3. 호출 최적화 고도화
 

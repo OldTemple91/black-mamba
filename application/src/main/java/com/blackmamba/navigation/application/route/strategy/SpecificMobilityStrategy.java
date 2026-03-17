@@ -236,19 +236,32 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
 
                     if (sameStation > 0) {
                         return Flux.just(diagnostic("LAST_MILE", type, "SAME_PICKUP_DROPOFF", candidateHubs.size(),
-                                labelFor(type) + " 라스트마일 후보 " + candidateHubs.size() + "개를 확인했지만 동일 정류소 대여/반납 조합만 발견되어 제외했습니다."));
+                                labelFor(type) + " 라스트마일 후보 " + candidateSummary(candidateHubs) + "를 확인했지만 동일 정류소 대여/반납 조합만 발견되어 제외했습니다."));
                     }
                     if (noDropoff > 0 && noPickup == 0) {
                         return Flux.just(diagnostic("LAST_MILE", type, "NO_DROPOFF", candidateHubs.size(),
-                                labelFor(type) + " 라스트마일 후보 " + candidateHubs.size() + "개를 확인했지만 반납 가능한 정류소를 찾지 못했습니다."));
+                                labelFor(type) + " 라스트마일 후보 " + candidateSummary(candidateHubs) + "를 확인했지만 반납 가능한 정류소를 찾지 못했습니다."));
                     }
                     if (noPickup > 0 && noDropoff == 0) {
                         return Flux.just(diagnostic("LAST_MILE", type, "NO_PICKUP", candidateHubs.size(),
-                                labelFor(type) + " 라스트마일 후보 " + candidateHubs.size() + "개를 확인했지만 반경 내 대여 가능한 수단을 찾지 못했습니다."));
+                                labelFor(type) + " 라스트마일 후보 " + candidateSummary(candidateHubs) + "를 확인했지만 반경 내 대여 가능한 수단을 찾지 못했습니다."));
                     }
                     return Flux.just(diagnostic("LAST_MILE", type, "NO_VALID_COMBINATION", candidateHubs.size(),
-                            labelFor(type) + " 라스트마일 후보 " + candidateHubs.size() + "개를 확인했지만 대여/반납 가능한 수단을 찾지 못했습니다."));
+                            labelFor(type) + " 라스트마일 후보 " + candidateSummary(candidateHubs) + "를 확인했지만 대여/반납 가능한 수단을 찾지 못했습니다."));
                 });
+    }
+
+    private String candidateSummary(List<Hub> hubs) {
+        long primaryCount = hubs.stream()
+                .filter(hub -> "PRIMARY".equals(hub.metadata().get("selectionStrategy")))
+                .count();
+        long fallbackCount = hubs.stream()
+                .filter(hub -> "FALLBACK_NEAREST".equals(hub.metadata().get("selectionStrategy")))
+                .count();
+        if (fallbackCount == 0) {
+            return hubs.size() + "개";
+        }
+        return hubs.size() + "개(기본 " + primaryCount + ", fallback " + fallbackCount + ")";
     }
 
     private GenerationDiagnostic diagnostic(String phase, MobilityType type, String reasonCode, int candidateCount, String message) {
