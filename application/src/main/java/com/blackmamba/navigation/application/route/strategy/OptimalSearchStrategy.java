@@ -374,7 +374,9 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                 "LAST_MILE",
                 type,
                 lastMileHubs.size(),
-                candidateSummary(lastMileHubs)
+                candidateSummary(lastMileHubs),
+                buildHintProvider(representativeHubLocation(lastMileHubs), type, false),
+                buildHintProvider(destination, type, true)
         );
 
         Mono<Optional<GenerationDiagnostic>> firstMileReason = diagnoseSegmentAvailability(
@@ -385,7 +387,9 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                 "FIRST_MILE",
                 type,
                 firstMileHubs.size(),
-                candidateSummary(firstMileHubs)
+                candidateSummary(firstMileHubs),
+                buildHintProvider(origin, type, false),
+                buildHintProvider(representativeHubLocation(firstMileHubs), type, true)
         );
 
         return Mono.zip(firstMileReason, lastMileReason)
@@ -403,35 +407,52 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                                                                String phaseCode,
                                                                MobilityType mobilityType,
                                                                int hubCount,
-                                                               String hubSummary) {
+                                                               String hubSummary,
+                                                               Mono<Optional<String>> noPickupHintProvider,
+                                                               Mono<Optional<String>> noDropoffHintProvider) {
         return diagnostics.collectList()
-                .map(items -> {
+                .flatMap(items -> {
                     if (hubCount == 0 || items.isEmpty()) {
-                        return Optional.<GenerationDiagnostic>empty();
+                        return Mono.just(Optional.<GenerationDiagnostic>empty());
                     }
                     long validCount = items.stream().filter(SegmentDiagnostic::isValid).count();
                     if (validCount > 0) {
-                        return Optional.<GenerationDiagnostic>empty();
+                        return Mono.just(Optional.<GenerationDiagnostic>empty());
                     }
                     long noPickup = items.stream().filter(item -> item.reason() == DiagnosticReason.NO_PICKUP).count();
                     long noDropoff = items.stream().filter(item -> item.reason() == DiagnosticReason.NO_DROPOFF).count();
                     long sameStation = items.stream().filter(item -> item.reason() == DiagnosticReason.SAME_STATION).count();
 
                     if (sameStation > 0) {
-                        return Optional.of(diagnostic(phaseCode, mobilityType, "SAME_PICKUP_DROPOFF", hubCount,
-                                label + " " + phaseLabel + " 후보 " + hubSummary + "를 확인했지만 동일 정류소 대여/반납 조합만 발견되어 제외했습니다."));
+                        return Mono.just(Optional.of(diagnostic(phaseCode, mobilityType, "SAME_PICKUP_DROPOFF", hubCount,
+                                label + " " + phaseLabel + " 후보 " + hubSummary + "를 확인했지만 동일 정류소 대여/반납 조합만 발견되어 제외했습니다.")));
                     }
                     if (noDropoff > 0 && noPickup == 0) {
-                        return Optional.of(diagnostic(phaseCode, mobilityType, "NO_DROPOFF", hubCount,
-                                label + " " + phaseLabel + " 후보 " + hubSummary + "를 확인했지만 반납 가능한 정류소를 찾지 못했습니다."));
+                        return noDropoffHintProvider.map(hint -> Optional.of(diagnostic(phaseCode, mobilityType, "NO_DROPOFF", hubCount,
+                                label + " " + phaseLabel + " 후보 " + hubSummary + "를 확인했지만 반납 가능한 정류소를 찾지 못했습니다."
+                                        + hint.map(value -> " " + value).orElse(""))));
                     }
                     if (noPickup > 0 && noDropoff == 0) {
-                        return Optional.of(diagnostic(phaseCode, mobilityType, "NO_PICKUP", hubCount,
-                                label + " " + phaseLabel + " 후보 " + hubSummary + "를 확인했지만 반경 내 대여 가능한 수단을 찾지 못했습니다."));
+                        return noPickupHintProvider.map(hint -> Optional.of(diagnostic(phaseCode, mobilityType, "NO_PICKUP", hubCount,
+                                label + " " + phaseLabel + " 후보 " + hubSummary + "를 확인했지만 반경 내 대여 가능한 수단을 찾지 못했습니다."
+                                        + hint.map(value -> " " + value).orElse(""))));
                     }
-                    return Optional.of(diagnostic(phaseCode, mobilityType, "NO_VALID_COMBINATION", hubCount,
-                            label + " " + phaseLabel + " 후보 " + hubSummary + "를 확인했지만 대여/반납 가능한 수단을 찾지 못했습니다."));
+                    return Mono.just(Optional.of(diagnostic(phaseCode, mobilityType, "NO_VALID_COMBINATION", hubCount,
+                            label + " " + phaseLabel + " 후보 " + hubSummary + "를 확인했지만 대여/반납 가능한 수단을 찾지 못했습니다.")));
                 });
+    }
+
+    private Mono<Optional<String>> buildHintProvider(Location location, MobilityType mobilityType, boolean dropoff) {
+        return mobilityAvailabilityPort.findNearestMobilityHint(location.lat(), location.lng(), mobilityType, dropoff)
+                .map(optionalHint -> optionalHint.map(MobilitySearchHint::toDiagnosticSuffix));
+    }
+
+    private Location representativeHubLocation(List<Hub> hubs) {
+        return hubs.isEmpty() ? destinationFallbackLocation() : hubs.getFirst().location();
+    }
+
+    private Location destinationFallbackLocation() {
+        return new Location("fallback", 0.0, 0.0);
     }
 
     private String candidateSummary(List<Hub> hubs) {

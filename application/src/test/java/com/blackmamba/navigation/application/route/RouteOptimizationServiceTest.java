@@ -45,6 +45,8 @@ class RouteOptimizationServiceTest {
                 .thenReturn(Mono.just(Optional.empty()));
         when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.empty()));
+        when(mobilityAvailabilityPort.findNearestMobilityHint(anyDouble(), anyDouble(), any(), anyBoolean()))
+                .thenReturn(Mono.just(Optional.empty()));
     }
 
     @Test

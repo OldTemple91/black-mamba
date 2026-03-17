@@ -239,16 +239,27 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                                 labelFor(type) + " 라스트마일 후보 " + candidateSummary(candidateHubs) + "를 확인했지만 동일 정류소 대여/반납 조합만 발견되어 제외했습니다."));
                     }
                     if (noDropoff > 0 && noPickup == 0) {
-                        return Flux.just(diagnostic("LAST_MILE", type, "NO_DROPOFF", candidateHubs.size(),
-                                labelFor(type) + " 라스트마일 후보 " + candidateSummary(candidateHubs) + "를 확인했지만 반납 가능한 정류소를 찾지 못했습니다."));
+                        return nearestHint(destination, type, true)
+                                .map(hint -> diagnostic("LAST_MILE", type, "NO_DROPOFF", candidateHubs.size(),
+                                        labelFor(type) + " 라스트마일 후보 " + candidateSummary(candidateHubs) + "를 확인했지만 반납 가능한 정류소를 찾지 못했습니다."
+                                                + hint.map(value -> " " + value).orElse("")))
+                                .flux();
                     }
                     if (noPickup > 0 && noDropoff == 0) {
-                        return Flux.just(diagnostic("LAST_MILE", type, "NO_PICKUP", candidateHubs.size(),
-                                labelFor(type) + " 라스트마일 후보 " + candidateSummary(candidateHubs) + "를 확인했지만 반경 내 대여 가능한 수단을 찾지 못했습니다."));
+                        return nearestHint(candidateHubs.getFirst().location(), type, false)
+                                .map(hint -> diagnostic("LAST_MILE", type, "NO_PICKUP", candidateHubs.size(),
+                                        labelFor(type) + " 라스트마일 후보 " + candidateSummary(candidateHubs) + "를 확인했지만 반경 내 대여 가능한 수단을 찾지 못했습니다."
+                                                + hint.map(value -> " " + value).orElse("")))
+                                .flux();
                     }
                     return Flux.just(diagnostic("LAST_MILE", type, "NO_VALID_COMBINATION", candidateHubs.size(),
                             labelFor(type) + " 라스트마일 후보 " + candidateSummary(candidateHubs) + "를 확인했지만 대여/반납 가능한 수단을 찾지 못했습니다."));
                 });
+    }
+
+    private Mono<Optional<String>> nearestHint(Location location, MobilityType type, boolean dropoff) {
+        return mobilityAvailabilityPort.findNearestMobilityHint(location.lat(), location.lng(), type, dropoff)
+                .map(optionalHint -> optionalHint.map(MobilitySearchHint::toDiagnosticSuffix));
     }
 
     private String candidateSummary(List<Hub> hubs) {

@@ -60,6 +60,8 @@ class OptimalSearchStrategyTest {
                 .thenReturn(Mono.just(Optional.empty()));
         lenient().when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.empty()));
+        lenient().when(mobilityAvailabilityPort.findNearestMobilityHint(anyDouble(), anyDouble(), any(), anyBoolean()))
+                .thenReturn(Mono.just(Optional.empty()));
         lenient().when(routeEvaluator.evaluate(any(Route.class), any(Route.class), anyInt(), anyBoolean(), eq(RecommendationPreference.RELIABILITY)))
                 .thenAnswer(invocation -> {
                     Route route = invocation.getArgument(0);

@@ -2,6 +2,7 @@ package com.blackmamba.navigation.infra.adapter;
 
 import com.blackmamba.navigation.application.route.port.MobilityAvailabilityPort;
 import com.blackmamba.navigation.domain.route.MobilityInfo;
+import com.blackmamba.navigation.domain.route.MobilitySearchHint;
 import com.blackmamba.navigation.domain.route.MobilityType;
 import com.blackmamba.navigation.infra.ddareungi.DdareungiApiClient;
 import com.blackmamba.navigation.infra.kickboard.KickboardApiClient;
@@ -152,6 +153,29 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                                         dropoffInfo.lng()
                                 ))
                                 .filter(info -> !info.hasSamePickupAndDropoffStation())));
+    }
+
+    @Override
+    public Mono<Optional<MobilitySearchHint>> findNearestMobilityHint(double lat, double lng, MobilityType type, boolean dropoff) {
+        if (type != MobilityType.DDAREUNGI) {
+            return Mono.just(Optional.empty());
+        }
+
+        int hintRadiusMeters = Math.max(searchRadiusMeters * 2, 1400);
+        return ddareungiClient.getNearbyStations(lat, lng, hintRadiusMeters, false)
+                .map(stations -> stations.stream().findFirst()
+                        .map(station -> new MobilitySearchHint(
+                                station.stationName(),
+                                station.stationId(),
+                                station.availableCount(),
+                                station.rackTotalCount(),
+                                distanceMeters(lat, lng, station.lat(), station.lng()),
+                                dropoff
+                        )))
+                .onErrorResume(ex -> {
+                    log.debug("[따릉이] 최근접 정류소 힌트 조회 실패: {}", ex.getMessage());
+                    return Mono.just(Optional.empty());
+                });
     }
 
     private Mono<Optional<MobilityInfo>> cachedLookup(double lat, double lng, MobilityType type, boolean dropoff,

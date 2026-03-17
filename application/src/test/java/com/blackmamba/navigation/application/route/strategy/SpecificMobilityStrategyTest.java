@@ -48,6 +48,8 @@ class SpecificMobilityStrategyTest {
             Route route = invocation.getArgument(0);
             return route.withScore(0.5, true);
         });
+        when(mobilityAvailabilityPort.findNearestMobilityHint(anyDouble(), anyDouble(), any(), anyBoolean()))
+                .thenReturn(Mono.just(Optional.empty()));
 
         SpecificMobilityStrategy strategy = new SpecificMobilityStrategy(
                 List.of(), transitRoutePort, mobilityTimePort,
@@ -86,6 +88,8 @@ class SpecificMobilityStrategyTest {
                     boolean recommended = invocation.getArgument(3);
                     return route.withScore(recommended ? 0.8 : 0.5, recommended);
                 });
+        when(mobilityAvailabilityPort.findNearestMobilityHint(anyDouble(), anyDouble(), any(), anyBoolean()))
+                .thenReturn(Mono.just(Optional.empty()));
 
         SpecificMobilityStrategy strategy = new SpecificMobilityStrategy(
                 List.of(MobilityType.KICKBOARD_SHARED), transitRoutePort, mobilityTimePort,
@@ -118,6 +122,8 @@ class SpecificMobilityStrategyTest {
                     boolean recommended = invocation.getArgument(3);
                     return route.withScore(0.5, recommended);
                 });
+        when(mobilityAvailabilityPort.findNearestMobilityHint(anyDouble(), anyDouble(), any(), anyBoolean()))
+                .thenReturn(Mono.just(Optional.empty()));
 
         SpecificMobilityStrategy strategy = new SpecificMobilityStrategy(
                 List.of(MobilityType.DDAREUNGI), transitRoutePort, mobilityTimePort,
@@ -162,6 +168,8 @@ class SpecificMobilityStrategyTest {
                     boolean recommended = invocation.getArgument(3);
                     return route.withScore(0.5, recommended);
                 });
+        when(mobilityAvailabilityPort.findNearestMobilityHint(anyDouble(), anyDouble(), any(), anyBoolean()))
+                .thenReturn(Mono.just(Optional.empty()));
 
         SpecificMobilityStrategy strategy = new SpecificMobilityStrategy(
                 List.of(MobilityType.DDAREUNGI), transitRoutePort, mobilityTimePort,

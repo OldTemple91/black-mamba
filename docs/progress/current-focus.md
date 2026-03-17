@@ -71,6 +71,7 @@
   - pickup/dropoff 반경 분리(`850m / 700m`)는 실험했지만 `mixed-winning` 성능을 악화시켜 원복
   - selected candidate 허브에 `selectionStrategy(PRIMARY / FALLBACK_NEAREST)` 노출
   - 진단 메시지에 후보 구성(`기본 n, fallback n`)이 포함되도록 보강
+  - `NO_PICKUP` / `NO_DROPOFF` 진단은 최근접 정류소 힌트를 선택적으로 포함하도록 보강
 - 최신 코드가 반영된 8082 서버 재실행 기준
   - `tmap_pedestrian_route`는 warm second-pass에서 `0 miss`
   - `mobility_availability` / `mobility_segment`는 허브·세그먼트 조합 다양성 때문에 miss가 일부 유지됨
