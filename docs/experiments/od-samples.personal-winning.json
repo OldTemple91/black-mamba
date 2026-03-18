@@ -1,0 +1,22 @@
+[
+  {
+    "id": "jamwon_personal_to_banpo_hangang",
+    "origin": { "name": "잠원 주거지", "lat": 37.5218, "lng": 127.0161 },
+    "destination": { "name": "반포한강공원 내부", "lat": 37.5137, "lng": 126.9955 }
+  },
+  {
+    "id": "banpo_personal_to_jamwon_hangang",
+    "origin": { "name": "반포 주거지", "lat": 37.5076, "lng": 127.0106 },
+    "destination": { "name": "잠원한강공원 내부", "lat": 37.5213, "lng": 126.9997 }
+  },
+  {
+    "id": "mangwon_personal_to_worldcup_park",
+    "origin": { "name": "망원 주거지", "lat": 37.5554, "lng": 126.9109 },
+    "destination": { "name": "월드컵공원 내부", "lat": 37.5676, "lng": 126.8786 }
+  },
+  {
+    "id": "mapo_personal_to_nanji_camp",
+    "origin": { "name": "마포 주거지", "lat": 37.5470, "lng": 126.9180 },
+    "destination": { "name": "난지캠핑장 인근", "lat": 37.5697, "lng": 126.8801 }
+  }
+]

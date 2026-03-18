@@ -16,6 +16,7 @@
 - [od-samples.mixed-opportunity.json](<project-root>/docs/experiments/od-samples.mixed-opportunity.json)
 - [od-samples.mixed-winning.json](<project-root>/docs/experiments/od-samples.mixed-winning.json)
 - [od-samples.no-mixed.json](<project-root>/docs/experiments/od-samples.no-mixed.json)
+- [od-samples.personal-winning.json](<project-root>/docs/experiments/od-samples.personal-winning.json)
 - mixed-winning 해석/확장 전략:
   - [2026-03-16-mixed-winning-playbook.md](<project-root>/docs/experiments/2026-03-16-mixed-winning-playbook.md)
 
@@ -65,6 +66,17 @@ mixed 자체가 생성되지 않는 케이스와 `reasonCode`를 보고 싶다�
   --search-mode OPTIMAL \
   --recommendation-preference RELIABILITY \
   --input <project-root>/docs/experiments/od-samples.no-mixed.json
+```
+
+개인 이동수단(`SPECIFIC + PERSONAL`)의 상한선 실험을 보고 싶다면:
+
+```bash
+<project-root>/scripts/evaluate_routes.py \
+  --base-url http://localhost:8081 \
+  --search-mode SPECIFIC \
+  --recommendation-preference TIME_PRIORITY \
+  --mobility PERSONAL \
+  --input <project-root>/docs/experiments/od-samples.personal-winning.json
 ```
 
 ## 출력
@@ -128,4 +140,10 @@ mixed 자체가 생성되지 않는 케이스와 `reasonCode`를 보고 싶다�
 - 같은 `no-mixed` 세트에서 `recommendedGenerationPhaseCounts`는 `FIRST_MILE 4`, `LAST_MILE 4`로 집계되어 어느 구간에서 병목이 큰지 바로 확인 가능
 - 최신 코드(`mobility_segment` 캐시 + fallback hub`) 기준 `no-mixed` 재실행에서는 `SAME_PICKUP_DROPOFF`가 사라지고 `NO_PICKUP 6`, `NO_CANDIDATE_HUB 2`로 재분류됨
 - 최신 warm second-pass 실험에서는 `tmap_pedestrian_route` miss가 `0`으로 관찰됐고, `mobility_availability`/`mobility_segment`는 허브·세그먼트 조합 다양성 때문에 miss가 일부 유지됨
+- 2026-03-18 기준 개인 이동수단 실험(`SPECIFIC + PERSONAL`)에서는 다음과 같은 stronger case를 확보했다.
+  - `jamwon_personal_to_banpo_hangang` -> `TRANSIT_WITH_KICKBOARD`, `20분` 단축, 비용 동일
+  - `banpo_personal_to_jamwon_hangang` -> `TRANSIT_WITH_KICKBOARD`, `12분` 단축, 비용 동일
+  - `mangwon_personal_to_worldcup_park` -> `TRANSIT_WITH_KICKBOARD`, `14분` 단축, 비용 `+50원`
+  - `mapo_personal_to_nanji_camp` -> `TRANSIT_WITH_KICKBOARD`, `10분` 단축, 비용 동일
+- 이는 개인 이동수단이 기본 `OPTIMAL`에서는 제외되어도, 사용자 보유를 전제로 한 별도 실험 축에서는 훨씬 큰 시간 단축 잠재력이 있음을 보여준다.
 - 따라서 포트폴리오에서는 `mixed가 실제로 이기는 사례를 확보했다` 수준으로 표현하고, 일반성을 주장하기보다 샘플 확장 계획을 함께 제시하는 것이 좋다.
