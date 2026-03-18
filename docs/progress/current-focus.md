@@ -20,6 +20,7 @@
 - 연속 도보 병합
 - 추천 이유/리스크 UI 추가
 - `Hub`, `HubType`, `HubSelector` 도입
+- `HubSearchPort` 도입으로 허브 검색/선택 책임 분리 시작
 - `RouteReliabilityMetrics` 도입
 - `RouteEvaluator`로 점수/비교/인사이트 통합
 - 대중교통 요금 / 따릉이 추정 요금 계산 반영

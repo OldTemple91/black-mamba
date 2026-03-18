@@ -1,5 +1,6 @@
 package com.blackmamba.navigation.application.route;
 
+import com.blackmamba.navigation.application.route.port.HubSearchPort;
 import com.blackmamba.navigation.domain.hub.Hub;
 import com.blackmamba.navigation.domain.hub.HubType;
 import com.blackmamba.navigation.domain.location.Location;
@@ -16,38 +17,34 @@ public class HubSelector {
 
     private static final int DEFAULT_HUB_RADIUS_METERS = 150;
 
-    private final CandidatePointSelector candidatePointSelector;
+    private final HubSearchPort hubSearchPort;
 
-    public HubSelector(CandidatePointSelector candidatePointSelector) {
-        this.candidatePointSelector = candidatePointSelector;
+    public HubSelector(HubSearchPort hubSearchPort) {
+        this.hubSearchPort = hubSearchPort;
     }
 
     public List<Hub> selectLastMileHubs(List<Leg> legs, Location destination, MobilityConfig config) {
-        List<Location> primaryCandidates = candidatePointSelector.filterByMobilityFeasibility(
-                candidatePointSelector.select(legs, config),
-                destination,
-                config
-        );
+        List<Location> primaryCandidates = hubSearchPort.findLastMilePrimaryCandidates(legs, destination, config);
         if (!primaryCandidates.isEmpty()) {
             return primaryCandidates.stream()
                     .map(location -> toTransitHub(location, legs, config, "LAST_MILE", "PRIMARY"))
                     .toList();
         }
 
-        return candidatePointSelector.selectLastMileFallback(destination, legs, config).stream()
+        return hubSearchPort.findLastMileFallbackCandidates(destination, legs, config).stream()
                 .map(location -> toTransitHub(location, legs, config, "LAST_MILE", "FALLBACK_NEAREST"))
                 .toList();
     }
 
     public List<Hub> selectFirstMileHubs(Location origin, List<Leg> legs, MobilityConfig config) {
-        List<Location> primaryCandidates = candidatePointSelector.selectFirstMile(origin, legs, config);
+        List<Location> primaryCandidates = hubSearchPort.findFirstMilePrimaryCandidates(origin, legs, config);
         if (!primaryCandidates.isEmpty()) {
             return primaryCandidates.stream()
                     .map(location -> toTransitHub(location, legs, config, "FIRST_MILE", "PRIMARY"))
                     .toList();
         }
 
-        return candidatePointSelector.selectFirstMileFallback(origin, legs, config).stream()
+        return hubSearchPort.findFirstMileFallbackCandidates(origin, legs, config).stream()
                 .map(location -> toTransitHub(location, legs, config, "FIRST_MILE", "FALLBACK_NEAREST"))
                 .toList();
     }
