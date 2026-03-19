@@ -105,6 +105,35 @@ class CandidatePointSelectorTest {
         });
     }
 
+    @Test
+    void 퍼스트마일_허브_검색은_출발지와_가까운_순으로_정렬한다() {
+        Location origin = new Location("출발", 37.5, 126.9);
+        Leg leg = new Leg(
+                LegType.TRANSIT,
+                "지하철",
+                30,
+                10_000,
+                new Location("시작", 37.5, 126.9),
+                new Location("끝", 37.59, 126.9),
+                TransitInfo.of("2호선", "#00A84D", 10),
+                null,
+                null
+        );
+
+        BaselineTransitHubSearchAdapter adapter = new BaselineTransitHubSearchAdapter(selector);
+        List<Location> candidates = adapter.findFirstMilePrimaryCandidates(origin, List.of(leg), MobilityConfig.kickboard());
+
+        assertThat(candidates).isNotEmpty();
+        double previous = -1;
+        for (Location candidate : candidates) {
+            double current = haversineMeters(origin.lat(), origin.lng(), candidate.lat(), candidate.lng());
+            if (previous >= 0) {
+                assertThat(current).isGreaterThanOrEqualTo(previous);
+            }
+            previous = current;
+        }
+    }
+
     // -----------------------------------------------------------------
     // helpers
     // -----------------------------------------------------------------

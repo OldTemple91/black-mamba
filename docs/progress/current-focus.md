@@ -83,6 +83,7 @@
   - `tmap_pedestrian_route`는 warm second-pass에서 `0 miss`
   - `mobility_availability` / `mobility_segment`는 허브·세그먼트 조합 다양성 때문에 miss가 일부 유지됨
 - 다음 단계는 `NO_PICKUP` 진단의 설명력을 더 높이고, 캠퍼스/박물관/업무지구 내부에서 허브 선택 규칙을 더 다듬는 것
+- 최신 허브 선택은 검색 결과를 출발지/목적지 기준 거리순으로 정렬하고, `selectionRank` / `distanceToAnchorMeters`를 metadata로 함께 노출한다
 
 ### 3. 호출 최적화 고도화
 
