@@ -106,6 +106,31 @@ class CandidatePointSelectorTest {
     }
 
     @Test
+    void 라스트마일_fallback은_엄격_기준_후보가_없을때만_완화된_최소거리로_허브를_살린다() {
+        Location destination = new Location("목적지", 37.5040, 127.0050);
+        List<Location> passStops = List.of(
+                new Location("완화후보", 37.5001, 127.0037), // 약 450m
+                new Location("너무가까운후보", 37.5027, 127.0048) // 약 150m
+        );
+        Leg leg = new Leg(
+                LegType.TRANSIT,
+                "BUS",
+                12,
+                3_000,
+                new Location("시작", 37.4950, 127.0000),
+                new Location("끝", 37.5050, 127.0040),
+                new TransitInfo("140", "#0052A4", 2, 0, passStops),
+                null,
+                null
+        );
+
+        List<Location> fallback = selector.selectLastMileFallback(destination, List.of(leg), MobilityConfig.bike());
+
+        assertThat(fallback).extracting(Location::name).contains("완화후보");
+        assertThat(fallback).extracting(Location::name).doesNotContain("너무가까운후보");
+    }
+
+    @Test
     void 퍼스트마일_허브_검색은_출발지와_가까운_순으로_정렬한다() {
         Location origin = new Location("출발", 37.5, 126.9);
         Leg leg = new Leg(

@@ -86,8 +86,19 @@ public class CandidatePointSelector {
     }
 
     public List<Location> selectLastMileFallback(Location destination, List<Leg> legs, MobilityConfig config) {
-        return deduplicateNearby(extractTransitStops(legs)).stream()
+        List<Location> stops = deduplicateNearby(extractTransitStops(legs));
+        List<Location> strict = stops.stream()
                 .filter(stop -> isFeasible(stop, destination, config))
+                .sorted(Comparator.comparingDouble(stop ->
+                        distanceMeters(stop.lat(), stop.lng(), destination.lat(), destination.lng())))
+                .limit(FALLBACK_CANDIDATE_LIMIT)
+                .toList();
+        if (!strict.isEmpty()) {
+            return strict;
+        }
+
+        return stops.stream()
+                .filter(stop -> isFallbackFeasible(stop, destination, config))
                 .sorted(Comparator.comparingDouble(stop ->
                         distanceMeters(stop.lat(), stop.lng(), destination.lat(), destination.lng())))
                 .limit(FALLBACK_CANDIDATE_LIMIT)
@@ -95,8 +106,19 @@ public class CandidatePointSelector {
     }
 
     public List<Location> selectFirstMileFallback(Location origin, List<Leg> legs, MobilityConfig config) {
-        return deduplicateNearby(extractTransitStops(legs)).stream()
+        List<Location> stops = deduplicateNearby(extractTransitStops(legs));
+        List<Location> strict = stops.stream()
                 .filter(stop -> isFeasible(origin, stop, config))
+                .sorted(Comparator.comparingDouble(stop ->
+                        distanceMeters(origin.lat(), origin.lng(), stop.lat(), stop.lng())))
+                .limit(FALLBACK_CANDIDATE_LIMIT)
+                .toList();
+        if (!strict.isEmpty()) {
+            return strict;
+        }
+
+        return stops.stream()
+                .filter(stop -> isFallbackFeasible(origin, stop, config))
                 .sorted(Comparator.comparingDouble(stop ->
                         distanceMeters(origin.lat(), origin.lng(), stop.lat(), stop.lng())))
                 .limit(FALLBACK_CANDIDATE_LIMIT)
@@ -153,6 +175,19 @@ public class CandidatePointSelector {
         double distance = distanceMeters(from.lat(), from.lng(), to.lat(), to.lng());
         return distance <= config.maxRangeMeters()
                 && distance >= config.minEffectiveDistanceMeters();
+    }
+
+    private boolean isFallbackFeasible(Location from, Location to, MobilityConfig config) {
+        double distance = distanceMeters(from.lat(), from.lng(), to.lat(), to.lng());
+        return distance <= config.maxRangeMeters()
+                && distance >= relaxedMinEffectiveDistance(config);
+    }
+
+    private int relaxedMinEffectiveDistance(MobilityConfig config) {
+        if (config.minEffectiveDistanceMeters() <= 0) {
+            return 0;
+        }
+        return Math.max(250, (int) Math.round(config.minEffectiveDistanceMeters() * 0.6));
     }
 
     private List<Location> deduplicateNearby(List<Location> candidates) {
