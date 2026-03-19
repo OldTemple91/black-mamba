@@ -2,9 +2,12 @@ package com.blackmamba.navigation.application.route;
 
 import com.blackmamba.navigation.domain.route.Leg;
 import com.blackmamba.navigation.domain.route.LegType;
+import com.blackmamba.navigation.domain.route.RouteHub;
 import com.blackmamba.navigation.domain.route.Route;
 
 final class RouteReliabilityMetrics {
+
+    private static final int WEAK_PICKUP_HINT_THRESHOLD_METERS = 900;
 
     private RouteReliabilityMetrics() {
     }
@@ -64,6 +67,20 @@ final class RouteReliabilityMetrics {
                 .anyMatch(leg -> leg.mobilityInfo() != null && leg.mobilityInfo().batteryLevel() < 30);
     }
 
+    static int maxPickupHintDistance(Route route) {
+        return route.selectedHubs().stream()
+                .map(RouteHub::metadata)
+                .map(metadata -> metadata.get("pickupHintDistanceMeters"))
+                .filter(java.util.Objects::nonNull)
+                .mapToInt(RouteReliabilityMetrics::parseDistanceOrZero)
+                .max()
+                .orElse(0);
+    }
+
+    static boolean hasWeakPickupAccess(Route route) {
+        return maxPickupHintDistance(route) >= WEAK_PICKUP_HINT_THRESHOLD_METERS;
+    }
+
     static boolean hasHealthyKickboard(Route route) {
         return route.legs().stream()
                 .filter(leg -> leg.type() == LegType.KICKBOARD)
@@ -78,5 +95,13 @@ final class RouteReliabilityMetrics {
 
     private static boolean isMobility(Leg leg) {
         return leg.type() == LegType.BIKE || leg.type() == LegType.KICKBOARD;
+    }
+
+    private static int parseDistanceOrZero(String raw) {
+        try {
+            return Integer.parseInt(raw);
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
     }
 }

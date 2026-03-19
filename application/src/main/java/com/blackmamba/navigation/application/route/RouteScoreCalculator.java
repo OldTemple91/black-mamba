@@ -15,11 +15,11 @@ import org.springframework.stereotype.Component;
 public class RouteScoreCalculator {
     private static final WeightProfile RELIABILITY_PROFILE = new WeightProfile(
             0.40, 0.15, 0.10, 0.10, 0.10, 0.15,
-            new ReliabilityPenaltyProfile(0.35, 0.15, 0.10, 0.15, 300)
+            new ReliabilityPenaltyProfile(0.35, 0.15, 0.10, 0.15, 0.12, 300)
     );
     private static final WeightProfile TIME_PRIORITY_PROFILE = new WeightProfile(
             0.72, 0.08, 0.03, 0.03, 0.02, 0.12,
-            new ReliabilityPenaltyProfile(0.20, 0.08, 0.04, 0.08, 420)
+            new ReliabilityPenaltyProfile(0.20, 0.08, 0.04, 0.08, 0.08, 420)
     );
 
     private static final int MAX_EXPECTED_MINUTES   = 90;
@@ -49,6 +49,8 @@ public class RouteScoreCalculator {
         boolean weakDropoff     = RouteReliabilityMetrics.hasWeakDropoff(route);
         boolean lowAvailability = RouteReliabilityMetrics.hasLowAvailability(route);
         boolean lowBattery      = RouteReliabilityMetrics.hasLowBattery(route);
+        boolean weakPickupAccess = RouteReliabilityMetrics.hasWeakPickupAccess(route);
+        int pickupHintDistance = RouteReliabilityMetrics.maxPickupHintDistance(route);
 
         double transferScore    = 1.0 - normalize(transferCount, MAX_EXPECTED_TRANSFERS);
         double costScore        = 1.0 - normalize(route.totalCostWon(), MAX_EXPECTED_COST);
@@ -60,6 +62,7 @@ public class RouteScoreCalculator {
                 weakDropoff,
                 lowAvailability,
                 lowBattery,
+                weakPickupAccess,
                 accessWalkDistance,
                 weightProfile.reliabilityPenaltyProfile()
         );
@@ -85,6 +88,8 @@ public class RouteScoreCalculator {
                 weakDropoff,
                 lowAvailability,
                 lowBattery,
+                weakPickupAccess,
+                pickupHintDistance,
                 RouteHubExtractor.extract(route)
         );
     }
@@ -104,6 +109,7 @@ public class RouteScoreCalculator {
                                     boolean weakDropoff,
                                     boolean lowAvailability,
                                     boolean lowBattery,
+                                    boolean weakPickupAccess,
                                     int accessWalkDistance,
                                     ReliabilityPenaltyProfile penaltyProfile) {
         double score = 1.0;
@@ -112,6 +118,7 @@ public class RouteScoreCalculator {
         if (lowAvailability) score -= penaltyProfile.lowAvailabilityPenalty();
         if (sharedMobility) score -= penaltyProfile.sharedMobilityPenalty();
         if (lowBattery) score -= penaltyProfile.lowBatteryPenalty();
+        if (weakPickupAccess) score -= penaltyProfile.weakPickupAccessPenalty();
         if (accessWalkDistance >= penaltyProfile.accessWalkPenaltyThresholdMeters()) {
             score -= penaltyProfile.accessWalkPenalty();
         }
@@ -135,6 +142,7 @@ public class RouteScoreCalculator {
             double lowAvailabilityPenalty,
             double sharedMobilityPenalty,
             double accessWalkPenalty,
+            double weakPickupAccessPenalty,
             int accessWalkPenaltyThresholdMeters
     ) {
         private double lowBatteryPenalty() {

@@ -17,6 +17,8 @@ public record RouteEvaluation(
         boolean weakDropoff,
         boolean lowAvailability,
         boolean lowBattery,
+        boolean weakPickupAccess,
+        int maxPickupHintDistanceMeters,
         List<RouteHub> hubs
 ) {
     public RouteEvaluation {

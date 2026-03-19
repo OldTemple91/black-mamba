@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -141,6 +142,36 @@ class RouteScoreCalculatorTest {
         assertThat(timePriorityScoreMixed).isGreaterThan(timePriorityScoreTransit);
         assertThat(timePriorityScoreMixed).isGreaterThan(reliabilityScoreMixed);
         assertThat(timePriorityScoreMixed).isGreaterThan(timePriorityScoreTransit);
+    }
+
+    @Test
+    void 대여소_힌트가_먼_허브는_점수가_낮다() {
+        Location a = new Location("A", 37.5, 127.0);
+        Location hub = new Location("Hub", 37.51, 127.01);
+        Location b = new Location("B", 37.4, 127.1);
+        MobilityInfo stableBike = new MobilityInfo(MobilityType.DDAREUNGI, "따릉이", null, 100,
+                "정류소", 37.51, 127.01, 6, 50)
+                .withDropoffStation("D1", "반납", 37.4, 127.1);
+
+        Route betterPickupHint = Route.of(List.of(
+                new Leg(LegType.TRANSIT, "BUS", 10, 1200, a, hub, null, null, null),
+                new Leg(LegType.BIKE, "DDAREUNGI", 13, 1800, hub, b, null, stableBike, null)
+        ), RouteType.TRANSIT_WITH_BIKE).withSelectedHubs(List.of(
+                new RouteHub("Hub", com.blackmamba.navigation.domain.hub.HubType.MOBILITY_TRANSFER_POINT,
+                        "LAST_MILE_CANDIDATE", "selected-candidate",
+                        Map.of("pickupHintDistanceMeters", "420"))
+        ));
+
+        Route worsePickupHint = Route.of(List.of(
+                new Leg(LegType.TRANSIT, "BUS", 10, 1200, a, hub, null, null, null),
+                new Leg(LegType.BIKE, "DDAREUNGI", 13, 1800, hub, b, null, stableBike, null)
+        ), RouteType.TRANSIT_WITH_BIKE).withSelectedHubs(List.of(
+                new RouteHub("Hub", com.blackmamba.navigation.domain.hub.HubType.MOBILITY_TRANSFER_POINT,
+                        "LAST_MILE_CANDIDATE", "selected-candidate",
+                        Map.of("pickupHintDistanceMeters", "1021"))
+        ));
+
+        assertThat(calculator.calculate(betterPickupHint)).isGreaterThan(calculator.calculate(worsePickupHint));
     }
 
     // -----------------------------------------------------------------
