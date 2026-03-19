@@ -260,6 +260,9 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                                 false
                         )
                         .map(optionalHint -> hubWithPickupHint(hub, optionalHint)))
+                .collectList()
+                .map(this::preferPickupAccessibleHubs)
+                .flatMapMany(Flux::fromIterable)
                 .sort(Comparator
                         .comparing((Hub hub) -> hasReasonablePickupHint(hub) ? 0 : 1)
                         .thenComparingInt(this::pickupHintDistanceOrMax)
@@ -307,6 +310,13 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
         } catch (NumberFormatException ignored) {
             return Integer.MAX_VALUE;
         }
+    }
+
+    private List<Hub> preferPickupAccessibleHubs(List<Hub> hubs) {
+        List<Hub> filtered = hubs.stream()
+                .filter(this::hasReasonablePickupHint)
+                .toList();
+        return filtered.isEmpty() ? hubs : filtered;
     }
 
     // ── 헬퍼 ──────────────────────────────────────────────────────────────────
