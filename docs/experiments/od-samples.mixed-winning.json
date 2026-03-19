@@ -1,10 +1,5 @@
 [
   {
-    "id": "gupabal_res_to_bukhan_entrance_fast_1",
-    "origin": { "name": "구파발 주거지 A", "lat": 37.6365, "lng": 126.9193 },
-    "destination": { "name": "북한산 입구", "lat": 37.6587, "lng": 126.9386 }
-  },
-  {
     "id": "gupabal_res_to_bukhan_entrance_fast_2",
     "origin": { "name": "구파발 주거지 B", "lat": 37.6353, "lng": 126.9181 },
     "destination": { "name": "북한산 입구", "lat": 37.6587, "lng": 126.9386 }
@@ -33,5 +28,10 @@
     "id": "mangwon_res_to_worldcup_park_fast_5",
     "origin": { "name": "망원 주거지 C", "lat": 37.5549, "lng": 126.9044 },
     "destination": { "name": "월드컵공원 북측", "lat": 37.5698, "lng": 126.8787 }
+  },
+  {
+    "id": "mapo_res_to_worldcup_park_fast_1",
+    "origin": { "name": "마포 주거지 A", "lat": 37.5532, "lng": 126.9072 },
+    "destination": { "name": "월드컵공원 내부 B", "lat": 37.5676, "lng": 126.8786 }
   }
 ]

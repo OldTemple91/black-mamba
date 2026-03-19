@@ -322,7 +322,7 @@ npm run dev
 - `RELIABILITY`에서는 같은 mixed-winning 샘플 세트에서도 추천이 모두 `TRANSIT_ONLY`
 - `TIME_PRIORITY`에서는 mixed-winning 샘플 7건이 모두 mixed 추천으로 전환
   - 평균 `3.857분` 단축
-  - 평균 비용 변화 `-271원`
+  - 평균 비용 변화 `-57원`
   - `MOBILITY_ONLY`, `TRANSIT_WITH_BIKE` 두 유형 모두 포함
 - 최신 `no-mixed` 샘플 4건에서는 `SAME_PICKUP_DROPOFF`가 사라지고, 진단 코드가 아래처럼 수렴
   - `NO_PICKUP: 6`

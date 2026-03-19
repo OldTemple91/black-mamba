@@ -131,7 +131,7 @@ mixed 자체가 생성되지 않는 케이스와 `reasonCode`를 보고 싶다�
 - `mangwon_res_to_worldcup_park_fast_5` -> `TRANSIT_WITH_BIKE` (`5분` 단축)
 - mixed-winning 샘플 7건 기준 요약:
   - `TIME_PRIORITY` 평균 `3.857분` 단축
-  - 평균 비용 변화 `-271원`
+  - 평균 비용 변화 `-57원`
   - `RELIABILITY`는 같은 샘플에서 `TRANSIT_ONLY 7/7` 유지
   - `MOBILITY_ONLY`와 `TRANSIT_WITH_BIKE` 두 유형을 모두 포함
   - warm cache 상태에서는 특히 `tmap_pedestrian_route`가 빠르게 `0 miss`에 수렴하고, `mobility_availability`/`mobility_segment`는 세그먼트 조합 다양성 때문에 일부 miss가 남을 수 있음
