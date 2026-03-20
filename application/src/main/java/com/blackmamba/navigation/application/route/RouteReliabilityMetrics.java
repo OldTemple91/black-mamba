@@ -8,6 +8,7 @@ import com.blackmamba.navigation.domain.route.Route;
 final class RouteReliabilityMetrics {
 
     private static final int WEAK_PICKUP_HINT_THRESHOLD_METERS = 900;
+    private static final int WEAK_HUB_DETOUR_THRESHOLD_METERS = 2_000;
 
     private RouteReliabilityMetrics() {
     }
@@ -79,6 +80,20 @@ final class RouteReliabilityMetrics {
 
     static boolean hasWeakPickupAccess(Route route) {
         return maxPickupHintDistance(route) >= WEAK_PICKUP_HINT_THRESHOLD_METERS;
+    }
+
+    static int maxHubAnchorDistance(Route route) {
+        return route.selectedHubs().stream()
+                .map(RouteHub::metadata)
+                .map(metadata -> metadata.get("distanceToAnchorMeters"))
+                .filter(java.util.Objects::nonNull)
+                .mapToInt(RouteReliabilityMetrics::parseDistanceOrZero)
+                .max()
+                .orElse(0);
+    }
+
+    static boolean hasWeakHubDetour(Route route) {
+        return maxHubAnchorDistance(route) >= WEAK_HUB_DETOUR_THRESHOLD_METERS;
     }
 
     static boolean hasHealthyKickboard(Route route) {

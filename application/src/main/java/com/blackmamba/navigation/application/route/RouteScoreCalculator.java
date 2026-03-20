@@ -15,11 +15,11 @@ import org.springframework.stereotype.Component;
 public class RouteScoreCalculator {
     private static final WeightProfile RELIABILITY_PROFILE = new WeightProfile(
             0.40, 0.15, 0.10, 0.10, 0.10, 0.15,
-            new ReliabilityPenaltyProfile(0.35, 0.15, 0.10, 0.15, 0.12, 300)
+            new ReliabilityPenaltyProfile(0.35, 0.15, 0.10, 0.15, 0.12, 0.08, 300)
     );
     private static final WeightProfile TIME_PRIORITY_PROFILE = new WeightProfile(
             0.72, 0.08, 0.03, 0.03, 0.02, 0.12,
-            new ReliabilityPenaltyProfile(0.20, 0.08, 0.04, 0.08, 0.08, 420)
+            new ReliabilityPenaltyProfile(0.20, 0.08, 0.04, 0.08, 0.08, 0.04, 420)
     );
 
     private static final int MAX_EXPECTED_MINUTES   = 90;
@@ -50,7 +50,9 @@ public class RouteScoreCalculator {
         boolean lowAvailability = RouteReliabilityMetrics.hasLowAvailability(route);
         boolean lowBattery      = RouteReliabilityMetrics.hasLowBattery(route);
         boolean weakPickupAccess = RouteReliabilityMetrics.hasWeakPickupAccess(route);
+        boolean weakHubDetour = RouteReliabilityMetrics.hasWeakHubDetour(route);
         int pickupHintDistance = RouteReliabilityMetrics.maxPickupHintDistance(route);
+        int hubAnchorDistance = RouteReliabilityMetrics.maxHubAnchorDistance(route);
 
         double transferScore    = 1.0 - normalize(transferCount, MAX_EXPECTED_TRANSFERS);
         double costScore        = 1.0 - normalize(route.totalCostWon(), MAX_EXPECTED_COST);
@@ -63,6 +65,7 @@ public class RouteScoreCalculator {
                 lowAvailability,
                 lowBattery,
                 weakPickupAccess,
+                weakHubDetour,
                 accessWalkDistance,
                 weightProfile.reliabilityPenaltyProfile()
         );
@@ -90,6 +93,8 @@ public class RouteScoreCalculator {
                 lowBattery,
                 weakPickupAccess,
                 pickupHintDistance,
+                weakHubDetour,
+                hubAnchorDistance,
                 RouteHubExtractor.extract(route)
         );
     }
@@ -110,6 +115,7 @@ public class RouteScoreCalculator {
                                     boolean lowAvailability,
                                     boolean lowBattery,
                                     boolean weakPickupAccess,
+                                    boolean weakHubDetour,
                                     int accessWalkDistance,
                                     ReliabilityPenaltyProfile penaltyProfile) {
         double score = 1.0;
@@ -119,6 +125,7 @@ public class RouteScoreCalculator {
         if (sharedMobility) score -= penaltyProfile.sharedMobilityPenalty();
         if (lowBattery) score -= penaltyProfile.lowBatteryPenalty();
         if (weakPickupAccess) score -= penaltyProfile.weakPickupAccessPenalty();
+        if (weakHubDetour) score -= penaltyProfile.weakHubDetourPenalty();
         if (accessWalkDistance >= penaltyProfile.accessWalkPenaltyThresholdMeters()) {
             score -= penaltyProfile.accessWalkPenalty();
         }
@@ -143,6 +150,7 @@ public class RouteScoreCalculator {
             double sharedMobilityPenalty,
             double accessWalkPenalty,
             double weakPickupAccessPenalty,
+            double weakHubDetourPenalty,
             int accessWalkPenaltyThresholdMeters
     ) {
         private double lowBatteryPenalty() {

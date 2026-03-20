@@ -92,6 +92,7 @@
   - 기본 후보가 전혀 없을 때에만 relaxed fallback을 허용해 `NO_CANDIDATE_HUB`를 줄이려는 방향
   - 전역 반경 확대와 달리 mixed-winning 품질을 덜 해치는 보수적 접근
   - 2026-03-20 재검증에서는 `samplesWithMixedAlternative`가 `2건`으로 늘었고, 진단은 `NO_PICKUP 4` 중심으로 수렴
+  - 추가로 `weakHubDetour`를 도입해 anchor에서 과도하게 먼 허브를 쓰는 mixed 대안을 점수와 리스크에서 더 명확히 불리하게 반영
 
 ### 3. 호출 최적화 고도화
 

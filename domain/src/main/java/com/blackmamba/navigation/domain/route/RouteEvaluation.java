@@ -19,6 +19,8 @@ public record RouteEvaluation(
         boolean lowBattery,
         boolean weakPickupAccess,
         int maxPickupHintDistanceMeters,
+        boolean weakHubDetour,
+        int maxHubAnchorDistanceMeters,
         List<RouteHub> hubs
 ) {
     public RouteEvaluation {

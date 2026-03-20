@@ -32,6 +32,7 @@ class RouteControllerTest {
                 0.8, 0.9, 0.7, 0.8, 0.9, 0.85, 0.82,
                 320, 1, 120,
                 false, false, false, false, false, 0,
+                false, 0,
                 List.of(new RouteHub("서울역", com.blackmamba.navigation.domain.hub.HubType.SUBWAY_STATION,
                         "TRANSIT_BOARDING", "actual", java.util.Map.of()))
         );

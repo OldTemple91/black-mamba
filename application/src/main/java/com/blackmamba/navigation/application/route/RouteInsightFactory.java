@@ -79,6 +79,7 @@ public class RouteInsightFactory {
         if (RouteReliabilityMetrics.hasWeakDropoff(route)) badges.add("반납 정보 약함");
         if (RouteReliabilityMetrics.hasLowAvailability(route)) badges.add("대여 여유 적음");
         if (RouteReliabilityMetrics.hasWeakPickupAccess(route)) badges.add("대여소 접근 김");
+        if (RouteReliabilityMetrics.hasWeakHubDetour(route)) badges.add("허브 우회 큼");
 
         if (RouteReliabilityMetrics.maxAccessWalkDistance(route) >= ACCESS_WALK_WARNING_METERS) {
             badges.add("접근 도보 김");
