@@ -1,6 +1,6 @@
 # Current Focus
 
-> 마지막 업데이트: 2026-03-17
+> 마지막 업데이트: 2026-03-20
 
 ## 현재 목표
 
@@ -91,6 +91,7 @@
   - fallback 허브 선택 단계에서만 최소 유효 거리 기준을 완화
   - 기본 후보가 전혀 없을 때에만 relaxed fallback을 허용해 `NO_CANDIDATE_HUB`를 줄이려는 방향
   - 전역 반경 확대와 달리 mixed-winning 품질을 덜 해치는 보수적 접근
+  - 2026-03-20 재검증에서는 `samplesWithMixedAlternative`가 `2건`으로 늘었고, 진단은 `NO_PICKUP 4` 중심으로 수렴
 
 ### 3. 호출 최적화 고도화
 
@@ -137,4 +138,5 @@
 - `output/experiments/latest-route-eval.md`
 - `docs/progress/2026-03-13-daily-log.md`
 - `docs/progress/2026-03-12-daily-log.md`
+- `docs/progress/2026-03-20-daily-log.md`
 - `docs/plans/2026-03-11-hub-reliability-design.md`

@@ -136,9 +136,9 @@ mixed 자체가 생성되지 않는 케이스와 `reasonCode`를 보고 싶다�
   - `MOBILITY_ONLY`와 `TRANSIT_WITH_BIKE` 두 유형을 모두 포함
   - warm cache 상태에서는 특히 `tmap_pedestrian_route`가 빠르게 `0 miss`에 수렴하고, `mobility_availability`/`mobility_segment`는 세그먼트 조합 다양성 때문에 일부 miss가 남을 수 있음
 - mixed-winning 표본 수는 목표 범위의 하한선(`7건`)에 도달했지만, 아직 목적지 유형이 `북한산/월드컵공원` 축에 몰려 있어 데이터 다양성은 더 보강해야 한다.
-- `od-samples.no-mixed.json` 4건은 최신 fallback hub 규칙까지 반영해도 mixed 대안이 없는 샘플로 다시 정리됨
+- `od-samples.no-mixed.json` 4건은 mixed 생성이 가장 어려운 샘플군으로 유지하며, 최신 relaxed fallback 기준으로도 추천은 모두 `TRANSIT_ONLY`다.
 - 같은 `no-mixed` 세트에서 `recommendedGenerationPhaseCounts`는 `FIRST_MILE 4`, `LAST_MILE 4`로 집계되어 어느 구간에서 병목이 큰지 바로 확인 가능
-- 최신 코드(`mobility_segment` 캐시 + fallback hub`) 기준 `no-mixed` 재실행에서는 `SAME_PICKUP_DROPOFF`가 사라지고 `NO_PICKUP 6`, `NO_CANDIDATE_HUB 2`로 재분류됨
+- 최신 코드(`mobility_segment` 캐시 + fallback hub + relaxed fallback`) 기준 `no-mixed` 재실행에서는 `SAME_PICKUP_DROPOFF`가 사라지고 `NO_PICKUP 4` 중심으로 수렴했으며, `samplesWithMixedAlternative`도 `2건`까지 늘었다.
 - 최신 warm second-pass 실험에서는 `tmap_pedestrian_route` miss가 `0`으로 관찰됐고, `mobility_availability`/`mobility_segment`는 허브·세그먼트 조합 다양성 때문에 miss가 일부 유지됨
 - 2026-03-18 기준 개인 이동수단 실험(`SPECIFIC + PERSONAL`)에서는 다음과 같은 stronger case를 확보했다.
   - `jamwon_personal_to_banpo_hangang` -> `TRANSIT_WITH_KICKBOARD`, `20분` 단축, 비용 동일
