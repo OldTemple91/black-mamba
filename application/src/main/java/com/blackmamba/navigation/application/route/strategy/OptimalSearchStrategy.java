@@ -114,34 +114,40 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     // 패턴 B: 이동수단으로 첫 정류장까지 → 대중교통으로 목적지
     private Flux<Route> patternB(Location origin, Location destination,
                                   List<Leg> baseLegs, MobilityType type, MobilityConfig config) {
-        List<Hub> firstMile = hubSelector.selectFirstMileHubs(origin, baseLegs, config).stream()
-                .limit(MAX_CANDIDATE_HUBS)
-                .toList();
-        return Flux.fromIterable(firstMile)
-                .flatMap(firstHub -> {
-                    Location transitStart = firstHub.location();
-                    return mobilityInfoForSegment(origin, transitStart, type)
-                                .filter(Optional::isPresent)
-                                .flatMap(avail -> {
-                                    MobilityInfo info = avail.get();
-                                    Mono<List<Leg>> transitLegs = transitRoutePort.getTransitRoute(transitStart, destination);
-                                    Mono<Integer> transitTime = transitRoutePort.getTransitTimeMinutes(transitStart, destination);
-                                    return Mono.zip(
-                                                    mobilitySegmentBuilder.build(origin, transitStart, type, info),
-                                                    transitLegs,
-                                                    transitTime
-                                            )
-                                            .map(tuple -> {
-                                                List<Leg> partialTransit = tuple.getT2().isEmpty()
-                                                        ? List.of(transitLeg(tuple.getT3(), transitStart, destination, baseLegs))
-                                                        : tuple.getT2();
-                                                List<Leg> legs = new ArrayList<>();
-                                                legs.addAll(tuple.getT1());
-                                                legs.addAll(partialTransit);
-                                                return buildRoute(legs, RouteType.MOBILITY_FIRST_TRANSIT,
-                                                        List.of(RouteHubExtractor.fromSelectedHub(firstHub, "FIRST_MILE_CANDIDATE")));
+        return hasPickupNearOrigin(origin, type)
+                .flatMapMany(hasPickup -> {
+                    if (!hasPickup) {
+                        return Flux.empty();
+                    }
+                    List<Hub> firstMile = hubSelector.selectFirstMileHubs(origin, baseLegs, config).stream()
+                            .limit(MAX_CANDIDATE_HUBS)
+                            .toList();
+                    return Flux.fromIterable(firstMile)
+                            .flatMap(firstHub -> {
+                                Location transitStart = firstHub.location();
+                                return mobilityInfoForSegment(origin, transitStart, type)
+                                            .filter(Optional::isPresent)
+                                            .flatMap(avail -> {
+                                                MobilityInfo info = avail.get();
+                                                Mono<List<Leg>> transitLegs = transitRoutePort.getTransitRoute(transitStart, destination);
+                                                Mono<Integer> transitTime = transitRoutePort.getTransitTimeMinutes(transitStart, destination);
+                                                return Mono.zip(
+                                                                mobilitySegmentBuilder.build(origin, transitStart, type, info),
+                                                                transitLegs,
+                                                                transitTime
+                                                        )
+                                                        .map(tuple -> {
+                                                            List<Leg> partialTransit = tuple.getT2().isEmpty()
+                                                                    ? List.of(transitLeg(tuple.getT3(), transitStart, destination, baseLegs))
+                                                                    : tuple.getT2();
+                                                            List<Leg> legs = new ArrayList<>();
+                                                            legs.addAll(tuple.getT1());
+                                                            legs.addAll(partialTransit);
+                                                            return buildRoute(legs, RouteType.MOBILITY_FIRST_TRANSIT,
+                                                                    List.of(RouteHubExtractor.fromSelectedHub(firstHub, "FIRST_MILE_CANDIDATE")));
+                                                        });
                                             });
-                                });
+                            });
                 });
     }
 
@@ -179,44 +185,50 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     // 패턴 D: 이동수단→정류장 + 대중교통(중간) + 이동수단→목적지
     private Flux<Route> patternD(Location origin, Location destination,
                                   List<Leg> baseLegs, MobilityType type, MobilityConfig config) {
-        List<Hub> firstMile = hubSelector.selectFirstMileHubs(origin, baseLegs, config);
-        return prioritizedLastMileHubs(baseLegs, destination, type, config)
-                .flatMapMany(lastMile -> {
-                    if (firstMile.isEmpty() || lastMile.isEmpty()) return Flux.empty();
+        return hasPickupNearOrigin(origin, type)
+                .flatMapMany(hasPickup -> {
+                    if (!hasPickup) {
+                        return Flux.empty();
+                    }
+                    List<Hub> firstMile = hubSelector.selectFirstMileHubs(origin, baseLegs, config);
+                    return prioritizedLastMileHubs(baseLegs, destination, type, config)
+                            .flatMapMany(lastMile -> {
+                                if (firstMile.isEmpty() || lastMile.isEmpty()) return Flux.empty();
 
-                    Hub startHub = firstMile.get(0);
-                    Hub endHub = lastMile.get(lastMile.size() / 2);
-                    Location transitStart = startHub.location();
-                    Location transitEnd   = endHub.location();
+                                Hub startHub = firstMile.get(0);
+                                Hub endHub = lastMile.get(lastMile.size() / 2);
+                                Location transitStart = startHub.location();
+                                Location transitEnd   = endHub.location();
 
-                    Mono<Optional<MobilityInfo>> startInfo = mobilityInfoForSegment(origin, transitStart, type);
-                    Mono<Optional<MobilityInfo>> endInfo   = mobilityInfoForSegment(transitEnd, destination, type);
+                                Mono<Optional<MobilityInfo>> startInfo = mobilityInfoForSegment(origin, transitStart, type);
+                                Mono<Optional<MobilityInfo>> endInfo   = mobilityInfoForSegment(transitEnd, destination, type);
 
-                    return Mono.zip(startInfo, endInfo)
-                            .filter(tuple -> tuple.getT1().isPresent() && tuple.getT2().isPresent())
-                            .flatMapMany(tuple -> {
-                                MobilityInfo startMobility = tuple.getT1().get();
-                                MobilityInfo endMobility   = tuple.getT2().get();
-                                Mono<List<Leg>> startSegment = mobilitySegmentBuilder.build(origin, transitStart, type, startMobility);
-                                Mono<List<Leg>>           tranLegs = transitRoutePort.getTransitRoute(transitStart, transitEnd);
-                                Mono<Integer>             tranTime = transitRoutePort.getTransitTimeMinutes(transitStart, transitEnd);
-                                Mono<List<Leg>> endSegment = mobilitySegmentBuilder.build(transitEnd, destination, type, endMobility);
-                                return Mono.zip(startSegment, tranLegs, tranTime, endSegment)
-                                        .map(t -> {
-                                            List<Leg> middleTransit = t.getT2().isEmpty()
-                                                    ? List.of(transitLeg(t.getT3(), transitStart, transitEnd, baseLegs))
-                                                    : t.getT2();
-                                            List<Leg> legs = new ArrayList<>();
-                                            legs.addAll(t.getT1());
-                                            legs.addAll(middleTransit);
-                                            legs.addAll(t.getT4());
-                                            return buildRoute(legs, RouteType.MOBILITY_TRANSIT_MOBILITY,
-                                                    List.of(
-                                                            RouteHubExtractor.fromSelectedHub(startHub, "FIRST_MILE_CANDIDATE"),
-                                                            RouteHubExtractor.fromSelectedHub(endHub, "LAST_MILE_CANDIDATE")
-                                                    ));
-                                        })
-                                        .flux();
+                                return Mono.zip(startInfo, endInfo)
+                                        .filter(tuple -> tuple.getT1().isPresent() && tuple.getT2().isPresent())
+                                        .flatMapMany(tuple -> {
+                                            MobilityInfo startMobility = tuple.getT1().get();
+                                            MobilityInfo endMobility   = tuple.getT2().get();
+                                            Mono<List<Leg>> startSegment = mobilitySegmentBuilder.build(origin, transitStart, type, startMobility);
+                                            Mono<List<Leg>>           tranLegs = transitRoutePort.getTransitRoute(transitStart, transitEnd);
+                                            Mono<Integer>             tranTime = transitRoutePort.getTransitTimeMinutes(transitStart, transitEnd);
+                                            Mono<List<Leg>> endSegment = mobilitySegmentBuilder.build(transitEnd, destination, type, endMobility);
+                                            return Mono.zip(startSegment, tranLegs, tranTime, endSegment)
+                                                    .map(t -> {
+                                                        List<Leg> middleTransit = t.getT2().isEmpty()
+                                                                ? List.of(transitLeg(t.getT3(), transitStart, transitEnd, baseLegs))
+                                                                : t.getT2();
+                                                        List<Leg> legs = new ArrayList<>();
+                                                        legs.addAll(t.getT1());
+                                                        legs.addAll(middleTransit);
+                                                        legs.addAll(t.getT4());
+                                                        return buildRoute(legs, RouteType.MOBILITY_TRANSIT_MOBILITY,
+                                                                List.of(
+                                                                        RouteHubExtractor.fromSelectedHub(startHub, "FIRST_MILE_CANDIDATE"),
+                                                                        RouteHubExtractor.fromSelectedHub(endHub, "LAST_MILE_CANDIDATE")
+                                                                ));
+                                                    })
+                                                    .flux();
+                                        });
                             });
                 });
     }
@@ -238,6 +250,14 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
 
     private Mono<Optional<MobilityInfo>> mobilityInfoForSegment(Location start, Location end, MobilityType type) {
         return mobilityAvailabilityPort.findSegmentMobility(start.lat(), start.lng(), end.lat(), end.lng(), type);
+    }
+
+    private Mono<Boolean> hasPickupNearOrigin(Location origin, MobilityType type) {
+        if (type == MobilityType.PERSONAL) {
+            return Mono.just(true);
+        }
+        return mobilityAvailabilityPort.findNearbyMobility(origin.lat(), origin.lng(), type)
+                .map(Optional::isPresent);
     }
 
     private Mono<List<Hub>> prioritizedLastMileHubs(List<Leg> baseLegs,
