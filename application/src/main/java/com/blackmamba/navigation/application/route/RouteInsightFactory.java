@@ -15,10 +15,15 @@ import java.util.Set;
 @Component
 public class RouteInsightFactory {
 
-    private static final int ACCESS_WALK_WARNING_METERS = 300;
+    private static final int ACCESS_WALK_WARNING_METERS_RELIABILITY = 300;
+    private static final int ACCESS_WALK_WARNING_METERS_TIME_PRIORITY = 420;
     private static final int TOTAL_WALK_WARNING_METERS = 800;
 
     public Route enrich(Route route, Route baselineRoute) {
+        return enrich(route, baselineRoute, RecommendationPreference.RELIABILITY);
+    }
+
+    public Route enrich(Route route, Route baselineRoute, RecommendationPreference preference) {
         List<GenerationDiagnostic> generationDiagnostics = route.insights() != null
                 ? route.insights().generationDiagnostics()
                 : List.of();
@@ -26,14 +31,14 @@ public class RouteInsightFactory {
                 ? route.insights().fallbackDiagnostics()
                 : List.of();
         return route.withInsights(new RouteInsights(
-                recommendationReasons(route, baselineRoute),
-                riskBadges(route),
+                recommendationReasons(route, baselineRoute, preference),
+                riskBadges(route, preference),
                 generationDiagnostics,
                 mergeFallbackDiagnostics(route, fallbackDiagnostics)
         ));
     }
 
-    private List<String> recommendationReasons(Route route, Route baselineRoute) {
+    private List<String> recommendationReasons(Route route, Route baselineRoute, RecommendationPreference preference) {
         List<String> reasons = new ArrayList<>();
 
         int baselineMinutes = route.comparison() != null
@@ -57,10 +62,17 @@ public class RouteInsightFactory {
 
         if (RouteReliabilityMetrics.hasBikeDropoff(route)) reasons.add("반납 정류소 확인");
 
-        if (RouteReliabilityMetrics.hasHealthyKickboard(route)) reasons.add("배터리 여유 확보");
+        // 배터리 낮음 배지와 양립 방지: lowBattery가 없을 때만 긍정 표시
+        if (RouteReliabilityMetrics.hasHealthyKickboard(route)
+                && !RouteReliabilityMetrics.hasLowBattery(route)) {
+            reasons.add("배터리 여유 확보");
+        }
 
         int accessWalkMeters = RouteReliabilityMetrics.maxAccessWalkDistance(route);
-        if (accessWalkMeters > 0 && accessWalkMeters < ACCESS_WALK_WARNING_METERS) {
+        int accessWalkThreshold = preference == RecommendationPreference.TIME_PRIORITY
+                ? ACCESS_WALK_WARNING_METERS_TIME_PRIORITY
+                : ACCESS_WALK_WARNING_METERS_RELIABILITY;
+        if (accessWalkMeters > 0 && accessWalkMeters < accessWalkThreshold) {
             reasons.add("접근 도보 짧음");
         }
 
@@ -71,7 +83,7 @@ public class RouteInsightFactory {
         return reasons.stream().limit(3).toList();
     }
 
-    private List<String> riskBadges(Route route) {
+    private List<String> riskBadges(Route route, RecommendationPreference preference) {
         Set<String> badges = new LinkedHashSet<>();
 
         if (RouteReliabilityMetrics.hasSharedMobility(route)) badges.add("공유수단 의존");
@@ -81,7 +93,10 @@ public class RouteInsightFactory {
         if (RouteReliabilityMetrics.hasWeakPickupAccess(route)) badges.add("대여소 접근 김");
         if (RouteReliabilityMetrics.hasWeakHubDetour(route)) badges.add("허브 우회 큼");
 
-        if (RouteReliabilityMetrics.maxAccessWalkDistance(route) >= ACCESS_WALK_WARNING_METERS) {
+        int accessWalkThreshold = preference == RecommendationPreference.TIME_PRIORITY
+                ? ACCESS_WALK_WARNING_METERS_TIME_PRIORITY
+                : ACCESS_WALK_WARNING_METERS_RELIABILITY;
+        if (RouteReliabilityMetrics.maxAccessWalkDistance(route) >= accessWalkThreshold) {
             badges.add("접근 도보 김");
         }
 

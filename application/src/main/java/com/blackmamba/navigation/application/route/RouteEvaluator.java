@@ -30,7 +30,7 @@ public class RouteEvaluator {
         var evaluation = routeScoreCalculator.evaluate(compared, preference);
         Route scored = compared.withEvaluation(evaluation)
                 .withScore(evaluation.totalScore(), recommended);
-        return routeInsightFactory.enrich(scored, baselineRoute);
+        return routeInsightFactory.enrich(scored, baselineRoute, preference);
     }
 
     public Route evaluate(Route route, boolean recommended) {
@@ -41,6 +41,6 @@ public class RouteEvaluator {
         var evaluation = routeScoreCalculator.evaluate(route, preference);
         Route scored = route.withEvaluation(evaluation)
                 .withScore(evaluation.totalScore(), recommended);
-        return routeInsightFactory.enrich(scored, route);
+        return routeInsightFactory.enrich(scored, route, preference);
     }
 }

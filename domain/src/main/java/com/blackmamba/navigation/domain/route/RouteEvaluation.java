@@ -10,6 +10,7 @@ public record RouteEvaluation(
         double accessWalkScore,
         double reliabilityScore,
         double totalScore,
+        String preferenceMode,  // "RELIABILITY" or "TIME_PRIORITY" — 어떤 기준으로 평가했는지 추적
         int walkingDistanceMeters,
         int transferCount,
         int maxAccessWalkDistanceMeters,

@@ -84,6 +84,7 @@ public class RouteScoreCalculator {
                 accessWalkScore,
                 reliabilityScore,
                 totalScore,
+                preference.name(),
                 walkingDistance,
                 transferCount,
                 accessWalkDistance,
