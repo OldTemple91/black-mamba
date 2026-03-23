@@ -339,7 +339,7 @@ npm run dev
 
 현재 한계:
 
-- 공유 킥보드 실시간 데이터 품질 한계
+- 공유 킥보드 실시간 데이터 미제공 (TAGO API 서울 데이터 없음 → 호출 차단, 개인 PM으로 전환)
 - 허브 모델이 아직 정류소/후보점 수준에 머무름
 - 점수 모델이 완전한 운영 리스크를 모두 반영하진 않음
 - 실험 데이터셋 기반 정량 평가가 아직 부족함
@@ -366,9 +366,10 @@ npm run dev
 
 ### 3) Automotive-Oriented Extension
 
+- 카셰어 존을 이동수단(Leg)이 아닌 환승 거점 가중치(MobilityHub)로 활용
+- 편도 카셰어(카셰어 사업자 등) 연동 시 Car → Transit → PM 완전 통합 경로 지원
 - EV charging-aware routing
 - PBV / mobility hub 시나리오 확장
-- 차량 연계형 multimodal routing 검토
 
 ## 16. Why This Project Matters
 
