@@ -204,6 +204,114 @@ class RouteScoreCalculatorTest {
         assertThat(calculator.calculate(betterAnchorFit)).isGreaterThan(calculator.calculate(worseAnchorFit));
     }
 
+    @Test
+    void 최대값_초과시_정규화는_1로_클램핑된다() {
+        Location a = new Location("A", 37.5, 127.0);
+        Location b = new Location("B", 37.4, 127.1);
+
+        List<Leg> legs = new ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            legs.add(new Leg(LegType.TRANSIT, "BUS", 15, 1000, a, b, null, null, null));
+        }
+        Route route = new Route("id", RouteType.TRANSIT_ONLY, 120, 8000,
+                new RouteCostBreakdown(List.of(new CostComponent("대중교통", 8000)), 8000),
+                List.of(), null, 0, false, legs, null, null);
+
+        RouteEvaluation evaluation = calculator.evaluate(route);
+
+        assertThat(evaluation.timeScore()).isEqualTo(0.0);
+        assertThat(evaluation.costScore()).isEqualTo(0.0);
+        assertThat(evaluation.transferScore()).isEqualTo(0.0);
+        assertThat(evaluation.totalScore()).isBetween(0.0, 1.0);
+    }
+
+    @Test
+    void 다중_신뢰도_페널티_누적시_점수가_대폭_하락한다() {
+        Location a = new Location("A", 37.5, 127.0);
+        Location b = new Location("B", 37.4, 127.1);
+        MobilityInfo unstableBike = new MobilityInfo(MobilityType.DDAREUNGI, "따릉이", null, 15,
+                "정류소", 37.5, 127.0, 1, 50);
+
+        Route penaltyRoute = Route.of(List.of(
+                new Leg(LegType.BIKE, "DDAREUNGI", 18, 2200, a, b, null, unstableBike, null)
+        ), RouteType.MOBILITY_ONLY);
+
+        MobilityInfo stableBike = new MobilityInfo(MobilityType.DDAREUNGI, "따릉이", null, 100,
+                "정류소", 37.5, 127.0, 10, 50)
+                .withDropoffStation("D1", "반납", 37.4, 127.1);
+
+        Route cleanRoute = Route.of(List.of(
+                new Leg(LegType.BIKE, "DDAREUNGI", 18, 2200, a, b, null, stableBike, null)
+        ), RouteType.MOBILITY_ONLY);
+
+        RouteEvaluation penaltyEval = calculator.evaluate(penaltyRoute);
+        RouteEvaluation cleanEval = calculator.evaluate(cleanRoute);
+
+        assertThat(penaltyEval.sharedMobilityDependent()).isTrue();
+        assertThat(penaltyEval.weakDropoff()).isTrue();
+        assertThat(penaltyEval.lowAvailability()).isTrue();
+        assertThat(penaltyEval.reliabilityScore()).isLessThan(cleanEval.reliabilityScore());
+        assertThat(penaltyEval.totalScore()).isLessThan(cleanEval.totalScore());
+    }
+
+    @Test
+    void 대중교통만_경로는_신뢰도_페널티가_없다() {
+        Route transitOnly = routeWithMinutes(30, 1, 1250);
+
+        RouteEvaluation evaluation = calculator.evaluate(transitOnly);
+
+        assertThat(evaluation.sharedMobilityDependent()).isFalse();
+        assertThat(evaluation.weakDropoff()).isFalse();
+        assertThat(evaluation.lowAvailability()).isFalse();
+        assertThat(evaluation.lowBattery()).isFalse();
+        assertThat(evaluation.reliabilityScore()).isEqualTo(1.0);
+    }
+
+    @Test
+    void 영값_경로는_만점에_가깝다() {
+        Location a = new Location("A", 37.5, 127.0);
+        Location b = new Location("B", 37.4, 127.1);
+
+        Route zeroRoute = new Route("id", RouteType.TRANSIT_ONLY, 0, 0,
+                new RouteCostBreakdown(List.of(new CostComponent("대중교통", 0)), 0),
+                List.of(), null, 0, false,
+                List.of(new Leg(LegType.TRANSIT, "BUS", 0, 0, a, b, null, null, null)),
+                null, null);
+
+        double score = calculator.calculate(zeroRoute);
+
+        assertThat(score).isGreaterThanOrEqualTo(0.95);
+    }
+
+    @Test
+    void 가용성_부족시_점수가_하락한다() {
+        Location a = new Location("A", 37.5, 127.0);
+        Location b = new Location("B", 37.4, 127.1);
+
+        MobilityInfo lowAvailBike = new MobilityInfo(MobilityType.DDAREUNGI, "따릉이", null, 100,
+                "정류소", 37.5, 127.0, 1, 50)
+                .withDropoffStation("D1", "반납", 37.4, 127.1);
+
+        MobilityInfo highAvailBike = new MobilityInfo(MobilityType.DDAREUNGI, "따릉이", null, 100,
+                "정류소", 37.5, 127.0, 10, 50)
+                .withDropoffStation("D1", "반납", 37.4, 127.1);
+
+        Route lowAvailRoute = Route.of(List.of(
+                new Leg(LegType.BIKE, "DDAREUNGI", 18, 2200, a, b, null, lowAvailBike, null)
+        ), RouteType.MOBILITY_ONLY);
+
+        Route highAvailRoute = Route.of(List.of(
+                new Leg(LegType.BIKE, "DDAREUNGI", 18, 2200, a, b, null, highAvailBike, null)
+        ), RouteType.MOBILITY_ONLY);
+
+        RouteEvaluation lowEval = calculator.evaluate(lowAvailRoute);
+        RouteEvaluation highEval = calculator.evaluate(highAvailRoute);
+
+        assertThat(lowEval.lowAvailability()).isTrue();
+        assertThat(highEval.lowAvailability()).isFalse();
+        assertThat(lowEval.totalScore()).isLessThan(highEval.totalScore());
+    }
+
     // -----------------------------------------------------------------
     // helpers
     // -----------------------------------------------------------------
