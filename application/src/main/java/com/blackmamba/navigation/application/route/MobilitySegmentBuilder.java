@@ -65,7 +65,7 @@ public class MobilitySegmentBuilder {
                     info.lat(),
                     info.lng()
             );
-            case PERSONAL -> fallback;
+            case PERSONAL_EBIKE, PERSONAL_KICKBOARD -> fallback;
         };
     }
 

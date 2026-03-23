@@ -31,8 +31,8 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     private static final double EARTH_RADIUS_METERS = 6_371_000;
     private static final int MAX_CANDIDATE_HUBS = 5;
     private static final int MAX_HINT_PRIORITY_DISTANCE_METERS = 1_100;
-    // KICKBOARD_SHARED 제외: TAGO API 서울 데이터 미제공으로 가상 경로만 생성됨 (B-1)
-    // PERSONAL 제외: 사용자 보유 여부가 전제이므로 OPTIMAL 기본 추천에는 포함하지 않음
+    // KICKBOARD_SHARED 제외: TAGO API 서울 데이터 미제공 (B-1)
+    // PERSONAL_EBIKE/PERSONAL_KICKBOARD 제외: 사용자 보유 전제, SPECIFIC 모드에서만 사용
     private static final List<MobilityType> ALL_TYPES =
             List.of(MobilityType.DDAREUNGI);
 
@@ -253,7 +253,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     }
 
     private Mono<Boolean> hasPickupNearOrigin(Location origin, MobilityType type) {
-        if (type == MobilityType.PERSONAL) {
+        if (type == MobilityType.PERSONAL_EBIKE || type == MobilityType.PERSONAL_KICKBOARD) {
             return Mono.just(true);
         }
         return mobilityAvailabilityPort.findNearbyMobility(origin.lat(), origin.lng(), type)
@@ -395,9 +395,10 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
 
     private MobilityConfig configFor(MobilityType type) {
         return switch (type) {
-            case PERSONAL -> MobilityConfig.personal();
-            case KICKBOARD_SHARED -> MobilityConfig.kickboard();
-            case DDAREUNGI -> MobilityConfig.bike();
+            case PERSONAL_EBIKE     -> MobilityConfig.personalEbike();
+            case PERSONAL_KICKBOARD -> MobilityConfig.personalKickboard();
+            case KICKBOARD_SHARED   -> MobilityConfig.kickboard();
+            case DDAREUNGI          -> MobilityConfig.bike();
         };
     }
 
@@ -407,7 +408,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     }
 
     private static boolean isKickboardType(MobilityType type) {
-        return type == MobilityType.KICKBOARD_SHARED || type == MobilityType.PERSONAL;
+        return type == MobilityType.KICKBOARD_SHARED || type == MobilityType.PERSONAL_KICKBOARD;
     }
 
     private List<Route> rank(List<Route> candidates, int baseMinutes, Route baseRoute) {
@@ -635,9 +636,10 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
 
     private String labelFor(MobilityType type) {
         return switch (type) {
-            case DDAREUNGI -> "따릉이";
-            case KICKBOARD_SHARED -> "공유 킥보드";
-            case PERSONAL -> "개인 이동수단";
+            case DDAREUNGI          -> "따릉이";
+            case KICKBOARD_SHARED   -> "공유 킥보드";
+            case PERSONAL_EBIKE     -> "개인 전기자전거";
+            case PERSONAL_KICKBOARD -> "개인 킥보드";
         };
     }
 

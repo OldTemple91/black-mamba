@@ -1,9 +1,8 @@
-// KICKBOARD_SHARED: TAGO API 서울 데이터 미제공으로 실데이터 없음 (B-3)
-// → unavailable 플래그로 표시만 하고 선택 불가 처리
 const MOBILITY_OPTIONS = [
-  { id: 'DDAREUNGI',        label: '🚲 따릉이',    unavailable: false },
-  { id: 'KICKBOARD_SHARED', label: '🛴 공유킥보드', unavailable: true  },
-  { id: 'PERSONAL',         label: '🛴 개인 이동수단', unavailable: false },
+  { id: 'DDAREUNGI',          label: '🚲 따릉이',       unavailable: false },
+  { id: 'PERSONAL_EBIKE',     label: '⚡ 전기자전거',    unavailable: false },
+  { id: 'PERSONAL_KICKBOARD', label: '🛴 개인킥보드',   unavailable: false },
+  { id: 'KICKBOARD_SHARED',   label: '🛴 공유킥보드',   unavailable: true  },
 ]
 
 const OPTIMAL_ID = 'OPTIMAL'

@@ -28,10 +28,10 @@ class KickboardLegPricingPolicyTest {
     void 개인_킥보드는_충전비만_부과된다() {
         Location a = new Location("A", 37.5, 127.0);
         Location b = new Location("B", 37.51, 127.01);
-        MobilityInfo personal = new MobilityInfo(MobilityType.PERSONAL, "개인", null,
+        MobilityInfo personal = new MobilityInfo(MobilityType.PERSONAL_KICKBOARD, "개인 킥보드", null,
                 100, null, 37.5, 127.0, 1, 0);
 
-        Leg leg = new Leg(LegType.KICKBOARD, "PERSONAL", 15, 2000, a, b, null, personal, null);
+        Leg leg = new Leg(LegType.KICKBOARD, "PERSONAL_KICKBOARD", 15, 2000, a, b, null, personal, null);
         Route route = Route.of(List.of(leg), RouteType.MOBILITY_ONLY);
 
         // 15분 × 10원 = 150원
@@ -39,6 +39,23 @@ class KickboardLegPricingPolicyTest {
         assertThat(route.costBreakdown().items())
                 .extracting(CostComponent::label)
                 .contains("개인 킥보드(충전비)");
+    }
+
+    @Test
+    void 개인_전기자전거는_충전비가_킥보드보다_낮다() {
+        Location a = new Location("A", 37.5, 127.0);
+        Location b = new Location("B", 37.51, 127.01);
+        MobilityInfo ebike = new MobilityInfo(MobilityType.PERSONAL_EBIKE, "개인 전기자전거", null,
+                100, null, 37.5, 127.0, 1, 0);
+
+        Leg leg = new Leg(LegType.BIKE, "PERSONAL_EBIKE", 15, 2000, a, b, null, ebike, null);
+        Route route = Route.of(List.of(leg), RouteType.MOBILITY_ONLY);
+
+        // 15분 × 8원 = 120원
+        assertThat(route.totalCostWon()).isEqualTo(120);
+        assertThat(route.costBreakdown().items())
+                .extracting(CostComponent::label)
+                .contains("개인 전기자전거(충전비)");
     }
 
     @Test

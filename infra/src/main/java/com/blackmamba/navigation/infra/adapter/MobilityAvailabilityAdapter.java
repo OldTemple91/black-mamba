@@ -85,7 +85,8 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
         return cachedLookup(lat, lng, type, false, () -> switch (type) {
             case DDAREUNGI -> findNearbyDdareungi(lat, lng);
             case KICKBOARD_SHARED -> findNearbyKickboard(lat, lng);
-            case PERSONAL -> Mono.just(Optional.of(personalMobility(lat, lng)));
+            case PERSONAL_EBIKE -> Mono.just(Optional.of(personalMobility(lat, lng, MobilityType.PERSONAL_EBIKE, "개인 전기자전거")));
+            case PERSONAL_KICKBOARD -> Mono.just(Optional.of(personalMobility(lat, lng, MobilityType.PERSONAL_KICKBOARD, "개인 킥보드")));
         });
     }
 
@@ -117,7 +118,7 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                         ddareungiFallbackErrorCounter.increment();
                         return Mono.just(Optional.<MobilityInfo>empty());
                     });
-            case KICKBOARD_SHARED, PERSONAL -> findNearbyMobility(lat, lng, type);
+            case KICKBOARD_SHARED, PERSONAL_EBIKE, PERSONAL_KICKBOARD -> findNearbyMobility(lat, lng, type);
         });
     }
 
@@ -275,10 +276,10 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                 });
     }
 
-    private MobilityInfo personalMobility(double lat, double lng) {
+    private MobilityInfo personalMobility(double lat, double lng, MobilityType type, String operatorName) {
         return new MobilityInfo(
-                MobilityType.PERSONAL,
-                "개인",
+                type,
+                operatorName,
                 null,
                 100,
                 null,

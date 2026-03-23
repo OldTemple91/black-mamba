@@ -246,13 +246,17 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
         return filtered.isEmpty() ? hubs : filtered;
     }
 
-    /** KICKBOARD_SHARED 및 PERSONAL 모두 킥보드 타입으로 처리 */
     private static boolean isKickboardType(MobilityType type) {
-        return type == MobilityType.KICKBOARD_SHARED || type == MobilityType.PERSONAL;
+        return type == MobilityType.KICKBOARD_SHARED || type == MobilityType.PERSONAL_KICKBOARD;
     }
 
     private MobilityConfig personalAwareConfig(MobilityType type) {
-        return type == MobilityType.PERSONAL ? MobilityConfig.personal() : MobilityConfig.kickboard();
+        return switch (type) {
+            case PERSONAL_EBIKE     -> MobilityConfig.personalEbike();
+            case PERSONAL_KICKBOARD -> MobilityConfig.personalKickboard();
+            case KICKBOARD_SHARED   -> MobilityConfig.kickboard();
+            default                 -> MobilityConfig.bike();
+        };
     }
 
     private List<Route> rank(Route base, List<Route> combined, int baseMinutes) {
@@ -416,9 +420,10 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
 
     private String labelFor(MobilityType type) {
         return switch (type) {
-            case DDAREUNGI -> "따릉이";
-            case KICKBOARD_SHARED -> "공유 킥보드";
-            case PERSONAL -> "개인 이동수단";
+            case DDAREUNGI          -> "따릉이";
+            case KICKBOARD_SHARED   -> "공유 킥보드";
+            case PERSONAL_EBIKE     -> "개인 전기자전거";
+            case PERSONAL_KICKBOARD -> "개인 킥보드";
         };
     }
 

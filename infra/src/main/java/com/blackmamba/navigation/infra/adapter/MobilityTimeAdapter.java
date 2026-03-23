@@ -19,11 +19,12 @@ import java.util.List;
 @Component
 public class MobilityTimeAdapter implements MobilityTimePort {
 
-    private static final double WALKING_KMH          = 4.5;
-    private static final double DDAREUNGI_KMH        = 15.0;
-    private static final double KICKBOARD_SHARED_KMH = 18.0;
-    private static final double PERSONAL_KMH         = 20.0;
-    private static final double DETOUR_FACTOR        = 1.3;
+    private static final double WALKING_KMH              = 4.5;
+    private static final double DDAREUNGI_KMH            = 15.0;  // 일반 자전거
+    private static final double PERSONAL_EBIKE_KMH       = 22.0;  // 전기자전거 (법적 최대 25, 실주행 평균)
+    private static final double PERSONAL_KICKBOARD_KMH   = 20.0;  // 전동킥보드
+    private static final double KICKBOARD_SHARED_KMH     = 18.0;  // 공유 킥보드 (호출 차단, fallback용 보존)
+    private static final double DETOUR_FACTOR            = 1.3;
 
     private final TmapPedestrianClient tmapClient;
 
@@ -60,9 +61,10 @@ public class MobilityTimeAdapter implements MobilityTimePort {
 
     private double speedKmh(MobilityType type) {
         return switch (type) {
-            case DDAREUNGI        -> DDAREUNGI_KMH;
-            case KICKBOARD_SHARED -> KICKBOARD_SHARED_KMH;
-            case PERSONAL         -> PERSONAL_KMH;
+            case DDAREUNGI          -> DDAREUNGI_KMH;
+            case PERSONAL_EBIKE     -> PERSONAL_EBIKE_KMH;
+            case PERSONAL_KICKBOARD -> PERSONAL_KICKBOARD_KMH;
+            case KICKBOARD_SHARED   -> KICKBOARD_SHARED_KMH;
         };
     }
 

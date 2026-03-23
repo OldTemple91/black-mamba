@@ -149,7 +149,7 @@ class OptimalSearchStrategyTest {
                                 null, 100, "142. 아현역 4번출구 앞", 37.52, 127.0, 5, 20)
                                 .withDropoffStation("S-142", "142. 아현역 4번출구 앞", 37.52, 127.0))
                         .filter(info -> !info.hasSamePickupAndDropoffStation())));
-        when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), eq(MobilityType.PERSONAL)))
+        when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), eq(MobilityType.PERSONAL_KICKBOARD)))
                 .thenReturn(Mono.just(Optional.empty()));
 
         List<Route> routes = strategy.search(origin, destination).block();

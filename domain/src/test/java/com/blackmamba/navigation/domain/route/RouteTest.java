@@ -20,11 +20,10 @@ class RouteTest {
         Route route = Route.of(List.of(transitLeg, kickboardLeg), RouteType.TRANSIT_WITH_KICKBOARD);
 
         assertThat(route.totalMinutes()).isEqualTo(27);
-        // 대중교통 1,500 + 킥보드(잠금 1,000 + 9분×150 = 1,350) = 3,850
-        assertThat(route.totalCostWon()).isEqualTo(3_850);
+        // 킥보드 leg에 mobilityInfo 없음 → 비용 계산 안 됨, 대중교통만 계산
+        assertThat(route.totalCostWon()).isEqualTo(1_500);
         assertThat(route.costBreakdown().items())
-                .extracting(CostComponent::label)
-                .containsExactly("대중교통", "공유 킥보드");
+                .containsExactly(new CostComponent("대중교통", 1_500));
     }
 
     @Test
