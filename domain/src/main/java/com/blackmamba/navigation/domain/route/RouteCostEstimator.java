@@ -7,7 +7,8 @@ final class RouteCostEstimator {
 
     private static final List<LegPricingPolicy> PRICING_POLICIES = List.of(
             new TransitLegPricingPolicy(),
-            new DdareungiLegPricingPolicy()
+            new DdareungiLegPricingPolicy(),
+            new KickboardLegPricingPolicy()
     );
 
     private RouteCostEstimator() {
