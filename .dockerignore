@@ -1,0 +1,10 @@
+.git
+.gradle
+**/build
+**/node_modules
+frontend/dist
+.env
+*.md
+docs/
+output/
+.claude/
