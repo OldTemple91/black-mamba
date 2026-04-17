@@ -34,7 +34,7 @@ services:
   # Phase 1: Metrics
   # ─────────────────────────────────────────────────────
   prometheus:
-    image: prom/prometheus:v2.54.0
+    image: prom/prometheus:v3.11.2
     container_name: black-mamba-prometheus
     ports:
       - "9090:9090"
@@ -49,7 +49,7 @@ services:
       - monitoring
 
   grafana:
-    image: grafana/grafana:11.2.0
+    image: grafana/grafana:12.4.3
     container_name: black-mamba-grafana
     ports:
       - "3000:3000"
@@ -72,7 +72,7 @@ services:
   # Phase 2: Logs
   # ─────────────────────────────────────────────────────
   loki:
-    image: grafana/loki:3.1.0
+    image: grafana/loki:3.7.1
     container_name: black-mamba-loki
     ports:
       - "3100:3100"
@@ -86,7 +86,7 @@ services:
   # Phase 3: Traces
   # ─────────────────────────────────────────────────────
   tempo:
-    image: grafana/tempo:2.5.0
+    image: grafana/tempo:2.10.4
     container_name: black-mamba-tempo
     ports:
       - "3200:3200"   # Tempo HTTP API

@@ -12,9 +12,8 @@ dependencies {
     // Phase 1: Prometheus Metrics — actuator /prometheus 엔드포인트 노출
     implementation 'io.micrometer:micrometer-registry-prometheus'
 
-    // Phase 2: Loki 로그 Push (loki4j) + 구조화 JSON 인코더
-    implementation 'com.github.loki4j:loki-logback-appender:1.5.2'
-    implementation 'net.logstash.logback:logstash-logback-encoder:7.4'
+    // Phase 2: Loki 로그 Push (loki4j 2.0.0 - Structured Metadata 지원)
+    implementation 'com.github.loki4j:loki-logback-appender:2.0.0'
 
     // Phase 3: 분산 추적 (Micrometer Tracing → Zipkin 포맷 → Tempo)
     implementation 'io.micrometer:micrometer-tracing-bridge-brave'

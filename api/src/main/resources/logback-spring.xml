@@ -9,36 +9,45 @@
         </encoder>
     </appender>
 
-    <!-- Phase 2: Loki 로그 Push (Docker 환경에서만 활성화) -->
+    <!--
+         Phase 2: Loki 로그 Push (loki4j 2.0.0 + Loki 3.7)
+         주요 개념:
+         - labels: 인덱스되는 라벨 (쿼리 필터용)
+         - structuredMetadata: 인덱스 안 되지만 펼치기로 필드 조회 가능 (Loki 3.0+)
+         - message: 목록에 표시되는 본문 (한 줄 권장)
+
+         → 긴 스택트레이스는 structuredMetadata로 → Grafana에서 펼쳐야만 보임
+    -->
     <springProfile name="docker">
-        <!--
-             운영 로깅 표준: Loki 한 엔트리 = 한 줄 = 빠른 검색
-             - 스택트레이스는 Loki에 포함하지 않는다 (엔트리 크기/UI 가독성 문제)
-             - 디버깅용 전체 스택트레이스는 아래 2가지 경로로 접근:
-               1) 콘솔/파일 로그 (docker logs black-mamba-app)
-               2) Tempo 분산 트레이싱 (traceId로 해당 요청의 span 이벤트 확인)
-             - Grafana에서 traceId를 derived field로 파싱해 Tempo로 점프 가능
-        -->
         <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
             <http>
                 <url>http://loki:3100/loki/api/v1/push</url>
             </http>
-            <format>
-                <label>
-                    <pattern>app=black-mamba,host=${HOSTNAME:-unknown},level=%level</pattern>
-                    <readMarkers>true</readMarkers>
-                </label>
-                <message>
-                    <!--
-                         평문 1라인: 타임스탬프 | 레벨 | 로거 | traceId=... | 메시지
-                         %ex 제외 → 스택트레이스 없음 → 엔트리 짧음
-                         %replace(%msg) → 개행 이스케이프 (메시지에 줄바꿈 있어도 한 줄 유지)
-                    -->
-                    <pattern>%d{ISO8601} | %-5level | %logger{30} | traceId=%X{traceId:-} spanId=%X{spanId:-} | %replace(%msg){'[\r\n]+','\\n'}</pattern>
-                </message>
-            </format>
-            <batchSize>100</batchSize>
-            <batchTimeoutMs>10000</batchTimeoutMs>
+            <batch>
+                <maxItems>100</maxItems>
+                <timeoutMs>10000</timeoutMs>
+            </batch>
+            <!-- 스트림 식별용 라벨 (쿼리 필터) -->
+            <labels>
+                app=black-mamba
+                host=${HOSTNAME:-unknown}
+                level=%level
+            </labels>
+            <!--
+                 Structured Metadata - 펼치기 시에만 노출
+                 stack_trace에 스택트레이스를 넣되 줄바꿈을 \n 이스케이프해 엔트리 한 줄 유지
+            -->
+            <structuredMetadata>
+                traceId=%mdc{traceId:-}
+                spanId=%mdc{spanId:-}
+                thread=%thread
+                logger=%logger
+                stack_trace=%replace(%xException){'[\r\n]+','\\n'}
+            </structuredMetadata>
+            <!-- 목록에 보이는 짧은 요약 -->
+            <message>
+                <pattern>%d{HH:mm:ss.SSS} | %-5level | traceId=%X{traceId:-} | %replace(%msg){'[\r\n]+','\\n'}</pattern>
+            </message>
         </appender>
 
         <root level="INFO">
@@ -54,6 +63,5 @@
         </root>
     </springProfile>
 
-    <!-- 네비게이션 도메인 로그 상세 -->
     <logger name="com.blackmamba.navigation" level="DEBUG"/>
 </configuration>
