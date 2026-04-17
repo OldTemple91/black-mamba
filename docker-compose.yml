@@ -45,6 +45,7 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.retention.time=7d'
       - '--web.enable-lifecycle'
+      - '--web.enable-remote-write-receiver'  # Tempo metrics-generator → Prometheus 푸시 수신
     networks:
       - monitoring
 
