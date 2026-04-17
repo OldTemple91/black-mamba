@@ -6,6 +6,10 @@ spring:
     name: black-mamba
   profiles:
     active: local
+  # Reactor 체인에서 traceId/spanId가 MDC로 전파되도록 활성화
+  # (기본값은 NONE — Reactor 스레드가 Micrometer Observation 컨텍스트 못 받음)
+  reactor:
+    context-propagation: auto
 
 odsay:
   api-key: ${ODSAY_API_KEY}
