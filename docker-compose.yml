@@ -1,7 +1,10 @@
 services:
-  # Backend API + Frontend (단일 컨테이너)
+  # ─────────────────────────────────────────────────────
+  # Application
+  # ─────────────────────────────────────────────────────
   app:
     build: .
+    container_name: black-mamba-app
     ports:
       - "8081:8081"
     environment:
@@ -13,6 +16,9 @@ services:
       - NAVER_CLIENT_SECRET=${NAVER_CLIENT_SECRET}
       - NAVER_SEARCH_CLIENT_ID=${NAVER_SEARCH_CLIENT_ID:-}
       - NAVER_SEARCH_CLIENT_SECRET=${NAVER_SEARCH_CLIENT_SECRET:-}
+      # Phase 3: 트레이싱 (Tempo로 전송)
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tempo:9411/api/v2/spans
+      - MANAGEMENT_TRACING_SAMPLING_PROBABILITY=1.0
     env_file:
       - .env
     healthcheck:
@@ -21,3 +27,80 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    networks:
+      - monitoring
+
+  # ─────────────────────────────────────────────────────
+  # Phase 1: Metrics
+  # ─────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.54.0
+    container_name: black-mamba-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-lifecycle'
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: black-mamba-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
+    volumes:
+      - ./monitoring/grafana-datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana-dashboards:/etc/grafana/provisioning/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring
+
+  # ─────────────────────────────────────────────────────
+  # Phase 2: Logs
+  # ─────────────────────────────────────────────────────
+  loki:
+    image: grafana/loki:3.1.0
+    container_name: black-mamba-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki.yml:/etc/loki/local-config.yaml:ro
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - monitoring
+
+  # ─────────────────────────────────────────────────────
+  # Phase 3: Traces
+  # ─────────────────────────────────────────────────────
+  tempo:
+    image: grafana/tempo:2.5.0
+    container_name: black-mamba-tempo
+    ports:
+      - "3200:3200"   # Tempo HTTP API
+      - "9411:9411"   # Zipkin receiver
+    command: [ "-config.file=/etc/tempo.yml" ]
+    volumes:
+      - ./monitoring/tempo.yml:/etc/tempo.yml:ro
+    networks:
+      - monitoring
+
+volumes:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  monitoring:
+    driver: bridge

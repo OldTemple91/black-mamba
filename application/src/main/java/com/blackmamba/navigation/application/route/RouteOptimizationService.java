@@ -6,6 +6,7 @@ import com.blackmamba.navigation.application.route.strategy.SpecificMobilityStra
 import com.blackmamba.navigation.application.route.strategy.RouteSearchStrategy;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.*;
+import io.micrometer.observation.annotation.Observed;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
@@ -42,6 +43,9 @@ public class RouteOptimizationService {
         return findRoutes(origin, destination, mobilityTypes, searchMode, RecommendationPreference.RELIABILITY);
     }
 
+    @Observed(name = "navigation.route.search",
+            contextualName = "경로 탐색",
+            lowCardinalityKeyValues = {"component", "RouteOptimizationService"})
     public Mono<List<Route>> findRoutes(Location origin, Location destination,
                                         List<MobilityType> mobilityTypes,
                                         SearchMode searchMode,

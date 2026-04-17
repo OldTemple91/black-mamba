@@ -6,6 +6,8 @@ import com.blackmamba.navigation.application.route.SearchMode;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.MobilityType;
 import com.blackmamba.navigation.domain.route.Route;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -28,9 +30,12 @@ public class RouteController {
     private static final double ODSAY_MIN_DISTANCE_METERS = 700.0;
     private static final Duration ROUTE_SEARCH_TIMEOUT = Duration.ofSeconds(30);
     private final RouteOptimizationService routeOptimizationService;
+    private final MeterRegistry meterRegistry;
 
-    public RouteController(RouteOptimizationService routeOptimizationService) {
+    public RouteController(RouteOptimizationService routeOptimizationService,
+                           MeterRegistry meterRegistry) {
         this.routeOptimizationService = routeOptimizationService;
+        this.meterRegistry = meterRegistry;
     }
 
     /**
@@ -91,13 +96,27 @@ public class RouteController {
                 .map(MobilityType::valueOf)
                 .toList();
 
+        Timer.Sample sample = Timer.start(meterRegistry);
         try {
             List<Route> routes = routeOptimizationService
                     .findRoutes(origin, destination, mobilityTypes, searchMode, recommendationPreference)
                     .block(ROUTE_SEARCH_TIMEOUT);
 
+            int count = routes != null ? routes.size() : 0;
+            sample.stop(meterRegistry.timer("navigation.route.duration",
+                    "mode", searchMode.name(),
+                    "preference", recommendationPreference.name(),
+                    "outcome", "success"));
+            meterRegistry.counter("navigation.route.generated",
+                    "mode", searchMode.name(),
+                    "preference", recommendationPreference.name()).increment(count);
+
             return ResponseEntity.ok(Map.of("routes", routes != null ? routes : List.of()));
         } catch (IllegalStateException e) {
+            sample.stop(meterRegistry.timer("navigation.route.duration",
+                    "mode", searchMode.name(),
+                    "preference", recommendationPreference.name(),
+                    "outcome", "timeout"));
             log.error("[경로 탐색] 타임아웃 ({}초 초과): {} → {}", ROUTE_SEARCH_TIMEOUT.getSeconds(),
                     origin.name(), destination.name());
             return ResponseEntity.status(504).body(Map.of(

@@ -36,7 +36,32 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: black-mamba
+    distribution:
+      # p50, p95, p99 히스토그램 자동 생성
+      percentiles-histogram:
+        http.server.requests: true
+        navigation.route.duration: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+        navigation.route.duration: 0.5, 0.95, 0.99
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  # Phase 3: 분산 추적
+  tracing:
+    sampling:
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
+  zipkin:
+    tracing:
+      endpoint: ${MANAGEMENT_ZIPKIN_TRACING_ENDPOINT:http://localhost:9411/api/v2/spans}
 
 navigation:
   mobility:

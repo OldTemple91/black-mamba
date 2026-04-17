@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <!-- 로컬 개발용: 콘솔 출력 (traceId/spanId 포함) -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} [traceId=%X{traceId:-} spanId=%X{spanId:-}] - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Phase 2: Loki 로그 Push (Docker 환경에서만 활성화) -->
+    <springProfile name="docker">
+        <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+            <http>
+                <url>http://loki:3100/loki/api/v1/push</url>
+            </http>
+            <format>
+                <label>
+                    <pattern>app=black-mamba,host=${HOSTNAME:-unknown},level=%level</pattern>
+                    <readMarkers>true</readMarkers>
+                </label>
+                <message>
+                    <!-- JSON 포맷: Grafana에서 파싱하기 쉽게 -->
+                    <pattern>{"ts":"%d{ISO8601}","level":"%level","logger":"%logger","thread":"%thread","traceId":"%X{traceId:-}","spanId":"%X{spanId:-}","message":"%msg","stackTrace":"%ex"}</pattern>
+                </message>
+            </format>
+            <batchSize>100</batchSize>
+            <batchTimeoutMs>10000</batchTimeoutMs>
+        </appender>
+
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="LOKI"/>
+        </root>
+    </springProfile>
+
+    <!-- 기본 프로필 (로컬) -->
+    <springProfile name="!docker">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <!-- 네비게이션 도메인 로그 상세 -->
+    <logger name="com.blackmamba.navigation" level="DEBUG"/>
+</configuration>

@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'black-mamba-app'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['app:8081']
+        labels:
+          application: 'black-mamba'
+          environment: 'local'
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

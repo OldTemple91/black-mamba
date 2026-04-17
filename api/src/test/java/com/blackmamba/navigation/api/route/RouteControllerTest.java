@@ -4,10 +4,14 @@ import com.blackmamba.navigation.application.route.RouteOptimizationService;
 import com.blackmamba.navigation.application.route.RecommendationPreference;
 import com.blackmamba.navigation.application.route.SearchMode;
 import com.blackmamba.navigation.domain.route.*;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import reactor.core.publisher.Mono;
 
@@ -20,10 +24,19 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(RouteController.class)
+@Import(RouteControllerTest.MeterRegistryTestConfig.class)
 class RouteControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockBean RouteOptimizationService routeOptimizationService;
+
+    /** Micrometer Prometheus registry가 WebMvcTest 슬라이스에 없어 SimpleMeterRegistry로 대체 주입 */
+    static class MeterRegistryTestConfig {
+        @Bean
+        MeterRegistry meterRegistry() {
+            return new SimpleMeterRegistry();
+        }
+    }
 
     @Test
     void 경로_탐색_API가_200을_반환한다() throws Exception {

@@ -307,6 +307,29 @@ npm run dev
 
 상세 기준 및 SLO: [`docs/performance/perf-baseline.md`](docs/performance/perf-baseline.md)
 
+### Observability Stack (Prometheus + Grafana LGTM)
+
+Metrics, Logs, Traces를 Grafana 한 곳에서 통합 조회할 수 있습니다.
+
+```bash
+docker compose up -d
+
+# 접속
+open http://localhost:3000     # Grafana (admin/admin) — 대시보드 자동 프로비저닝
+open http://localhost:9090     # Prometheus
+open http://localhost:3100     # Loki
+open http://localhost:3200     # Tempo
+```
+
+| Phase | 스택 | 역할 |
+|-------|-----|------|
+| 1. Metrics | Prometheus + Micrometer | JVM/HTTP/비즈니스 메트릭 (`navigation.route.*`, `navigation.cache.*`) |
+| 2. Logs | Loki + loki4j | 애플리케이션 로그 Push, `traceId` 자동 삽입 |
+| 3. Traces | Tempo + Micrometer Tracing | 분산 추적 (Zipkin 포맷), 로그↔트레이스 연결 |
+
+상세 설계: [`docs/monitoring/observability-stack.md`](docs/monitoring/observability-stack.md)
+관련 기술 블로그: [모니터링 시스템 개발 (Prometheus & Grafana LGTM)](https://www.notion.so/Prometheus-Grafana-LGTM-15b8983855a3807c840addfdbe093342)
+
 ## 13. Current Implementation Status
 
 현재 구현된 핵심 사항:

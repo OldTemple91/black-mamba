@@ -8,4 +8,16 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'io.projectreactor:reactor-core'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0'
+
+    // Phase 1: Prometheus Metrics — actuator /prometheus 엔드포인트 노출
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+
+    // Phase 2: Loki 로그 Push (loki4j)
+    implementation 'com.github.loki4j:loki-logback-appender:1.5.2'
+
+    // Phase 3: 분산 추적 (Micrometer Tracing → Zipkin 포맷 → Tempo)
+    implementation 'io.micrometer:micrometer-tracing-bridge-brave'
+    implementation 'io.zipkin.reporter2:zipkin-reporter-brave'
+    // @Observed 어노테이션을 AOP로 처리
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
 }

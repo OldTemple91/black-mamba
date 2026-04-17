@@ -37,4 +37,5 @@ EXPOSE 8081
 # static-locations: 정적 파일 위치 / spring.mvc.static-path-pattern: /** (기본값)
 # → /api 컨트롤러는 매핑 우선, 나머지는 static에서 서빙
 ENTRYPOINT ["java", "-jar", "/app/app.jar", \
+    "--spring.profiles.active=local,docker", \
     "--spring.web.resources.static-locations=file:/app/static/"]
