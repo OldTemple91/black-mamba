@@ -15,9 +15,13 @@ dependencies {
     // Phase 2: Loki 로그 Push (loki4j 2.0.0 - Structured Metadata 지원)
     implementation 'com.github.loki4j:loki-logback-appender:2.0.0'
 
-    // Phase 3: 분산 추적 (Micrometer Tracing → Zipkin 포맷 → Tempo)
-    implementation 'io.micrometer:micrometer-tracing-bridge-brave'
-    implementation 'io.zipkin.reporter2:zipkin-reporter-brave'
+    // Phase 3: 분산 추적 (Micrometer Tracing → OTLP/gRPC → Tempo)
+    // 기존 Zipkin/HTTP → OTLP/gRPC 전환 (2026-04-17)
+    // - Protobuf 직렬화로 페이로드 약 60% 감소
+    // - HTTP/2 멀티플렉싱으로 전송 지연 감소
+    // - OpenTelemetry 표준 준수 (벤더 중립)
+    implementation 'io.micrometer:micrometer-tracing-bridge-otel'
+    implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
     // @Observed 어노테이션을 AOP로 처리
     implementation 'org.springframework.boot:spring-boot-starter-aop'
 }

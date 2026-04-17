@@ -77,6 +77,7 @@ YYYY-MM-DD-<카테고리>-<제목>.md
 | # | 날짜 | 카테고리 | 제목 | 성과 요약 |
 |---|------|---------|------|----------|
 | 1 | 2026-04-17 | B-3 | [Geohash 공간 인덱스 캐시](./2026-04-17-B3-geohash-spatial-caching.md) | ODsay 히트율 **46.9% → 80.4%** (1.71배) |
+| 2 | 2026-04-17 | OTel | [Zipkin/JSON → OTLP/Protobuf 트레이스 전송](./2026-04-17-C-otlp-protobuf-tracing.md) | OpenTelemetry 표준 준수 + Protobuf 직렬화 전환 |
 
 ---
 

@@ -61,13 +61,18 @@ management:
     metrics:
       export:
         enabled: true
-  # Phase 3: 분산 추적
+  # Phase 3: 분산 추적 (OTLP/HTTP+Protobuf → Tempo)
+  # Spring Boot 3.3의 management.otlp.tracing은 기본 HTTP/Protobuf 전송 사용.
+  # Protobuf 직렬화로 Zipkin JSON 대비 페이로드 감소, OpenTelemetry 표준 준수.
+  # 추후 Spring Boot 3.5 업그레이드 시 transport: grpc 공식 지원 활용 예정.
   tracing:
     sampling:
       probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
-  zipkin:
+  otlp:
     tracing:
-      endpoint: ${MANAGEMENT_ZIPKIN_TRACING_ENDPOINT:http://localhost:9411/api/v2/spans}
+      # OTLP/HTTP endpoint (Tempo 4318, Protobuf payload)
+      endpoint: ${MANAGEMENT_OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
+      compression: gzip
 
 navigation:
   mobility:
