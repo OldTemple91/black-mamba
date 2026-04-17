@@ -6,4 +6,6 @@ dependencies {
     implementation 'io.micrometer:micrometer-core'
     // @Observed 어노테이션 기반 span 자동 생성
     implementation 'io.micrometer:micrometer-observation'
+    // B-3: 공간 인덱스 기반 캐시 키 생성 (Geohash)
+    implementation 'ch.hsr:geohash:1.4.0'
 }

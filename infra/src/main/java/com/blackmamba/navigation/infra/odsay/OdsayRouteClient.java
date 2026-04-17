@@ -2,6 +2,7 @@ package com.blackmamba.navigation.infra.odsay;
 
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Leg;
+import com.blackmamba.navigation.infra.common.GeohashKeyGenerator;
 import com.blackmamba.navigation.infra.odsay.dto.OdsayRouteResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Counter;
@@ -40,7 +41,8 @@ public class OdsayRouteClient {
     private final Counter routeCacheHitCounter;
     private final Counter routeCacheMissCounter;
     private final AtomicLong nextPermitMs = new AtomicLong(0);
-    private final ConcurrentHashMap<RouteKey, CacheEntry<List<Leg>>> routeCache = new ConcurrentHashMap<>();
+    // B-3: Geohash 기반 키 → 150m 격자 내 좌표는 동일 키로 캐시 공유
+    private final ConcurrentHashMap<String, CacheEntry<List<Leg>>> routeCache = new ConcurrentHashMap<>();
     private final long routeCacheTtlMs;
 
     public OdsayRouteClient(
@@ -113,7 +115,7 @@ public class OdsayRouteClient {
             log.info("[ODsay] 직선거리 700m 이하 구간은 호출 생략 ({} -> {})", origin.name(), destination.name());
             return Mono.just(List.of());
         }
-        RouteKey key = new RouteKey(origin, destination);
+        String key = GeohashKeyGenerator.forRoute(origin, destination);
         long now = System.currentTimeMillis();
         return routeCache.compute(key, (ignored, existing) -> {
             if (existing != null && !existing.isExpired(now)) {
@@ -270,27 +272,6 @@ public class OdsayRouteClient {
                 + Math.cos(Math.toRadians(a.lat())) * Math.cos(Math.toRadians(b.lat()))
                 * Math.sin(dLng / 2) * Math.sin(dLng / 2);
         return 6_371_000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
-    }
-
-    private record RouteKey(double originLat, double originLng, double destinationLat, double destinationLng) {
-        private RouteKey(Location origin, Location destination) {
-            this(origin.lat(), origin.lng(), destination.lat(), destination.lng());
-        }
-
-        @Override
-        public boolean equals(Object object) {
-            if (this == object) return true;
-            if (!(object instanceof RouteKey routeKey)) return false;
-            return Double.compare(originLat, routeKey.originLat) == 0
-                    && Double.compare(originLng, routeKey.originLng) == 0
-                    && Double.compare(destinationLat, routeKey.destinationLat) == 0
-                    && Double.compare(destinationLng, routeKey.destinationLng) == 0;
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(originLat, originLng, destinationLat, destinationLng);
-        }
     }
 
     private record CacheEntry<T>(Mono<T> value, long expiresAtMs) {

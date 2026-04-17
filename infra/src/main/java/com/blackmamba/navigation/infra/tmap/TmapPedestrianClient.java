@@ -1,6 +1,7 @@
 package com.blackmamba.navigation.infra.tmap;
 
 import com.blackmamba.navigation.domain.location.Location;
+import com.blackmamba.navigation.infra.common.GeohashKeyGenerator;
 import com.blackmamba.navigation.infra.tmap.dto.TmapPedestrianResponse;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -37,7 +38,8 @@ public class TmapPedestrianClient {
     private final Counter quotaShortCircuitCounter;
     private final Counter routeCacheHitCounter;
     private final Counter routeCacheMissCounter;
-    private final ConcurrentHashMap<RouteKey, CacheEntry<Optional<TmapRouteData>>> routeCache = new ConcurrentHashMap<>();
+    // B-3: Geohash 기반 키 (150m 격자 내 좌표는 동일 키로 공유)
+    private final ConcurrentHashMap<String, CacheEntry<Optional<TmapRouteData>>> routeCache = new ConcurrentHashMap<>();
     private final long routeCacheTtlMs;
     private final long quotaBackoffMs;
     private final AtomicLong quotaBlockedUntilMs = new AtomicLong(0L);
@@ -87,7 +89,7 @@ public class TmapPedestrianClient {
             log.warn("[TMAP] quota backoff active -> API 호출 생략 ({}초 남음)", (blockedUntil - now) / 1000);
             return Mono.just(Optional.empty());
         }
-        RouteKey key = new RouteKey(origin, destination);
+        String key = GeohashKeyGenerator.forRoute(origin, destination);
         return routeCache.compute(key, (ignored, existing) -> {
             if (existing != null && !existing.isExpired(now)) {
                 routeCacheHitCounter.increment();
@@ -148,12 +150,6 @@ public class TmapPedestrianClient {
     }
 
     public record TmapRouteData(int distanceMeters, List<Location> coordinates) {}
-
-    private record RouteKey(double originLat, double originLng, double destinationLat, double destinationLng) {
-        private RouteKey(Location origin, Location destination) {
-            this(origin.lat(), origin.lng(), destination.lat(), destination.lng());
-        }
-    }
 
     private record CacheEntry<T>(Mono<T> value, long expiresAtMs) {
         private boolean isExpired(long nowMs) {
