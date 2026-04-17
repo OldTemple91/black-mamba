@@ -2,15 +2,23 @@
 <configuration>
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
-    <!-- 로컬 개발용: 콘솔 출력 (traceId/spanId 포함) -->
+    <!-- 로컬 개발용: 콘솔 출력 (traceId/spanId + 전체 스택트레이스 포함) -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} [traceId=%X{traceId:-} spanId=%X{spanId:-}] - %msg%n</pattern>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} [traceId=%X{traceId:-} spanId=%X{spanId:-}] - %msg%n%ex</pattern>
         </encoder>
     </appender>
 
     <!-- Phase 2: Loki 로그 Push (Docker 환경에서만 활성화) -->
     <springProfile name="docker">
+        <!--
+             운영 로깅 표준: Loki 한 엔트리 = 한 줄 = 빠른 검색
+             - 스택트레이스는 Loki에 포함하지 않는다 (엔트리 크기/UI 가독성 문제)
+             - 디버깅용 전체 스택트레이스는 아래 2가지 경로로 접근:
+               1) 콘솔/파일 로그 (docker logs black-mamba-app)
+               2) Tempo 분산 트레이싱 (traceId로 해당 요청의 span 이벤트 확인)
+             - Grafana에서 traceId를 derived field로 파싱해 Tempo로 점프 가능
+        -->
         <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
             <http>
                 <url>http://loki:3100/loki/api/v1/push</url>
@@ -22,14 +30,11 @@
                 </label>
                 <message>
                     <!--
-                         Loki 로그 한 건 = 한 줄(한 엔트리)
-                         %msg와 %ex에 개행/따옴표/백슬래시가 섞이면 JSON이 깨지거나 Grafana에서
-                         펼치지 않아도 멀티라인으로 노출된다.
-                         %replace로 제어문자를 이스케이프해 "접기/펼치기" 토글이 정상 동작하게 만든다.
+                         평문 1라인: 타임스탬프 | 레벨 | 로거 | traceId=... | 메시지
+                         %ex 제외 → 스택트레이스 없음 → 엔트리 짧음
+                         %replace(%msg) → 개행 이스케이프 (메시지에 줄바꿈 있어도 한 줄 유지)
                     -->
-                    <pattern>
-                        {"ts":"%d{ISO8601}","level":"%level","logger":"%logger","thread":"%thread","traceId":"%X{traceId:-}","spanId":"%X{spanId:-}","message":"%replace(%replace(%replace(%msg){'\\\\','\\\\\\\\'}){'"','\\\\"'}){'[\r\n]+','\\\\n'}","stackTrace":"%replace(%replace(%replace(%ex){'\\\\','\\\\\\\\'}){'"','\\\\"'}){'[\r\n\t]+','\\\\n'}"}
-                    </pattern>
+                    <pattern>%d{ISO8601} | %-5level | %logger{30} | traceId=%X{traceId:-} spanId=%X{spanId:-} | %replace(%msg){'[\r\n]+','\\n'}</pattern>
                 </message>
             </format>
             <batchSize>100</batchSize>

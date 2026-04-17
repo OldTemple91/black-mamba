@@ -17,11 +17,11 @@ datasources:
     editable: true
     uid: loki
     jsonData:
-      # JSON 로그의 "traceId":"abc123" 패턴을 파싱하여
+      # 평문 로그의 traceId=abc123 패턴을 파싱하여
       # 해당 traceId를 Tempo로 점프할 수 있는 링크 생성
       derivedFields:
         - datasourceUid: tempo
-          matcherRegex: '"traceId":"([a-f0-9]+)"'
+          matcherRegex: 'traceId=([a-f0-9]+)'
           name: traceId
           url: '$${__value.raw}'
           urlDisplayLabel: 'Tempo에서 트레이스 보기'
