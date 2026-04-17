@@ -44,9 +44,13 @@
                 logger=%logger
                 stack_trace=%replace(%xException){'[\r\n]+','\\n'}
             </structuredMetadata>
-            <!-- 목록에 보이는 짧은 요약 -->
+            <!--
+                 목록에 보이는 짧은 요약.
+                 %nopex : PatternLayout이 패턴 끝에 암묵적으로 추가하는 예외 출력을 suppress.
+                         스택트레이스는 위 <structuredMetadata>의 stack_trace 필드로 분리됨.
+            -->
             <message>
-                <pattern>%d{HH:mm:ss.SSS} | %-5level | traceId=%X{traceId:-} | %replace(%msg){'[\r\n]+','\\n'}</pattern>
+                <pattern>%d{HH:mm:ss.SSS} | %-5level | traceId=%X{traceId:-} | %replace(%msg){'[\r\n]+','\\n'}%nopex</pattern>
             </message>
         </appender>
 

@@ -52,8 +52,9 @@ public class GlobalExceptionHandler {
     /** 나머지 예외는 500 */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleUnhandled(Exception e) {
-        // 여기서 로깅 — MDC에 traceId/spanId가 아직 살아있는 시점
-        log.error("[전역 예외] {} : {}", e.getClass().getSimpleName(), e.getMessage(), e);
+        // e를 인자로 넘겨야 SLF4J가 stackTrace를 event.throwable에 저장 → structuredMetadata 의 %xException 에서 사용
+        // line 자체에는 예외 타입 + 메시지만 출력 (스택트레이스는 분리)
+        log.error("[전역 예외] {}: {}", e.getClass().getSimpleName(), e.getMessage(), e);
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of(
