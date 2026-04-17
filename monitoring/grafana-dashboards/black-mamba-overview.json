@@ -43,7 +43,7 @@
       "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
       "id": 3,
       "targets": [
-        { "expr": "sum(rate(navigation_cache_total_total{result=\"hit\"}[5m])) / sum(rate(navigation_cache_total_total[5m]))", "refId": "A" }
+        { "expr": "sum(rate(navigation_cache_total{result=\"hit\"}[5m])) / sum(rate(navigation_cache_total[5m]))", "refId": "A" }
       ],
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
@@ -107,7 +107,7 @@
       "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
       "id": 7,
       "targets": [
-        { "expr": "sum(rate(navigation_cache_total_total[1m])) by (cache, result)", "legendFormat": "{{cache}} - {{result}}", "refId": "A" }
+        { "expr": "sum(rate(navigation_cache_total[1m])) by (cache, result)", "legendFormat": "{{cache}} - {{result}}", "refId": "A" }
       ],
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "ops" } }
@@ -118,7 +118,7 @@
       "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
       "id": 8,
       "targets": [
-        { "expr": "sum(rate(navigation_mobility_fallback_total_total[1m])) by (mobility, reason)", "legendFormat": "{{mobility}} - {{reason}}", "refId": "A" }
+        { "expr": "sum(rate(navigation_mobility_fallback_total[1m])) by (mobility, reason)", "legendFormat": "{{mobility}} - {{reason}}", "refId": "A" }
       ],
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "ops" } }
@@ -150,7 +150,7 @@
   "schemaVersion": 39,
   "tags": ["black-mamba", "maas"],
   "templating": { "list": [] },
-  "time": { "from": "now-15m", "to": "now" },
+  "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
   "timezone": "",
   "title": "Black Mamba — MaaS 라우팅 엔진 Overview",
