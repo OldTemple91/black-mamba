@@ -39,19 +39,20 @@ export const MOBILITY_TYPES = ['DDAREUNGI', 'PERSONAL_EBIKE', 'PERSONAL_KICKBOAR
 /**
  * OD 쌍 + 검색 조건을 조합한 요청 URL 생성
  */
+// k6는 goja 런타임을 사용해 URLSearchParams가 없음 → 수동 쿼리스트링 빌드
 export function buildRouteUrl(od, { mode = 'OPTIMAL', pref = 'RELIABILITY', mobility = [] } = {}) {
-  const params = new URLSearchParams({
-    originLat: od.originLat,
-    originLng: od.originLng,
-    destLat: od.destLat,
-    destLng: od.destLng,
-    searchMode: mode,
-    recommendationPreference: pref,
-  });
+  const parts = [
+    `originLat=${od.originLat}`,
+    `originLng=${od.originLng}`,
+    `destLat=${od.destLat}`,
+    `destLng=${od.destLng}`,
+    `searchMode=${mode}`,
+    `recommendationPreference=${pref}`,
+  ];
   if (mobility.length > 0) {
-    params.append('mobility', mobility.join(','));
+    parts.push(`mobility=${encodeURIComponent(mobility.join(','))}`);
   }
-  return `${BASE_URL}/api/routes?${params.toString()}`;
+  return `${BASE_URL}/api/routes?${parts.join('&')}`;
 }
 
 /**
