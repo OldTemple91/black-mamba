@@ -1,5 +1,11 @@
 # Hub-Based Reliability-Aware MaaS Routing Engine
 
+[![CI](https://github.com/OldTemple91/black-mamba/actions/workflows/ci.yml/badge.svg)](https://github.com/OldTemple91/black-mamba/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-46%25-yellow)](build/reports/jacoco/aggregate/index.html)
+[![Java 21](https://img.shields.io/badge/Java-21-orange)](https://openjdk.org/projects/jdk/21/)
+[![Spring Boot 3.3](https://img.shields.io/badge/Spring%20Boot-3.3-brightgreen)](https://spring.io/projects/spring-boot)
+[![React 18](https://img.shields.io/badge/React-18-61DAFB)](https://react.dev/)
+
 대중교통, 공공자전거, 개인 이동수단을 결합해 도착 성공 가능성이 높은 경로를 추천하는 도시형 멀티모달 라우팅 엔진입니다. 기본 `OPTIMAL` 추천은 MaaS 시나리오에 맞춰 대중교통과 공공/공유 수단 중심으로 구성하고, 개인 이동수단은 사용자가 명시적으로 선택한 경우에만 탐색합니다.
 
 현재 실험 기준으로는 이 축을 두 개로 분리해 해석합니다.

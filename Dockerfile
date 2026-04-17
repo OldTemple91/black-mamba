@@ -21,13 +21,20 @@ RUN VITE_API_BASE_URL=/api npm run build
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 
-# Backend JAR
-COPY --from=backend-build /app/api/build/libs/*.jar app.jar
+# curl 설치 (healthcheck용)
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Frontend static (serve via Spring Boot static resources)
+# Backend bootJar만 복사 (-plain.jar 제외)
+COPY --from=backend-build /app/api/build/libs/api-*.jar /app/app.jar
+
+# Frontend 정적 파일을 Spring Boot static resources 경로에 배치
 COPY --from=frontend-build /app/dist/ /app/static/
 
-# Nginx for frontend (optional, simple approach: serve from Spring Boot)
 EXPOSE 8081
 
-ENTRYPOINT ["java", "-jar", "app.jar", "--spring.web.resources.static-locations=file:/app/static/"]
+# React SPA fallback + Spring Boot 컨트롤러 우선순위 유지
+# static-locations: 정적 파일 위치 / spring.mvc.static-path-pattern: /** (기본값)
+# → /api 컨트롤러는 매핑 우선, 나머지는 static에서 서빙
+ENTRYPOINT ["java", "-jar", "/app/app.jar", \
+    "--spring.web.resources.static-locations=file:/app/static/"]

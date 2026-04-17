@@ -1,12 +1,18 @@
 plugins {
     id 'java'
+    id 'jacoco'
     id 'org.springframework.boot' version '3.3.0' apply false
     id 'io.spring.dependency-management' version '1.1.4' apply false
+}
+
+repositories {
+    mavenCentral()
 }
 
 subprojects {
     apply plugin: 'java'
     apply plugin: 'io.spring.dependency-management'
+    apply plugin: 'jacoco'
 
     group = 'com.blackmamba'
     version = '0.0.1-SNAPSHOT'
@@ -33,5 +39,29 @@ subprojects {
 
     test {
         useJUnitPlatform()
+        finalizedBy jacocoTestReport
+    }
+
+    jacocoTestReport {
+        dependsOn test
+        reports {
+            xml.required = true
+            html.required = true
+        }
+    }
+}
+
+// 전체 모듈 커버리지 통합 리포트
+tasks.register('jacocoRootReport', JacocoReport) {
+    dependsOn subprojects.test
+    additionalSourceDirs.setFrom(files(subprojects.sourceSets.main.allSource.srcDirs))
+    sourceDirectories.setFrom(files(subprojects.sourceSets.main.allSource.srcDirs))
+    classDirectories.setFrom(files(subprojects.sourceSets.main.output))
+    executionData.setFrom(files(subprojects.jacocoTestReport.executionData).filter { it.exists() })
+    reports {
+        xml.required = true
+        xml.outputLocation = layout.buildDirectory.file('reports/jacoco/aggregate/jacoco.xml')
+        html.required = true
+        html.outputLocation = layout.buildDirectory.dir('reports/jacoco/aggregate')
     }
 }
