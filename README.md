@@ -293,6 +293,20 @@ npm run dev
 - backend: `8081`
 - frontend: `5173`
 
+### Load Testing (k6)
+
+5종 부하 테스트 시나리오를 제공합니다. k6가 로컬에 없으면 Docker(`grafana/k6`) 자동 사용.
+
+```bash
+./scripts/k6/run.sh smoke    # 1 VU, 30초 — 기본 정상성
+./scripts/k6/run.sh load     # 50 VU, 7분 — 평시 SLO 검증 (p95 < 2s)
+./scripts/k6/run.sh stress   # 50→200 VU, 10분 — 한계 탐색
+./scripts/k6/run.sh spike    # 50→300→50 VU — 급증 대응
+./scripts/k6/run.sh cache    # Cold vs Warm 응답시간 비교
+```
+
+상세 기준 및 SLO: [`docs/performance/perf-baseline.md`](docs/performance/perf-baseline.md)
+
 ## 13. Current Implementation Status
 
 현재 구현된 핵심 사항:

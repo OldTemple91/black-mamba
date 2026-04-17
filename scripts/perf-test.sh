@@ -1,5 +1,9 @@
 #!/bin/bash
-# Black Mamba — 성능 측정 스크립트
+# [DEPRECATED] curl 기반 간이 측정 — 3회 순차 반복
+# 본격 부하 테스트는 scripts/k6/ 디렉토리의 k6 스크립트를 사용하세요:
+#   ./scripts/k6/run.sh smoke | load | stress | spike | cache
+#
+# Black Mamba — 성능 측정 스크립트 (간이용)
 # 사용법: ./scripts/perf-test.sh
 #
 # 사전 조건: 백엔드가 http://localhost:8081 에서 실행 중이어야 함
