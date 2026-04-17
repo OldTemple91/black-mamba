@@ -22,11 +22,10 @@ public class DebugErrorController {
 
     /**
      * 의도적으로 RuntimeException을 던져 500 응답 + 스택트레이스 로그를 발생시킨다.
-     * Loki에서 level=ERROR로 필터링되며, stackTrace 필드에 전체 스택이 한 줄로 기록된다.
+     * 예외는 GlobalExceptionHandler가 잡아 로깅 + 500 응답 생성.
      */
     @GetMapping("/boom")
     public String boom() {
-        log.error("[디버그] 의도적 예외 발생 - 관측 테스트용");
         throw new IllegalStateException("의도적 데모 예외: Loki ERROR + Tempo 실패 트레이스 검증용");
     }
 
