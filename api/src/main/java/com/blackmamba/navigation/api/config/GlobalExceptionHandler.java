@@ -4,8 +4,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.ErrorResponseException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.Instant;
 import java.util.Map;
@@ -25,6 +27,29 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    /** 404 (NoResourceFoundException은 Spring 기본 상태를 유지) */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleNotFound(NoResourceFoundException e) {
+        log.warn("[404] 존재하지 않는 리소스: {}", e.getResourcePath());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                "code", "NOT_FOUND",
+                "message", "요청한 리소스가 존재하지 않습니다: " + e.getResourcePath(),
+                "timestamp", Instant.now().toString()
+        ));
+    }
+
+    /** Spring ErrorResponseException 계열은 본인이 가진 상태코드 유지 */
+    @ExceptionHandler(ErrorResponseException.class)
+    public ResponseEntity<Map<String, Object>> handleErrorResponse(ErrorResponseException e) {
+        log.warn("[{}] {}", e.getStatusCode(), e.getMessage());
+        return ResponseEntity.status(e.getStatusCode()).body(Map.of(
+                "code", e.getStatusCode().toString(),
+                "message", e.getMessage() != null ? e.getMessage() : "요청 처리 실패",
+                "timestamp", Instant.now().toString()
+        ));
+    }
+
+    /** 나머지 예외는 500 */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleUnhandled(Exception e) {
         // 여기서 로깅 — MDC에 traceId/spanId가 아직 살아있는 시점
