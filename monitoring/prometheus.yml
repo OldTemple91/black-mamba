@@ -5,9 +5,8 @@ global:
 scrape_configs:
   - job_name: 'black-mamba-app'
     metrics_path: '/actuator/prometheus'
-    # Exemplars 수집: Micrometer는 히스토그램/카운터에 trace_id를 exemplar로 첨부
-    # OpenMetrics 포맷으로 요청해야 Prometheus가 exemplars를 파싱 가능
-    scrape_classic_histograms: true
+    # Exemplars 수집: Prometheus 3.x 기본 동작으로 OpenMetrics 포맷 자동 파싱.
+    # Micrometer가 히스토그램/카운터에 trace_id를 exemplar로 첨부하면 자동 수집됨.
     static_configs:
       - targets: ['app:8081']
         labels:
