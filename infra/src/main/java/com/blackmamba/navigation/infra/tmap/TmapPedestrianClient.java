@@ -4,6 +4,7 @@ import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.infra.tmap.dto.TmapPedestrianResponse;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.observation.annotation.Observed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -75,6 +76,9 @@ public class TmapPedestrianClient {
      * 성공 시 (도로 거리m, 실제 경로 좌표)를 담은 Optional 반환.
      * 실패 또는 경로 없으면 Optional.empty().
      */
+    @Observed(name = "external.api.tmap.route",
+            contextualName = "Tmap 보행자 경로 조회",
+            lowCardinalityKeyValues = {"external.api", "tmap"})
     public Mono<Optional<TmapRouteData>> getRoute(Location origin, Location destination) {
         long blockedUntil = quotaBlockedUntilMs.get();
         long now = System.currentTimeMillis();

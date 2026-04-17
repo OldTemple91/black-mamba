@@ -4,6 +4,7 @@ import com.blackmamba.navigation.infra.ddareungi.dto.DdareungiStation;
 import com.blackmamba.navigation.infra.ddareungi.dto.DdareungiStationResponse;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.observation.annotation.Observed;
 import io.netty.channel.ChannelOption;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,6 +90,9 @@ public class DdareungiApiClient {
         );
     }
 
+    @Observed(name = "external.api.ddareungi.nearby",
+            contextualName = "따릉이 반경 내 정류소 조회",
+            lowCardinalityKeyValues = {"external.api", "ddareungi"})
     public Mono<List<DdareungiStation>> getNearbyStations(double lat, double lng, int radiusMeters) {
         return getNearbyStations(lat, lng, radiusMeters, true);
     }

@@ -1,0 +1,145 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {"title": "Overview", "url": "/d/black-mamba-overview", "type": "dashboards", "tags": ["black-mamba"]}
+  ],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "평균 응답시간 (5분)",
+      "gridPos": {"x": 0, "y": 0, "w": 4, "h": 4},
+      "id": 1,
+      "targets": [
+        {
+          "expr": "sum(rate(navigation_route_duration_seconds_sum[5m])) / sum(rate(navigation_route_duration_seconds_count[5m])) * 1000",
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
+        }
+      ],
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ms"}}
+    },
+    {
+      "type": "stat",
+      "title": "타임아웃 발생률",
+      "gridPos": {"x": 4, "y": 0, "w": 4, "h": 4},
+      "id": 2,
+      "targets": [
+        {
+          "expr": "sum(rate(navigation_route_duration_seconds_count{outcome=\"timeout\"}[5m])) / sum(rate(navigation_route_duration_seconds_count[5m]))",
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
+        }
+      ],
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {"mode": "absolute", "steps": [
+            {"color": "green", "value": null},
+            {"color": "yellow", "value": 0.01},
+            {"color": "red", "value": 0.05}
+          ]}
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "평균 경로 수 / 요청",
+      "gridPos": {"x": 8, "y": 0, "w": 4, "h": 4},
+      "id": 3,
+      "targets": [
+        {
+          "expr": "sum(rate(navigation_route_generated_total[5m])) / sum(rate(navigation_route_duration_seconds_count[5m]))",
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
+        }
+      ],
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 1}}
+    },
+    {
+      "type": "timeseries",
+      "title": "Mode × Preference 응답시간 p95 (Exemplars 활성화 — 점 클릭 시 Tempo)",
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+      "id": 4,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(navigation_route_duration_seconds_bucket[1m])) by (mode, preference, le)) * 1000",
+          "legendFormat": "{{mode}} / {{preference}}",
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "exemplar": true
+        }
+      ],
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ms"}}
+    },
+    {
+      "type": "timeseries",
+      "title": "처리량 (RPS by outcome)",
+      "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+      "id": 5,
+      "targets": [
+        {
+          "expr": "sum(rate(navigation_route_duration_seconds_count[1m])) by (outcome)",
+          "legendFormat": "{{outcome}}",
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
+        }
+      ],
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "reqps"}}
+    },
+    {
+      "type": "timeseries",
+      "title": "응답시간 히트맵 (분포)",
+      "gridPos": {"x": 0, "y": 12, "w": 24, "h": 8},
+      "id": 6,
+      "targets": [
+        {
+          "expr": "sum(increase(navigation_route_duration_seconds_bucket[1m])) by (le)",
+          "format": "heatmap",
+          "legendFormat": "{{le}}",
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
+        }
+      ],
+      "datasource": {"type": "prometheus", "uid": "prometheus"}
+    },
+    {
+      "type": "logs",
+      "title": "최근 ERROR 로그 (경로 탐색 실패)",
+      "gridPos": {"x": 0, "y": 20, "w": 24, "h": 10},
+      "id": 7,
+      "targets": [
+        {
+          "expr": "{app=\"black-mamba\",level=\"ERROR\"}",
+          "refId": "A",
+          "datasource": {"type": "loki", "uid": "loki"}
+        }
+      ],
+      "datasource": {"type": "loki", "uid": "loki"},
+      "options": {
+        "showLabels": false,
+        "showTime": true,
+        "wrapLogMessage": false,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      }
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["black-mamba", "route"],
+  "templating": {"list": []},
+  "time": {"from": "now-30m", "to": "now"},
+  "title": "Black Mamba — Route Performance",
+  "uid": "black-mamba-route-performance",
+  "version": 1
+}

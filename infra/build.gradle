@@ -4,4 +4,6 @@ dependencies {
     testImplementation project(':application')
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
     implementation 'io.micrometer:micrometer-core'
+    // @Observed 어노테이션 기반 span 자동 생성
+    implementation 'io.micrometer:micrometer-observation'
 }

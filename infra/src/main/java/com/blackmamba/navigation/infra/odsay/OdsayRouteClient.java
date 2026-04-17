@@ -6,6 +6,7 @@ import com.blackmamba.navigation.infra.odsay.dto.OdsayRouteResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.observation.annotation.Observed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -103,6 +104,9 @@ public class OdsayRouteClient {
         });
     }
 
+    @Observed(name = "external.api.odsay.route",
+            contextualName = "ODsay 대중교통 경로 조회",
+            lowCardinalityKeyValues = {"external.api", "odsay"})
     public Mono<List<Leg>> getTransitRoute(Location origin, Location destination) {
         if (isTooShortForTransit(origin, destination)) {
             transitRouteShortDistanceSkipCounter.increment();
@@ -224,6 +228,9 @@ public class OdsayRouteClient {
         return fallback;
     }
 
+    @Observed(name = "external.api.odsay.time",
+            contextualName = "ODsay 소요시간 조회",
+            lowCardinalityKeyValues = {"external.api", "odsay"})
     public Mono<Integer> getTransitTimeMinutes(Location origin, Location destination) {
         if (isTooShortForTransit(origin, destination)) {
             transitTimeShortDistanceSkipCounter.increment();

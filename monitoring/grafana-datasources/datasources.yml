@@ -8,6 +8,12 @@ datasources:
     isDefault: true
     editable: true
     uid: prometheus
+    jsonData:
+      # Exemplars: 메트릭 그래프에서 trace_id 점을 클릭하면 Tempo로 점프
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo
+          urlDisplayLabel: '트레이스 보기'
 
   # Phase 2에서 활성화
   - name: Loki

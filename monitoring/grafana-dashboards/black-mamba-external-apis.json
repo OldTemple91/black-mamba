@@ -1,0 +1,218 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {"title": "Overview", "url": "/d/black-mamba-overview", "type": "dashboards", "tags": ["black-mamba"]}
+  ],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "ODsay p95",
+      "gridPos": {"x": 0, "y": 0, "w": 4, "h": 4},
+      "id": 1,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(external_api_odsay_route_seconds_bucket[5m])) by (le)) * 1000",
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
+        }
+      ],
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {"mode": "absolute", "steps": [
+            {"color": "green", "value": null},
+            {"color": "yellow", "value": 1000},
+            {"color": "red", "value": 2000}
+          ]}
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Tmap p95",
+      "gridPos": {"x": 4, "y": 0, "w": 4, "h": 4},
+      "id": 2,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(external_api_tmap_route_seconds_bucket[5m])) by (le)) * 1000",
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
+        }
+      ],
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {"mode": "absolute", "steps": [
+            {"color": "green", "value": null},
+            {"color": "yellow", "value": 500},
+            {"color": "red", "value": 1500}
+          ]}
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "따릉이 p95",
+      "gridPos": {"x": 8, "y": 0, "w": 4, "h": 4},
+      "id": 3,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(external_api_ddareungi_nearby_seconds_bucket[5m])) by (le)) * 1000",
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
+        }
+      ],
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ms"}}
+    },
+    {
+      "type": "stat",
+      "title": "Fallback 발생 (최근 5분)",
+      "gridPos": {"x": 12, "y": 0, "w": 6, "h": 4},
+      "id": 4,
+      "targets": [
+        {
+          "expr": "sum(increase(navigation_mobility_fallback_total[5m]))",
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
+        }
+      ],
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {"mode": "absolute", "steps": [
+            {"color": "green", "value": null},
+            {"color": "red", "value": 1}
+          ]}
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "외부 API 호출 응답시간 (p95)",
+      "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+      "id": 5,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(external_api_odsay_route_seconds_bucket[1m])) by (le)) * 1000",
+          "legendFormat": "ODsay /route",
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(external_api_odsay_time_seconds_bucket[1m])) by (le)) * 1000",
+          "legendFormat": "ODsay /time",
+          "refId": "B",
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(external_api_tmap_route_seconds_bucket[1m])) by (le)) * 1000",
+          "legendFormat": "Tmap",
+          "refId": "C",
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(external_api_ddareungi_nearby_seconds_bucket[1m])) by (le)) * 1000",
+          "legendFormat": "따릉이",
+          "refId": "D",
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
+        }
+      ],
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ms"}}
+    },
+    {
+      "type": "timeseries",
+      "title": "외부 API 호출 수 (RPS)",
+      "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+      "id": 6,
+      "targets": [
+        {
+          "expr": "sum(rate(external_api_odsay_route_seconds_count[1m])) + sum(rate(external_api_odsay_time_seconds_count[1m]))",
+          "legendFormat": "ODsay",
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
+        },
+        {
+          "expr": "sum(rate(external_api_tmap_route_seconds_count[1m]))",
+          "legendFormat": "Tmap",
+          "refId": "B",
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
+        },
+        {
+          "expr": "sum(rate(external_api_ddareungi_nearby_seconds_count[1m]))",
+          "legendFormat": "따릉이",
+          "refId": "C",
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
+        }
+      ],
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "reqps"}}
+    },
+    {
+      "type": "timeseries",
+      "title": "Fallback 발생 (by mobility × reason)",
+      "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
+      "id": 7,
+      "targets": [
+        {
+          "expr": "sum(rate(navigation_mobility_fallback_total[1m])) by (mobility, reason)",
+          "legendFormat": "{{mobility}} / {{reason}}",
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
+        }
+      ],
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops"}}
+    },
+    {
+      "type": "timeseries",
+      "title": "캐시 Hit률 (by 캐시 종류)",
+      "gridPos": {"x": 12, "y": 12, "w": 12, "h": 8},
+      "id": 8,
+      "targets": [
+        {
+          "expr": "sum(rate(navigation_cache_total{result=\"hit\"}[1m])) by (cache) / sum(rate(navigation_cache_total[1m])) by (cache)",
+          "legendFormat": "{{cache}}",
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
+        }
+      ],
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}}
+    },
+    {
+      "type": "logs",
+      "title": "외부 API 관련 WARN/ERROR 로그",
+      "gridPos": {"x": 0, "y": 20, "w": 24, "h": 10},
+      "id": 9,
+      "targets": [
+        {
+          "expr": "{app=\"black-mamba\"} |~ \"ODsay|Tmap|따릉이\" |~ \"WARN|ERROR|fallback|오류|실패\"",
+          "refId": "A",
+          "datasource": {"type": "loki", "uid": "loki"}
+        }
+      ],
+      "datasource": {"type": "loki", "uid": "loki"},
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
+      }
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["black-mamba", "external-api"],
+  "templating": {"list": []},
+  "time": {"from": "now-30m", "to": "now"},
+  "title": "Black Mamba — External APIs",
+  "uid": "black-mamba-external-apis",
+  "version": 1
+}
