@@ -91,10 +91,22 @@ public class RouteController {
             ));
         }
 
-        List<MobilityType> mobilityTypes = mobility.stream()
-                .filter(m -> !m.isBlank())
-                .map(MobilityType::valueOf)
-                .toList();
+        List<MobilityType> mobilityTypes;
+        try {
+            mobilityTypes = mobility.stream()
+                    .filter(m -> !m.isBlank())
+                    .map(MobilityType::valueOf)
+                    .toList();
+        } catch (IllegalArgumentException e) {
+            String allowed = java.util.Arrays.stream(MobilityType.values())
+                    .map(Enum::name)
+                    .collect(java.util.stream.Collectors.joining(", "));
+            log.warn("[경로 탐색] 잘못된 이동수단 타입 입력: {} → 400 반환", mobility);
+            return ResponseEntity.badRequest().body(Map.of(
+                    "code", "INVALID_MOBILITY_TYPE",
+                    "message", "지원하지 않는 이동수단 타입입니다. 허용 값: " + allowed
+            ));
+        }
 
         Timer.Sample sample = Timer.start(meterRegistry);
         try {

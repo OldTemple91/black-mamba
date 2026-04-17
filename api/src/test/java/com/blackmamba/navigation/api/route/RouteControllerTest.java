@@ -138,4 +138,39 @@ class RouteControllerTest {
                 .andExpect(jsonPath("$.code").value("SHORT_DISTANCE"))
                 .andExpect(jsonPath("$.message").exists());
     }
+
+    @Test
+    void 위도_범위를_벗어나면_400을_반환한다() throws Exception {
+        mockMvc.perform(get("/api/routes")
+                        .param("originLat", "100")
+                        .param("originLng", "127.0")
+                        .param("destLat", "37.5")
+                        .param("destLng", "127.0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_LATITUDE"));
+    }
+
+    @Test
+    void 경도_범위를_벗어나면_400을_반환한다() throws Exception {
+        mockMvc.perform(get("/api/routes")
+                        .param("originLat", "37.5")
+                        .param("originLng", "-999")
+                        .param("destLat", "37.6")
+                        .param("destLng", "127.0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_LONGITUDE"));
+    }
+
+    @Test
+    void 지원하지_않는_이동수단_타입은_400을_반환한다() throws Exception {
+        mockMvc.perform(get("/api/routes")
+                        .param("originLat", "37.4979")
+                        .param("originLng", "127.0276")
+                        .param("destLat", "37.5573")
+                        .param("destLng", "126.9246")
+                        .param("mobility", "INVALID_TYPE"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_MOBILITY_TYPE"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("DDAREUNGI")));
+    }
 }

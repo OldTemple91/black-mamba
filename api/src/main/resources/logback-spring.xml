@@ -21,8 +21,15 @@
                     <readMarkers>true</readMarkers>
                 </label>
                 <message>
-                    <!-- JSON 포맷: Grafana에서 파싱하기 쉽게 -->
-                    <pattern>{"ts":"%d{ISO8601}","level":"%level","logger":"%logger","thread":"%thread","traceId":"%X{traceId:-}","spanId":"%X{spanId:-}","message":"%msg","stackTrace":"%ex"}</pattern>
+                    <!--
+                         Loki 로그 한 건 = 한 줄(한 엔트리)
+                         %msg와 %ex에 개행/따옴표/백슬래시가 섞이면 JSON이 깨지거나 Grafana에서
+                         펼치지 않아도 멀티라인으로 노출된다.
+                         %replace로 제어문자를 이스케이프해 "접기/펼치기" 토글이 정상 동작하게 만든다.
+                    -->
+                    <pattern>
+                        {"ts":"%d{ISO8601}","level":"%level","logger":"%logger","thread":"%thread","traceId":"%X{traceId:-}","spanId":"%X{spanId:-}","message":"%replace(%replace(%replace(%msg){'\\\\','\\\\\\\\'}){'"','\\\\"'}){'[\r\n]+','\\\\n'}","stackTrace":"%replace(%replace(%replace(%ex){'\\\\','\\\\\\\\'}){'"','\\\\"'}){'[\r\n\t]+','\\\\n'}"}
+                    </pattern>
                 </message>
             </format>
             <batchSize>100</batchSize>
