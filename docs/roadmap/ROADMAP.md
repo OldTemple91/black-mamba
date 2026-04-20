@@ -734,6 +734,7 @@ Claude에게:
 - [x] k6 부하 테스트 5종
 - [x] **B-3 Geohash 공간 인덱스 캐시** (ODsay 히트율 46.9% → 80.4%) — [개선 기록](../improvements/2026-04-17-B3-geohash-spatial-caching.md)
 - [x] **Zipkin/JSON → OTLP/Protobuf 트레이스 전송** (OpenTelemetry 표준 준수, Protobuf 페이로드) — [개선 기록](../improvements/2026-04-17-C-otlp-protobuf-tracing.md)
+- [x] **T-4 Phase 1: Spring Boot 3.5.13 + OTLP/gRPC + Gradle 8.14.3** — [개선 기록](../improvements/2026-04-20-T4-phase1-springboot-3.5-otlp-grpc.md)
 
 ### 다음 진행 예정 (우선순위 순)
 - [ ] **C-1** EV 충전소 연동 (**발표 1순위**)
@@ -742,7 +743,7 @@ Claude에게:
 - [ ] **A-4** 날씨 인식
 - [ ] **T-2** WireMock E2E 테스트
 - [ ] **T-1** ADR 작성
-- [ ] **T-4** Spring Boot 3.3 → 3.5 업그레이드 + OTLP transport: grpc 공식 지원
+- [ ] **T-4 Phase 2**: Java 21 → Java 25 LTS 전환 (Phase 1 완료, Phase 2 대기)
 - [ ] **B-1** Event-Driven 재탐색
 - [ ] **A-1** SSE 실시간 재탐색
 - [ ] **D-1** 멀티 지역 확장

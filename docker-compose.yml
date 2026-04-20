@@ -16,8 +16,8 @@ services:
       - NAVER_CLIENT_SECRET=${NAVER_CLIENT_SECRET}
       - NAVER_SEARCH_CLIENT_ID=${NAVER_SEARCH_CLIENT_ID:-}
       - NAVER_SEARCH_CLIENT_SECRET=${NAVER_SEARCH_CLIENT_SECRET:-}
-      # Phase 3: 트레이싱 (OTLP/HTTP+Protobuf → Tempo)
-      - MANAGEMENT_OTLP_TRACING_ENDPOINT=http://tempo:4318/v1/traces
+      # Phase 3: 트레이싱 (OTLP/gRPC → Tempo)
+      - MANAGEMENT_OTLP_TRACING_ENDPOINT=http://tempo:4317
       - MANAGEMENT_TRACING_SAMPLING_PROBABILITY=1.0
     env_file:
       - .env
