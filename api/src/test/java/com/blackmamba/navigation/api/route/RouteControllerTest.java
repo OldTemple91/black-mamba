@@ -53,7 +53,7 @@ class RouteControllerTest {
         Route route = new Route("rt_001", RouteType.TRANSIT_ONLY, 45, 1250,
                 breakdown, List.of(), evaluation, 0.5, true, List.of(), new Comparison(45, 0), null, null);
 
-        when(routeOptimizationService.findRoutes(any(), any(), any(), any(), any()))
+        when(routeOptimizationService.findRoutes(any(), any(), any(), any(), any(), any()))
                 .thenReturn(Mono.just(List.of(route)));
 
         mockMvc.perform(get("/api/routes")
@@ -76,7 +76,7 @@ class RouteControllerTest {
         Route route = new Route("rt_002", RouteType.TRANSIT_ONLY, 30, 1250,
                 breakdown, List.of(), null, 0.6, true, List.of(), new Comparison(30, 0), null, null);
 
-        when(routeOptimizationService.findRoutes(any(), any(), any(), any(), any()))
+        when(routeOptimizationService.findRoutes(any(), any(), any(), any(), any(), any()))
                 .thenReturn(Mono.just(List.of(route)));
 
         mockMvc.perform(get("/api/routes")
@@ -94,7 +94,7 @@ class RouteControllerTest {
         Route route = new Route("rt_opt", RouteType.MOBILITY_ONLY, 20, 0,
                 breakdown, List.of(), null, 0.9, true, List.of(), null, null, null);
 
-        when(routeOptimizationService.findRoutes(any(), any(), any(), eq(SearchMode.OPTIMAL), eq(RecommendationPreference.RELIABILITY)))
+        when(routeOptimizationService.findRoutes(any(), any(), any(), eq(SearchMode.OPTIMAL), eq(RecommendationPreference.RELIABILITY), any()))
                 .thenReturn(Mono.just(List.of(route)));
 
         mockMvc.perform(get("/api/routes")
@@ -113,7 +113,7 @@ class RouteControllerTest {
         Route route = new Route("rt_pref", RouteType.TRANSIT_WITH_BIKE, 18, 1000,
                 breakdown, List.of(), null, 0.91, true, List.of(), null, null, null);
 
-        when(routeOptimizationService.findRoutes(any(), any(), any(), eq(SearchMode.OPTIMAL), eq(RecommendationPreference.TIME_PRIORITY)))
+        when(routeOptimizationService.findRoutes(any(), any(), any(), eq(SearchMode.OPTIMAL), eq(RecommendationPreference.TIME_PRIORITY), any()))
                 .thenReturn(Mono.just(List.of(route)));
 
         mockMvc.perform(get("/api/routes")

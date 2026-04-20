@@ -25,25 +25,37 @@ public class RouteOptimizationService {
     private final HubSelector hubSelector;
     private final RouteEvaluator routeEvaluator;
     private final CarReferenceCalculator carReferenceCalculator;
+    private final AccessibilityPostProcessor accessibilityPostProcessor;
 
     public RouteOptimizationService(TransitRoutePort transitRoutePort,
                                      MobilityTimePort mobilityTimePort,
                                      MobilityAvailabilityPort mobilityAvailabilityPort,
                                      HubSelector hubSelector,
                                      RouteEvaluator routeEvaluator,
-                                     CarReferenceCalculator carReferenceCalculator) {
+                                     CarReferenceCalculator carReferenceCalculator,
+                                     AccessibilityPostProcessor accessibilityPostProcessor) {
         this.transitRoutePort = transitRoutePort;
         this.mobilityTimePort = mobilityTimePort;
         this.mobilityAvailabilityPort = mobilityAvailabilityPort;
         this.hubSelector = hubSelector;
         this.routeEvaluator = routeEvaluator;
         this.carReferenceCalculator = carReferenceCalculator;
+        this.accessibilityPostProcessor = accessibilityPostProcessor;
     }
 
     public Mono<List<Route>> findRoutes(Location origin, Location destination,
                                          List<MobilityType> mobilityTypes,
                                          SearchMode searchMode) {
-        return findRoutes(origin, destination, mobilityTypes, searchMode, RecommendationPreference.RELIABILITY);
+        return findRoutes(origin, destination, mobilityTypes, searchMode,
+                RecommendationPreference.RELIABILITY, AccessibilityContext.DEFAULT);
+    }
+
+    public Mono<List<Route>> findRoutes(Location origin, Location destination,
+                                        List<MobilityType> mobilityTypes,
+                                        SearchMode searchMode,
+                                        RecommendationPreference recommendationPreference) {
+        return findRoutes(origin, destination, mobilityTypes, searchMode,
+                recommendationPreference, AccessibilityContext.DEFAULT);
     }
 
     @Observed(name = "navigation.route.search",
@@ -52,7 +64,8 @@ public class RouteOptimizationService {
     public Mono<List<Route>> findRoutes(Location origin, Location destination,
                                         List<MobilityType> mobilityTypes,
                                         SearchMode searchMode,
-                                        RecommendationPreference recommendationPreference) {
+                                        RecommendationPreference recommendationPreference,
+                                        AccessibilityContext accessibilityContext) {
         RouteSearchStrategy strategy = switch (searchMode) {
             case OPTIMAL -> new OptimalSearchStrategy(
                     transitRoutePort, mobilityTimePort,
@@ -62,6 +75,7 @@ public class RouteOptimizationService {
                     mobilityAvailabilityPort, hubSelector, routeEvaluator, recommendationPreference);
         };
         return strategy.search(origin, destination)
+                .map(routes -> accessibilityPostProcessor.apply(routes, accessibilityContext))
                 .map(routes -> attachCarComparison(routes, origin, destination));
     }
 
