@@ -79,6 +79,7 @@ YYYY-MM-DD-<카테고리>-<제목>.md
 | 1 | 2026-04-17 | B-3 | [Geohash 공간 인덱스 캐시](./2026-04-17-B3-geohash-spatial-caching.md) | ODsay 히트율 **46.9% → 80.4%** (1.71배) |
 | 2 | 2026-04-17 | OTel | [Zipkin/JSON → OTLP/Protobuf 트레이스 전송](./2026-04-17-C-otlp-protobuf-tracing.md) | OpenTelemetry 표준 준수 + Protobuf 직렬화 전환 |
 | 3 | 2026-04-20 | T-4 Phase 1 | [Spring Boot 3.5.13 + OTLP/gRPC 완전 전환](./2026-04-20-T4-phase1-springboot-3.5-otlp-grpc.md) | OSS 지원 유지 + gRPC transport 공식 활성화 + Gradle 8.14 |
+| 4 | 2026-04-20 | F-1 | [vs 자가용 비교 응답 (MaaS 정체성 전환)](./2026-04-20-F1-vs-car-comparison.md) | 경로별 시간/비용/탄소 3축 자가용 비교 + narrative 생성 |
 
 ---
 

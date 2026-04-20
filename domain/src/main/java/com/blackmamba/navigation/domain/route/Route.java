@@ -18,7 +18,8 @@ public record Route(
         boolean recommended,
         List<Leg> legs,
         Comparison comparison,
-        RouteInsights insights
+        RouteInsights insights,
+        RouteComparison carComparison       // F-1: 자가용 대비 비교 (nullable)
 ) {
     // compact constructor: 모든 생성 경로에서 불변 컬렉션 강제
     public Route {
@@ -32,28 +33,32 @@ public record Route(
         RouteCostBreakdown costBreakdown = RouteCostEstimator.estimate(normalizedLegs);
         return new Route(
                 UUID.randomUUID().toString(),
-                type, total, costBreakdown.totalWon(), costBreakdown, List.of(), null, 0.0, false, normalizedLegs, null, null
+                type, total, costBreakdown.totalWon(), costBreakdown, List.of(), null, 0.0, false, normalizedLegs, null, null, null
         );
     }
 
     public Route withComparison(Comparison comparison) {
-        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights);
+        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights, carComparison);
     }
 
     public Route withScore(double score, boolean recommended) {
-        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights);
+        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights, carComparison);
     }
 
     public Route withInsights(RouteInsights insights) {
-        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights);
+        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights, carComparison);
     }
 
     public Route withEvaluation(RouteEvaluation evaluation) {
-        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights);
+        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights, carComparison);
     }
 
     public Route withSelectedHubs(List<RouteHub> selectedHubs) {
-        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights);
+        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights, carComparison);
+    }
+
+    public Route withCarComparison(RouteComparison carComparison) {
+        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights, carComparison);
     }
 
     private static List<Leg> normalizeLegs(List<Leg> legs) {

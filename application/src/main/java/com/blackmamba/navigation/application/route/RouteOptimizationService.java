@@ -24,17 +24,20 @@ public class RouteOptimizationService {
     private final MobilityAvailabilityPort mobilityAvailabilityPort;
     private final HubSelector hubSelector;
     private final RouteEvaluator routeEvaluator;
+    private final CarReferenceCalculator carReferenceCalculator;
 
     public RouteOptimizationService(TransitRoutePort transitRoutePort,
                                      MobilityTimePort mobilityTimePort,
                                      MobilityAvailabilityPort mobilityAvailabilityPort,
                                      HubSelector hubSelector,
-                                     RouteEvaluator routeEvaluator) {
+                                     RouteEvaluator routeEvaluator,
+                                     CarReferenceCalculator carReferenceCalculator) {
         this.transitRoutePort = transitRoutePort;
         this.mobilityTimePort = mobilityTimePort;
         this.mobilityAvailabilityPort = mobilityAvailabilityPort;
         this.hubSelector = hubSelector;
         this.routeEvaluator = routeEvaluator;
+        this.carReferenceCalculator = carReferenceCalculator;
     }
 
     public Mono<List<Route>> findRoutes(Location origin, Location destination,
@@ -58,6 +61,18 @@ public class RouteOptimizationService {
                     mobilityTypes, transitRoutePort, mobilityTimePort,
                     mobilityAvailabilityPort, hubSelector, routeEvaluator, recommendationPreference);
         };
-        return strategy.search(origin, destination);
+        return strategy.search(origin, destination)
+                .map(routes -> attachCarComparison(routes, origin, destination));
+    }
+
+    /**
+     * F-1: 각 경로에 "자가용 대비 비교" 정보를 첨부한다.
+     * 전략이 생성한 모든 경로에 일괄 적용해 프론트엔드가 "자가용 대체" 설득 UI를 렌더링할 수 있게 한다.
+     */
+    private List<Route> attachCarComparison(List<Route> routes, Location origin, Location destination) {
+        return routes.stream()
+                .map(route -> route.withCarComparison(
+                        carReferenceCalculator.compareWithRoute(route, origin, destination)))
+                .toList();
     }
 }

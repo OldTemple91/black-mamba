@@ -29,6 +29,8 @@ class RouteOptimizationServiceTest {
     @Mock MobilityAvailabilityPort mobilityAvailabilityPort;
     @Mock HubSelector hubSelector;
     @Mock RouteEvaluator routeEvaluator;
+    // F-1: CarReferenceCalculator는 순수 계산 컴포넌트 → 실제 인스턴스 주입
+    @org.mockito.Spy CarReferenceCalculator carReferenceCalculator = new CarReferenceCalculator();
 
     @InjectMocks RouteOptimizationService service;
 

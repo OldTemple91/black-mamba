@@ -215,7 +215,7 @@ class RouteScoreCalculatorTest {
         }
         Route route = new Route("id", RouteType.TRANSIT_ONLY, 120, 8000,
                 new RouteCostBreakdown(List.of(new CostComponent("대중교통", 8000)), 8000),
-                List.of(), null, 0, false, legs, null, null);
+                List.of(), null, 0, false, legs, null, null, null);
 
         RouteEvaluation evaluation = calculator.evaluate(route);
 
@@ -276,7 +276,7 @@ class RouteScoreCalculatorTest {
                 new RouteCostBreakdown(List.of(new CostComponent("대중교통", 0)), 0),
                 List.of(), null, 0, false,
                 List.of(new Leg(LegType.TRANSIT, "BUS", 0, 0, a, b, null, null, null)),
-                null, null);
+                null, null, null);
 
         double score = calculator.calculate(zeroRoute);
 
@@ -326,6 +326,6 @@ class RouteScoreCalculatorTest {
         }
         return new Route("id", RouteType.TRANSIT_ONLY, minutes, cost,
                 new RouteCostBreakdown(List.of(new CostComponent("대중교통", cost)), cost),
-                List.of(), null, 0, false, legs, null, null);
+                List.of(), null, 0, false, legs, null, null, null);
     }
 }

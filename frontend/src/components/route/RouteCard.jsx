@@ -115,6 +115,35 @@ export default function RouteCard({
         </p>
       )}
 
+      {/* F-1: 자가용 대비 비교 */}
+      {route.carComparison && (
+        <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+          <div className="flex items-center gap-2 text-[11px] font-semibold text-emerald-700">
+            <span>🚗</span>
+            <span>자가용 대비</span>
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-3 text-xs">
+            <span className={route.carComparison.timeDiffMinutes >= 0 ? 'text-slate-600' : 'text-emerald-700 font-semibold'}>
+              {route.carComparison.timeDiffMinutes >= 0 ? '+' : ''}
+              {route.carComparison.timeDiffMinutes}분
+            </span>
+            <span className={route.carComparison.costSavedWon > 0 ? 'text-emerald-700 font-semibold' : 'text-slate-600'}>
+              {route.carComparison.costSavedWon > 0 ? '-' : '+'}
+              {Math.abs(route.carComparison.costSavedWon).toLocaleString()}원
+            </span>
+            <span className="text-emerald-700 font-semibold">
+              -{route.carComparison.co2ReducedGrams >= 1000
+                  ? `${(route.carComparison.co2ReducedGrams / 1000).toFixed(1)}kg`
+                  : `${Math.round(route.carComparison.co2ReducedGrams)}g`}
+              {' CO₂'}
+            </span>
+          </div>
+          <p className="mt-1.5 text-[11px] text-emerald-800">
+            {route.carComparison.narrative}
+          </p>
+        </div>
+      )}
+
       <div className="mt-3 flex flex-wrap gap-2">
         {reasons.map(reason => (
           <span key={reason} className="text-xs px-2 py-1 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
