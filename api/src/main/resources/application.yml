@@ -41,13 +41,18 @@ springdoc:
 # RAG Phase 1: Ollama 로컬 LLM (자연어 경로 검색)
 # - 로컬: Ollama 기본 포트 11434
 # - Docker 환경: host.docker.internal:11434
-# 모델은 llama3.2:3b (M2 Pro에서 2~5초 응답, 한국어 JSON 파싱 가능)
+#
+# 모델 선택 (환경변수 OLLAMA_MODEL 로 교체 가능):
+# - llama3.2:3b   (기본, 1.9GB, 2~5초 응답, 한국어 기본 파싱 OK)
+# - qwen2.5:7b    (4.7GB, 한국어 품질 훨씬 좋음, 수식어 포함 쿼리 정확)
+# - exaone3.5:7.8b (5GB, LG AI 연구원, 한국어 특화)
+# 모델 교체: `ollama pull qwen2.5:7b && OLLAMA_MODEL=qwen2.5:7b` 후 재기동
 spring.ai:
   ollama:
     base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
     chat:
       options:
-        model: llama3.2:3b
+        model: ${OLLAMA_MODEL:llama3.2:3b}
         temperature: 0.2    # JSON 파싱용이라 결정성 높게
   # 사용 안 하는 자동 구성 기능 비활성화
   model:
