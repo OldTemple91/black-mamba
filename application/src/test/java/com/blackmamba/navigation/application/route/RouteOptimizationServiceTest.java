@@ -34,6 +34,8 @@ class RouteOptimizationServiceTest {
     // C-3: AccessibilityPostProcessor도 순수 후처리 → 실제 인스턴스
     @org.mockito.Spy AccessibilityPostProcessor accessibilityPostProcessor =
             new AccessibilityPostProcessor(new AccessibilityStationRegistry());
+    // RAG Phase 2: Recorder 는 비동기 fire-and-forget이라 mock 으로 주입 (호출 검증 불필요)
+    @Mock RouteHistoryRecorder routeHistoryRecorder;
 
     @InjectMocks RouteOptimizationService service;
 

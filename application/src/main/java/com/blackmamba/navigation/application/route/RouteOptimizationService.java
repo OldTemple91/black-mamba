@@ -26,6 +26,7 @@ public class RouteOptimizationService {
     private final RouteEvaluator routeEvaluator;
     private final CarReferenceCalculator carReferenceCalculator;
     private final AccessibilityPostProcessor accessibilityPostProcessor;
+    private final RouteHistoryRecorder routeHistoryRecorder;
 
     public RouteOptimizationService(TransitRoutePort transitRoutePort,
                                      MobilityTimePort mobilityTimePort,
@@ -33,7 +34,8 @@ public class RouteOptimizationService {
                                      HubSelector hubSelector,
                                      RouteEvaluator routeEvaluator,
                                      CarReferenceCalculator carReferenceCalculator,
-                                     AccessibilityPostProcessor accessibilityPostProcessor) {
+                                     AccessibilityPostProcessor accessibilityPostProcessor,
+                                     RouteHistoryRecorder routeHistoryRecorder) {
         this.transitRoutePort = transitRoutePort;
         this.mobilityTimePort = mobilityTimePort;
         this.mobilityAvailabilityPort = mobilityAvailabilityPort;
@@ -41,6 +43,7 @@ public class RouteOptimizationService {
         this.routeEvaluator = routeEvaluator;
         this.carReferenceCalculator = carReferenceCalculator;
         this.accessibilityPostProcessor = accessibilityPostProcessor;
+        this.routeHistoryRecorder = routeHistoryRecorder;
     }
 
     public Mono<List<Route>> findRoutes(Location origin, Location destination,
@@ -74,9 +77,14 @@ public class RouteOptimizationService {
                     mobilityTypes, transitRoutePort, mobilityTimePort,
                     mobilityAvailabilityPort, hubSelector, routeEvaluator, recommendationPreference);
         };
+        String preferenceName = recommendationPreference == null
+                ? "RELIABILITY" : recommendationPreference.name();
+
         return strategy.search(origin, destination)
                 .map(routes -> accessibilityPostProcessor.apply(routes, accessibilityContext))
-                .map(routes -> attachCarComparison(routes, origin, destination));
+                .map(routes -> attachCarComparison(routes, origin, destination))
+                // RAG Phase 2: 추천 경로를 벡터 DB 에 비동기 저장 (fire-and-forget, 본 요청에 영향 없음)
+                .doOnNext(routes -> routeHistoryRecorder.recordAsync(routes, origin, destination, preferenceName));
     }
 
     /**
