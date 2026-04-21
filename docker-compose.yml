@@ -21,8 +21,13 @@ services:
       - MANAGEMENT_TRACING_SAMPLING_PROBABILITY=1.0
       # RAG Phase 1: 호스트의 Ollama로 접근 (Mac/Windows: host.docker.internal)
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      # RAG Phase 2: Qdrant 벡터 DB (경로 이력 유사 검색)
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6334
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      - qdrant
     env_file:
       - .env
     healthcheck:
@@ -105,9 +110,28 @@ services:
     networks:
       - monitoring
 
+  # ─────────────────────────────────────────────────────
+  # RAG Phase 2: Vector DB
+  # ─────────────────────────────────────────────────────
+  # 경로 이력을 1024차원 벡터(bge-m3)로 임베딩해 저장.
+  # 사용자 자연어 쿼리를 벡터화해 코사인 유사도로 유사 경로를 검색.
+  qdrant:
+    image: qdrant/qdrant:v1.15.6
+    container_name: black-mamba-qdrant
+    ports:
+      - "6333:6333"   # REST API (대시보드: http://localhost:6333/dashboard)
+      - "6334:6334"   # gRPC API (Spring AI 가 gRPC 사용)
+    volumes:
+      - qdrant-data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    networks:
+      - monitoring
+
 volumes:
   prometheus-data:
   grafana-data:
+  qdrant-data:
 
 networks:
   monitoring:

@@ -54,9 +54,24 @@ spring.ai:
       options:
         model: ${OLLAMA_MODEL:llama3.2:3b}
         temperature: 0.2    # JSON 파싱용이라 결정성 높게
-  # 사용 안 하는 자동 구성 기능 비활성화
-  model:
-    embedding: none
+    # RAG Phase 2: 경로 이력 임베딩용 모델
+    # - bge-m3 (BAAI, 1024차원, 다국어/한국어 강함, 1.2GB)
+    # - 사용 전 `ollama pull bge-m3` 필요
+    embedding:
+      options:
+        model: ${OLLAMA_EMBEDDING_MODEL:bge-m3}
+
+  # RAG Phase 2: Qdrant Vector Store (경로 이력 저장 + 유사 검색)
+  # - gRPC 연결 (HTTP REST 보다 빠름, Spring AI 기본값)
+  # - collection 이름: navigation-route-history
+  # - initializeSchema: true → 앱 기동 시 collection 자동 생성
+  vectorstore:
+    qdrant:
+      host: ${QDRANT_HOST:localhost}
+      port: ${QDRANT_PORT:6334}
+      collection-name: navigation-route-history
+      initialize-schema: true
+      use-tls: false
 
 management:
   endpoints:

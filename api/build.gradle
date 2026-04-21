@@ -28,4 +28,9 @@ dependencies {
     // RAG Phase 1: Spring AI + Ollama — 자연어 경로 검색 인터페이스
     implementation platform('org.springframework.ai:spring-ai-bom:1.0.2')
     implementation 'org.springframework.ai:spring-ai-starter-model-ollama'
+
+    // RAG Phase 2: Qdrant Vector Store — 경로 이력 유사 검색
+    // - Ollama bge-m3(1024차원) 임베딩은 ollama starter 가 EmbeddingModel Bean 제공
+    // - Qdrant starter 가 Spring AI VectorStore 추상화를 제공 (similaritySearch/add)
+    implementation 'org.springframework.ai:spring-ai-starter-vector-store-qdrant'
 }

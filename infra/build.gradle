@@ -8,4 +8,7 @@ dependencies {
     implementation 'io.micrometer:micrometer-observation'
     // B-3: 공간 인덱스 기반 캐시 키 생성 (Geohash)
     implementation 'ch.hsr:geohash:1.4.0'
+    // RAG Phase 2: Spring AI VectorStore API (Qdrant 어댑터에서 사용)
+    implementation platform('org.springframework.ai:spring-ai-bom:1.0.2')
+    implementation 'org.springframework.ai:spring-ai-vector-store'
 }
