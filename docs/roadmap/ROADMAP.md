@@ -687,6 +687,87 @@ public Mono<List<Leg>> getTransitRoute(...) { ... }
 
 ---
 
+## RAG. 생성형 AI / 검색 ((자동차 제조사) 공고 대응)
+
+---
+
+### RAG-1. ✅ 자연어 경로 검색 (Ollama + Spring AI) — 완료
+
+> 2026-04-20 완료. [개선 기록](../improvements/2026-04-20-RAG1-nlp-route-search.md)
+
+**성과:**
+- 좌표 4개를 요구하던 개발자용 API에 **자연어 진입점** 추가 (`/api/nlp/routes?q=...`)
+- Ollama + `llama3.2:3b` 로컬 LLM으로 의도 파싱 (무료, 오프라인 데모 가능)
+- **"LLM은 의도 파싱만, 경로 계산은 결정론적"** 으로 설명 가능성·테스트 용이성 확보
+- Spring AI 추상화 덕분에 상용 API(OpenAI/Claude) 전환은 설정 1줄
+
+---
+
+### RAG-2. 🔥🔥🔥🔥 Qdrant 벡터 DB + 경로 이력 유사 검색
+
+**현재:** 경로 이력 저장/검색 없음
+**개선:** 경로 이력을 벡터로 임베딩 → 유사 경로 추천
+
+#### 시나리오
+```
+"오늘 강남역에서 회사까지 어떻게 갈까?"
+  ↓
+과거 유사 OD 경로 5건 조회 (코사인 유사도)
+  ↓
+"보통은 2호선 직행을 이용하셨고, 평균 38분 소요했습니다"
+```
+
+#### 기술
+- Qdrant (벡터 DB, Docker 1줄)
+- Spring AI VectorStore 추상화
+- 경로 특징(거리/환승/이동수단/시간대)을 임베딩으로 변환
+
+#### 파일
+- `infra/.../vector/QdrantRouteHistoryAdapter.java`
+- `application/.../rag/SimilarRouteService.java`
+- docker-compose에 qdrant 서비스 추가
+
+#### 공수
+3~4일
+
+#### 발표 포인트
+> "(자동차 제조사) 공고의 **'벡터 DB, Embedding 기반 검색 활용'** 요건을 Qdrant로 직접 구현했습니다. 경로 이력을 임베딩하고 코사인 유사도로 유사 경로를 추천합니다."
+
+---
+
+### RAG-3. 🔥🔥🔥 POI Semantic Search (pgvector + 임베딩)
+
+**현재:** 장소명 단순 매칭 (네이버 지오코딩 의존)
+**개선:** "강남역 근처 조용한 카페" 같은 의미 검색
+
+#### 기술
+- PostgreSQL + pgvector
+- Sentence Transformers로 POI 설명 임베딩
+- Spring AI EmbeddingClient
+
+#### 공수
+3~4일
+
+---
+
+### RAG-4. 🔥🔥 LLM 기반 narrative 생성 (템플릿 → LLM)
+
+**현재:** `carComparison.narrative`가 템플릿 기반
+**개선:** LLM이 경로 데이터 + 사용자 맥락으로 자연스러운 설명 생성
+
+```
+템플릿:  "자가용보다 3분 더 걸리지만 3,422원 절약"
+  ↓
+LLM:    "지금은 퇴근 시간대라 강남대로가 밀리실 텐데,
+         2호선 직행이 3분 더 걸려도 탄소 1kg 덜 배출하면서
+         편하게 앉아 가실 수 있어요."
+```
+
+#### 공수
+1~2일
+
+---
+
 ## 🎬 작업 재개 가이드
 
 ### 집에서 이어서 작업할 때
@@ -736,9 +817,14 @@ Claude에게:
 - [x] **Zipkin/JSON → OTLP/Protobuf 트레이스 전송** (OpenTelemetry 표준 준수, Protobuf 페이로드) — [개선 기록](../improvements/2026-04-17-C-otlp-protobuf-tracing.md)
 - [x] **T-4 Phase 1: Spring Boot 3.5.13 + OTLP/gRPC + Gradle 8.14.3** — [개선 기록](../improvements/2026-04-20-T4-phase1-springboot-3.5-otlp-grpc.md)
 - [x] **T-1 ADR 6건 작성** (설계 결정 근거 문서화) — [docs/adr/](../adr/)
+- [x] **F-1 vs 자가용 비교 응답 (MaaS 정체성 전환)** — [개선 기록](../improvements/2026-04-20-F1-vs-car-comparison.md)
+- [x] **C-3 Accessibility 경로 (휠체어/노인 옵션)** — [개선 기록](../improvements/2026-04-20-C3-accessibility.md)
+- [x] **RAG-1 자연어 경로 검색 (Ollama + Spring AI)** — (자동차 제조사) 공고 대응, 자연어 진입점 — [개선 기록](../improvements/2026-04-20-RAG1-nlp-route-search.md)
 
 ### 다음 진행 예정 (우선순위 순)
-- [ ] **C-1** EV 충전소 연동 (**발표 1순위**)
+- [ ] **RAG-2** Qdrant 경로 이력 + 유사 경로 검색 (벡터 DB 실전 — (자동차 제조사) 공고 매칭)
+- [ ] **RAG-3** POI Semantic Search (pgvector + 임베딩)
+- [ ] **RAG-4** LLM 기반 narrative 생성 (템플릿 → LLM)
 - [ ] **M-1** Alerting + Discord 웹훅
 - [ ] **M-4** 로그 레벨 정리
 - [ ] **A-4** 날씨 인식
@@ -749,6 +835,8 @@ Claude에게:
 - [ ] **A-1** SSE 실시간 재탐색
 - [ ] **D-1** 멀티 지역 확장
 - [ ] **T-3** Resilience4j
+
+> ⚠️ **C-1 EV 충전소 연동 보류**: MaaS(대중교통+공유모빌리티) 정체성과 결이 다른 것으로 재평가되어, 자가용 비교(F-1)/접근성(C-3)/RAG(AI) 방향으로 피봇.
 
 ---
 

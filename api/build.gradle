@@ -24,4 +24,8 @@ dependencies {
     implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
     // @Observed 어노테이션을 AOP로 처리
     implementation 'org.springframework.boot:spring-boot-starter-aop'
+
+    // RAG Phase 1: Spring AI + Ollama — 자연어 경로 검색 인터페이스
+    implementation platform('org.springframework.ai:spring-ai-bom:1.0.2')
+    implementation 'org.springframework.ai:spring-ai-starter-model-ollama'
 }

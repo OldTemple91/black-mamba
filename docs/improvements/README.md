@@ -18,7 +18,7 @@ YYYY-MM-DD-<카테고리>-<제목>.md
 
 **카테고리 약어:**
 - `A` 기능 / `B` 아키텍처 / `C` 모빌리티 / `D` 확장성
-- `E` ML·AI / `M` 모니터링 / `T` 테스트·설계
+- `E` ML·AI / `F` MaaS 정체성 / `M` 모니터링 / `RAG` 생성형 AI · 검색 / `T` 테스트·설계
 
 ---
 
@@ -81,6 +81,7 @@ YYYY-MM-DD-<카테고리>-<제목>.md
 | 3 | 2026-04-20 | T-4 Phase 1 | [Spring Boot 3.5.13 + OTLP/gRPC 완전 전환](./2026-04-20-T4-phase1-springboot-3.5-otlp-grpc.md) | OSS 지원 유지 + gRPC transport 공식 활성화 + Gradle 8.14 |
 | 4 | 2026-04-20 | F-1 | [vs 자가용 비교 응답 (MaaS 정체성 전환)](./2026-04-20-F1-vs-car-comparison.md) | 경로별 시간/비용/탄소 3축 자가용 비교 + narrative 생성 |
 | 5 | 2026-04-20 | C-3 | [Accessibility 경로 (포용성)](./2026-04-20-C3-accessibility.md) | 휠체어/노인 옵션 + Post-Process 패턴 도입 |
+| 6 | 2026-04-20 | RAG-1 | [자연어 경로 검색 (Ollama + Spring AI)](./2026-04-20-RAG1-nlp-route-search.md) | LLM 의도 파싱 + 기존 엔진 결합, 자연어 진입점 추가 |
 
 ---
 

@@ -38,6 +38,21 @@ springdoc:
     tags-sorter: alpha
     operations-sorter: method
 
+# RAG Phase 1: Ollama 로컬 LLM (자연어 경로 검색)
+# - 로컬: Ollama 기본 포트 11434
+# - Docker 환경: host.docker.internal:11434
+# 모델은 llama3.2:3b (M2 Pro에서 2~5초 응답, 한국어 JSON 파싱 가능)
+spring.ai:
+  ollama:
+    base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+    chat:
+      options:
+        model: llama3.2:3b
+        temperature: 0.2    # JSON 파싱용이라 결정성 높게
+  # 사용 안 하는 자동 구성 기능 비활성화
+  model:
+    embedding: none
+
 management:
   endpoints:
     web:

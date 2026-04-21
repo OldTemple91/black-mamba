@@ -19,6 +19,10 @@ services:
       # Phase 3: 트레이싱 (OTLP/gRPC → Tempo)
       - MANAGEMENT_OTLP_TRACING_ENDPOINT=http://tempo:4317
       - MANAGEMENT_TRACING_SAMPLING_PROBABILITY=1.0
+      # RAG Phase 1: 호스트의 Ollama로 접근 (Mac/Windows: host.docker.internal)
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - .env
     healthcheck:
