@@ -1,10 +1,30 @@
-# Hub-Based Reliability-Aware MaaS Routing Engine
+# Black Mamba — AI 기반 MaaS 라우팅 엔진
 
 [![CI](https://github.com/OldTemple91/black-mamba/actions/workflows/ci.yml/badge.svg)](https://github.com/OldTemple91/black-mamba/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-46%25-yellow)](build/reports/jacoco/aggregate/index.html)
 [![Java 21](https://img.shields.io/badge/Java-21-orange)](https://openjdk.org/projects/jdk/21/)
-[![Spring Boot 3.3](https://img.shields.io/badge/Spring%20Boot-3.3-brightgreen)](https://spring.io/projects/spring-boot)
-[![React 18](https://img.shields.io/badge/React-18-61DAFB)](https://react.dev/)
+[![Spring Boot 3.5](https://img.shields.io/badge/Spring%20Boot-3.5.13-brightgreen)](https://spring.io/projects/spring-boot)
+[![Spring AI 1.0](https://img.shields.io/badge/Spring%20AI-1.0.2-0081CB)](https://docs.spring.io/spring-ai/reference/)
+[![Resilience4j](https://img.shields.io/badge/Resilience4j-2.2-green)](https://resilience4j.readme.io/)
+[![Observability](https://img.shields.io/badge/Observability-Loki%20%7C%20Tempo%20%7C%20Prometheus-F46800)](docs/monitoring/observability-stack.md)
+
+대중교통 + 공공자전거 + 개인 이동수단 멀티모달 경로 엔진에,
+**Spring AI 기반 RAG 파이프라인 / Reactor 기반 SSE 실시간 스트림 / Resilience4j 장애 대응 / 3축 관측성(Logs↔Metrics↔Traces)** 을
+통합한 "설명 가능한 MaaS" 포트폴리오.
+
+## ⚡ 한눈에 보기
+
+| 영역 | 내용 |
+|------|------|
+| 🧠 **AI/RAG (Phase 1~6)** | 자연어 경로 검색 + Qdrant 벡터 DB + bge-m3(1024차원) 하이브리드 검색 + LLM narrative + 할루시네이션 감지 |
+| ⚡ **실시간 스트림 (A-1)** | Reactor Flux 기반 SSE — 30초 재탐색, 변화 감지 push, HEARTBEAT, 자동 종료 |
+| 🛡️ **장애 대응 (T-3)** | Resilience4j CircuitBreaker + Retry + Fallback — 외부 API 5개 3층 방어선 |
+| 🔍 **3축 관측성** | Loki(log) ↔ Tempo(trace) ↔ Prometheus(metric) + Exemplars + OTLP/gRPC |
+| 🏗️ **Clean Architecture** | Hexagonal Port/Adapter, 4-module gradle (domain/application/infra/api) |
+| 📊 **성능 튜닝** | Geohash 공간 캐싱 — ODsay 히트율 46.9% → 80.4% |
+
+👉 **[개선 기록 11건](docs/improvements/README.md)** / **[ADR 6건](docs/adr/)** / **[로드맵](docs/roadmap/ROADMAP.md)**
+
+## 🎯 원래 목적: 신뢰도 중심 MaaS 라우팅
 
 대중교통, 공공자전거, 개인 이동수단을 결합해 도착 성공 가능성이 높은 경로를 추천하는 도시형 멀티모달 라우팅 엔진입니다. 기본 `OPTIMAL` 추천은 MaaS 시나리오에 맞춰 대중교통과 공공/공유 수단 중심으로 구성하고, 개인 이동수단은 사용자가 명시적으로 선택한 경우에만 탐색합니다.
 
@@ -253,32 +273,69 @@ flowchart TD
 
 ## 11. Tech Stack
 
-### Backend
+### Backend Core
+- **Java 21** (LTS, records / sealed interface / pattern matching 활용)
+- **Spring Boot 3.5.13** + Gradle 8.14
+- **Reactor** (Mono/Flux) — WebClient + 비동기 체인
 
-- Java
-- Spring Boot
-- Gradle
-- Reactor
+### AI / RAG (Phase 1~6)
+- **Spring AI 1.0.2** (ChatClient / VectorStore 추상화)
+- **Ollama** — `llama3.2:3b` (Chat) + `bge-m3` (Embedding, 1024차원)
+- **Qdrant v1.17** — 벡터 DB (gRPC, HNSW 인덱스, Cosine 유사도)
+
+### 장애 대응 / 관측성
+- **Resilience4j 2.2** — CircuitBreaker, Retry, Reactor Operator
+- **Prometheus + Grafana 12** — Micrometer, Exemplars
+- **Loki 3.7** — loki4j 2.0, structured metadata
+- **Tempo 2.10** — OTLP/gRPC, Micrometer Tracing Bridge (OTel)
+
+### Testing
+- JUnit 5 + Mockito + AssertJ
+- **WireMock** (ODsay 클라이언트 HTTP 레벨 통합 테스트)
 
 ### Frontend
+- React + Vite + Naver Map
 
-- React
-- Vite
-- Naver Map
-
-### Infra / External
-
-- ODsay
-- TMAP
-- 서울시 따릉이 API
+### External APIs
+- ODsay (대중교통), TMAP (보행), 서울시 따릉이, 네이버 지오코딩/로컬검색
 
 ## 12. Run Locally
 
-### Backend
+### 전체 스택 (권장)
+
+```bash
+docker compose up -d     # 앱 + Qdrant + Prometheus + Grafana + Loki + Tempo
+```
+
+### Backend 단독 (개발 중)
 
 ```bash
 ./gradlew :api:bootRun
 ```
+
+### AI/RAG 기능 사용 시 사전 준비 (Ollama)
+
+```bash
+ollama pull llama3.2:3b     # 자연어 경로 파싱 + narrative (1.9GB)
+ollama pull bge-m3          # 경로 임베딩 (1.2GB)
+docker compose up -d qdrant # 벡터 DB
+```
+
+데모용 시드 200건 투입:
+```bash
+curl -X POST http://localhost:8081/api/rag/admin/seed
+```
+
+### 주요 엔드포인트
+
+| 엔드포인트 | 설명 |
+|-----------|------|
+| `GET /api/routes?originLat=...` | 1회성 경로 탐색 |
+| `GET /api/routes/stream?...` | **SSE 실시간 재탐색** (30초 주기) |
+| `GET /api/nlp/routes?q=강남에서 홍대까지` | **자연어 경로 검색** (RAG-1) |
+| `GET /api/rag/similar-routes?q=...` | **의미 유사 과거 경로** (RAG-2) |
+| `GET /actuator/circuitbreakers` | **외부 API 회로 상태** (T-3) |
+| `GET /actuator/prometheus` | 메트릭 스크레이프 |
 
 ### Frontend
 
