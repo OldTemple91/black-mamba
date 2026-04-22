@@ -33,4 +33,7 @@ dependencies {
     // - Ollama bge-m3(1024차원) 임베딩은 ollama starter 가 EmbeddingModel Bean 제공
     // - Qdrant starter 가 Spring AI VectorStore 추상화를 제공 (similaritySearch/add)
     implementation 'org.springframework.ai:spring-ai-starter-vector-store-qdrant'
+
+    // T-2: WireMock E2E — 외부 API 모킹으로 end-to-end 테스트
+    testImplementation 'org.wiremock:wiremock-standalone:3.10.0'
 }

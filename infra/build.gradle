@@ -19,4 +19,8 @@ dependencies {
     implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.2.0'
     implementation 'io.github.resilience4j:resilience4j-reactor:2.2.0'
     implementation 'org.springframework.boot:spring-boot-starter-aop'
+
+    // T-2: WireMock — 외부 API 모킹 + Resilience4j fallback E2E 검증
+    testImplementation 'org.wiremock:wiremock-standalone:3.10.0'
+    testImplementation 'io.projectreactor:reactor-test'
 }

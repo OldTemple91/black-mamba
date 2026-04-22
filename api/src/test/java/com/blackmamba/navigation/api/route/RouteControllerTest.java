@@ -1,5 +1,6 @@
 package com.blackmamba.navigation.api.route;
 
+import com.blackmamba.navigation.application.route.RouteNarrativeEnhancer;
 import com.blackmamba.navigation.application.route.RouteOptimizationService;
 import com.blackmamba.navigation.application.route.RecommendationPreference;
 import com.blackmamba.navigation.application.route.SearchMode;
@@ -20,6 +21,8 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import org.mockito.invocation.InvocationOnMock;
+import org.junit.jupiter.api.BeforeEach;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -29,6 +32,7 @@ class RouteControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockBean RouteOptimizationService routeOptimizationService;
+    @MockBean RouteNarrativeEnhancer narrativeEnhancer;  // RAG-4 추가 의존성
 
     /** Micrometer Prometheus registry가 WebMvcTest 슬라이스에 없어 SimpleMeterRegistry로 대체 주입 */
     static class MeterRegistryTestConfig {
@@ -36,6 +40,13 @@ class RouteControllerTest {
         MeterRegistry meterRegistry() {
             return new SimpleMeterRegistry();
         }
+    }
+
+    @BeforeEach
+    void setUpNarrativeEnhancer() {
+        // RAG-4 narrativeEnhancer 는 Mock — 기본적으로 입력 routes 를 그대로 반환 (pass-through)
+        when(narrativeEnhancer.enhanceRecommended(any(), any(), any(), any()))
+                .thenAnswer((InvocationOnMock inv) -> inv.getArgument(0));
     }
 
     @Test

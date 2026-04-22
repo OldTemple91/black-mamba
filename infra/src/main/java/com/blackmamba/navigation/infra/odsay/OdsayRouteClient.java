@@ -31,7 +31,6 @@ import java.util.concurrent.atomic.AtomicLong;
 @Component
 public class OdsayRouteClient {
 
-    private static final String BASE_URL = "https://api.odsay.com/v1/api";
     private static final Logger log = LoggerFactory.getLogger(OdsayRouteClient.class);
 
     private static final long RATE_INTERVAL_MS = 200L; // max 5 req/sec
@@ -59,6 +58,7 @@ public class OdsayRouteClient {
             OdsayRouteMapper mapper,
             ObjectMapper objectMapper,
             @Value("${odsay.api-key}") String apiKey,
+            @Value("${odsay.base-url:https://api.odsay.com/v1/api}") String baseUrl,
             @Value("${navigation.cache.odsay-route-ttl-ms:30000}") long routeCacheTtlMs,
             MeterRegistry meterRegistry,
             CircuitBreakerRegistry circuitBreakerRegistry,
@@ -68,7 +68,7 @@ public class OdsayRouteClient {
         this.objectMapper = objectMapper;
         this.apiKey = apiKey;
         this.routeCacheTtlMs = routeCacheTtlMs;
-        this.webClient = webClientBuilder.baseUrl(BASE_URL).build();
+        this.webClient = webClientBuilder.baseUrl(baseUrl).build();
         this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("odsay");
         this.retry = retryRegistry.retry("odsay");
         this.transitRouteErrorFallbackCounter = meterRegistry.counter(
