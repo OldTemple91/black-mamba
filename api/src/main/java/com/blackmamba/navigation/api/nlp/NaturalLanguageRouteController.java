@@ -2,6 +2,7 @@ package com.blackmamba.navigation.api.nlp;
 
 import com.blackmamba.navigation.application.route.AccessibilityContext;
 import com.blackmamba.navigation.application.route.RecommendationPreference;
+import com.blackmamba.navigation.application.route.RouteNarrativeEnhancer;
 import com.blackmamba.navigation.application.route.RouteOptimizationService;
 import com.blackmamba.navigation.application.route.SearchMode;
 import com.blackmamba.navigation.domain.location.Location;
@@ -45,15 +46,18 @@ public class NaturalLanguageRouteController {
     private final NaverGeocodingClient geocodingClient;
     private final NaverLocalSearchClient localSearchClient;
     private final RouteOptimizationService routeOptimizationService;
+    private final RouteNarrativeEnhancer narrativeEnhancer;  // RAG-4
 
     public NaturalLanguageRouteController(NlpRouteIntentParser intentParser,
                                           NaverGeocodingClient geocodingClient,
                                           NaverLocalSearchClient localSearchClient,
-                                          RouteOptimizationService routeOptimizationService) {
+                                          RouteOptimizationService routeOptimizationService,
+                                          RouteNarrativeEnhancer narrativeEnhancer) {
         this.intentParser = intentParser;
         this.geocodingClient = geocodingClient;
         this.localSearchClient = localSearchClient;
         this.routeOptimizationService = routeOptimizationService;
+        this.narrativeEnhancer = narrativeEnhancer;
     }
 
     @Operation(
@@ -114,6 +118,12 @@ public class NaturalLanguageRouteController {
         List<Route> routes = routeOptimizationService
                 .findRoutes(origin, destination, mobilityTypes, mode, preference, access)
                 .block(ROUTE_SEARCH_TIMEOUT);
+
+        // RAG-4: 추천 경로의 carComparison.narrative 를 LLM 설명으로 업그레이드
+        if (routes != null && !routes.isEmpty()) {
+            routes = narrativeEnhancer.enhanceRecommended(
+                    routes, origin, destination, preference.name());
+        }
 
         return ResponseEntity.ok(Map.of(
                 "query", query,

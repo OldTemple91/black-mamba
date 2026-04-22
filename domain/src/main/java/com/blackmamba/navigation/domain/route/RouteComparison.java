@@ -19,4 +19,8 @@ public record RouteComparison(
         double co2ReducedGrams,
         String narrative
 ) {
+    /** narrative 만 교체한 새 인스턴스. RAG Phase 4 에서 LLM 출력으로 덮어쓸 때 사용. */
+    public RouteComparison withNarrative(String newNarrative) {
+        return new RouteComparison(car, timeDiffMinutes, costSavedWon, co2ReducedGrams, newNarrative);
+    }
 }

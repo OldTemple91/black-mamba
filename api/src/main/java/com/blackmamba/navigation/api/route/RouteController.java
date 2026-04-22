@@ -1,6 +1,7 @@
 package com.blackmamba.navigation.api.route;
 
 import com.blackmamba.navigation.application.route.AccessibilityContext;
+import com.blackmamba.navigation.application.route.RouteNarrativeEnhancer;
 import com.blackmamba.navigation.application.route.RouteOptimizationService;
 import com.blackmamba.navigation.application.route.RecommendationPreference;
 import com.blackmamba.navigation.application.route.SearchMode;
@@ -31,11 +32,14 @@ public class RouteController {
     private static final double ODSAY_MIN_DISTANCE_METERS = 700.0;
     private static final Duration ROUTE_SEARCH_TIMEOUT = Duration.ofSeconds(30);
     private final RouteOptimizationService routeOptimizationService;
+    private final RouteNarrativeEnhancer narrativeEnhancer;  // RAG-4: 추천 경로 LLM narrative
     private final MeterRegistry meterRegistry;
 
     public RouteController(RouteOptimizationService routeOptimizationService,
+                           RouteNarrativeEnhancer narrativeEnhancer,
                            MeterRegistry meterRegistry) {
         this.routeOptimizationService = routeOptimizationService;
+        this.narrativeEnhancer = narrativeEnhancer;
         this.meterRegistry = meterRegistry;
     }
 
@@ -118,6 +122,13 @@ public class RouteController {
             List<Route> routes = routeOptimizationService
                     .findRoutes(origin, destination, mobilityTypes, searchMode, recommendationPreference, accessibilityContext)
                     .block(ROUTE_SEARCH_TIMEOUT);
+
+            // RAG-4: 추천 경로의 carComparison.narrative 를 LLM 설명으로 업그레이드
+            // (N개 경로 중 recommended=true 인 것만 LLM 호출 → 지연 제어)
+            if (routes != null && !routes.isEmpty()) {
+                routes = narrativeEnhancer.enhanceRecommended(
+                        routes, origin, destination, recommendationPreference.name());
+            }
 
             int count = routes != null ? routes.size() : 0;
             sample.stop(meterRegistry.timer("navigation.route.duration",

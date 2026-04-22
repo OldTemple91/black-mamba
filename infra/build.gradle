@@ -11,4 +11,6 @@ dependencies {
     // RAG Phase 2: Spring AI VectorStore API (Qdrant 어댑터에서 사용)
     implementation platform('org.springframework.ai:spring-ai-bom:1.0.2')
     implementation 'org.springframework.ai:spring-ai-vector-store'
+    // RAG Phase 4: Spring AI Chat API (OllamaNarrativeGenerator 에서 ChatClient 사용)
+    implementation 'org.springframework.ai:spring-ai-client-chat'
 }

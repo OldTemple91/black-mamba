@@ -736,21 +736,20 @@ public Mono<List<Leg>> getTransitRoute(...) { ... }
 
 ---
 
-### RAG-4. 🔥🔥 LLM 기반 narrative 생성 (템플릿 → LLM)
+### RAG-4. ✅ LLM 기반 narrative 생성 (RAG 시리즈 완결) — 완료
 
-**현재:** `carComparison.narrative`가 템플릿 기반
-**개선:** LLM이 경로 데이터 + 사용자 맥락으로 자연스러운 설명 생성
+> 2026-04-22 완료. [개선 기록](../improvements/2026-04-22-RAG4-llm-narrative.md)
 
-```
-템플릿:  "자가용보다 3분 더 걸리지만 3,422원 절약"
-  ↓
-LLM:    "지금은 퇴근 시간대라 강남대로가 밀리실 텐데,
-         2호선 직행이 3분 더 걸려도 탄소 1kg 덜 배출하면서
-         편하게 앉아 가실 수 있어요."
-```
+**성과:**
+- `/api/routes` 및 `/api/nlp/routes` 의 **추천 경로 1개** 에 자동 LLM narrative
+- **R+A+G 파이프라인 완성**: Qdrant 유사 이력 top 3 (R) + 프롬프트 주입 (A) + llama3.2:3b 생성 (G)
+- carComparison.narrative 를 통째로 덮어쓰기 (스키마 호환)
+- 다층 폴백: Optional 주입 + 15초 타임아웃 + 실패 시 원본 narrative 유지
+- @Observed 로 기존 3축 관측성에 자동 편입
 
-#### 공수
-1~2일
+**Before/After:**
+- Before: "자가용보다 3분 더 걸리지만 3,422원 절약, 탄소 998g 감소."
+- After: "이 경로는 빠른 시간 우선 추천 경로입니다. 강남역에서 홍대입구까지 지하철 직행으로 39분, 1,650원에 도달할 수 있습니다. 비슷한 과거 이력에 따르면 이 경로는 다른 경로보다도 빠르게 이동하는 경로 중 하나입니다."
 
 ---
 
@@ -807,10 +806,10 @@ Claude에게:
 - [x] **C-3 Accessibility 경로 (휠체어/노인 옵션)** — [개선 기록](../improvements/2026-04-20-C3-accessibility.md)
 - [x] **RAG-1 자연어 경로 검색 (Ollama + Spring AI)** — (자동차 제조사) 공고 대응, 자연어 진입점 — [개선 기록](../improvements/2026-04-20-RAG1-nlp-route-search.md)
 - [x] **RAG-2 Qdrant 벡터 DB + 유사 경로 검색** — bge-m3 임베딩(1024차원) + 3축 하이브리드 검색 + @Observed 관측성 통합 — [개선 기록](../improvements/2026-04-22-RAG2-qdrant-similar-routes.md)
+- [x] **RAG-4 LLM narrative 생성 (RAG 시리즈 완결)** — `/api/routes` 추천 경로에 R+A+G 파이프라인 자동 적용 — [개선 기록](../improvements/2026-04-22-RAG4-llm-narrative.md)
 
 ### 다음 진행 예정 (우선순위 순)
-- [ ] **RAG-4** LLM narrative 생성 (템플릿 → LLM) — RAG-2 를 `/api/routes` 에 통합, **RAG 시리즈 완결**
-- [ ] **RAG-3** POI Semantic Search (pgvector + 임베딩) — 장소 추천 영역 확장
+- [ ] **RAG-3** POI Semantic Search (pgvector + 임베딩) — 장소 추천 영역 확장 (선택, RAG 시리즈는 완결됨)
 - [ ] **M-1** Alerting + Discord 웹훅
 - [ ] **M-4** 로그 레벨 정리
 - [ ] **A-4** 날씨 인식
