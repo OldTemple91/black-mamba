@@ -4,4 +4,6 @@ dependencies {
     implementation 'io.projectreactor:reactor-core'
     // Phase 3: @Observed 어노테이션 사용
     implementation 'io.micrometer:micrometer-observation'
+    // RAG-6: MeterRegistry 로 RAG 운영 메트릭 노출
+    implementation 'io.micrometer:micrometer-core'
 }

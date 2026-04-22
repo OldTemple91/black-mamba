@@ -3,6 +3,7 @@ package com.blackmamba.navigation.application.route.port;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Route;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -24,9 +25,20 @@ import java.util.List;
 public interface RouteHistoryPort {
 
     /**
-     * 경로를 벡터 DB 에 upsert. 실패해도 본 요청은 성공해야 함.
+     * 경로를 벡터 DB 에 upsert (현재 시각 기준 맥락 태그 자동 부여).
+     * 실패해도 본 요청은 성공해야 함.
      */
-    void save(Route route, Location origin, Location destination, String preference);
+    default void save(Route route, Location origin, Location destination, String preference) {
+        save(route, origin, destination, preference, null);
+    }
+
+    /**
+     * 지정된 시각을 맥락 태그 기준으로 사용해 upsert.
+     * 시드 데이터를 과거 다양한 시간대로 주입할 때 사용.
+     *
+     * @param timestamp null 이면 현재 시각 사용
+     */
+    void save(Route route, Location origin, Location destination, String preference, Instant timestamp);
 
     /**
      * 유사 경로 이력 조회 (의미 + payload 필터 하이브리드).

@@ -88,14 +88,15 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
     // ─── 쓰기 ─────────────────────────────────────
 
     @Override
-    public void save(Route route, Location origin, Location destination, String preference) {
+    public void save(Route route, Location origin, Location destination, String preference, Instant timestamp) {
         if (route == null || origin == null || destination == null) {
             log.debug("[RAG] save 생략 — route/origin/destination null");
             return;
         }
 
         try {
-            String description = RouteHistoryDescriber.describe(route, origin, destination, preference);
+            Instant when = (timestamp != null) ? timestamp : Instant.now();
+            String description = RouteHistoryDescriber.describeAt(route, origin, destination, preference, when);
             String originGeohash = GeohashKeyGenerator.of(origin);
             String destGeohash = GeohashKeyGenerator.of(destination);
             List<MobilityType> mobilityTypes = RouteHistoryDescriber.extractMobilityTypes(route.legs());
@@ -123,7 +124,7 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
             metadata.put(META_TOTAL_MINUTES, route.totalMinutes());
             metadata.put(META_TOTAL_COST, route.totalCostWon());
             metadata.put(META_PREFERENCE, preference == null ? "RELIABILITY" : preference);
-            metadata.put(META_CREATED_AT, Instant.now().getEpochSecond());
+            metadata.put(META_CREATED_AT, when.getEpochSecond());
 
             Document document = new Document(route.routeId(), description, metadata);
             vectorStore.add(List.of(document));

@@ -4,6 +4,8 @@ import com.blackmamba.navigation.application.route.port.RouteHistoryPort;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.LegType;
 import com.blackmamba.navigation.domain.route.Route;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -52,6 +54,9 @@ public class RouteHistoryRecorder {
     private static final int MIN_TOTAL_COST_WON = 0;
 
     private final RouteHistoryPort routeHistoryPort; // null 가능 (Qdrant 빈 부재 시)
+    private final Counter savedCounter;
+    private final Counter qualityGateRejectedCounter;
+    private final Counter duplicateSkippedCounter;
 
     /**
      * (OD 해시 + preference) → 최근 저장 시각.
@@ -59,12 +64,25 @@ public class RouteHistoryRecorder {
      */
     private final Map<String, Instant> recentlySaved = new ConcurrentHashMap<>();
 
-    public RouteHistoryRecorder(ObjectProvider<RouteHistoryPort> portProvider) {
+    public RouteHistoryRecorder(ObjectProvider<RouteHistoryPort> portProvider,
+                                MeterRegistry meterRegistry) {
         this.routeHistoryPort = portProvider.getIfAvailable();
+        this.savedCounter = Counter.builder("navigation.rag.history.saved")
+                .description("Qdrant 에 실제 저장된 경로 이력 건수")
+                .register(meterRegistry);
+        this.qualityGateRejectedCounter = Counter.builder("navigation.rag.history.rejected")
+                .description("품질 게이트에 걸려 제외된 경로 이력 건수")
+                .tag("reason", "quality_gate")
+                .register(meterRegistry);
+        this.duplicateSkippedCounter = Counter.builder("navigation.rag.history.rejected")
+                .description("중복 감지로 스킵된 경로 이력 건수")
+                .tag("reason", "duplicate")
+                .register(meterRegistry);
+
         if (this.routeHistoryPort == null) {
             log.info("[RAG] RouteHistoryPort 빈 없음 → 경로 이력 저장 비활성화 (Qdrant 미기동?)");
         } else {
-            log.info("[RAG] RouteHistoryPort 주입 완료 — {} (품질 게이트 + 중복 감지 활성)",
+            log.info("[RAG] RouteHistoryPort 주입 완료 — {} (품질 게이트 + 중복 감지 + 메트릭 활성)",
                     this.routeHistoryPort.getClass().getSimpleName());
         }
     }
@@ -77,31 +95,36 @@ public class RouteHistoryRecorder {
         if (routeHistoryPort == null) return;
         if (routes == null || routes.isEmpty()) return;
 
-        List<Route> toSave = routes.stream()
-                .filter(Route::recommended)
+        List<Route> recommended = routes.stream().filter(Route::recommended).toList();
+        List<Route> toSave = recommended.stream()
                 .filter(this::passesQualityGate)
                 .toList();
+
+        int rejectedByQuality = recommended.size() - toSave.size();
+        if (rejectedByQuality > 0) qualityGateRejectedCounter.increment(rejectedByQuality);
         if (toSave.isEmpty()) return;
 
         // 중복 감지 (OD + preference 키로)
         if (isRecentlySaved(origin, destination, preference)) {
             log.debug("[RAG] 중복 저장 스킵 — {} → {} [{}]", origin.name(), destination.name(), preference);
+            duplicateSkippedCounter.increment(toSave.size());
             return;
         }
 
         markSaved(origin, destination, preference);
 
+        int savingCount = toSave.size();
+        // Mono.fromRunnable 은 Mono<Void> 라 onNext 가 발생하지 않음 → doOnSuccess/doOnError 로 훅
         Mono.fromRunnable(() -> {
                     for (Route r : toSave) {
                         routeHistoryPort.save(r, origin, destination, preference);
                     }
                 })
                 .subscribeOn(Schedulers.boundedElastic())
-                .subscribe(
-                        v -> {},
-                        err -> log.warn("[RAG] 비동기 저장 실패 — {}: {}",
-                                err.getClass().getSimpleName(), err.getMessage())
-                );
+                .doOnSuccess(v -> savedCounter.increment(savingCount))
+                .doOnError(err -> log.warn("[RAG] 비동기 저장 실패 — {}: {}",
+                        err.getClass().getSimpleName(), err.getMessage()))
+                .subscribe();
     }
 
     // ─── 품질 게이트 ─────────────────────────────

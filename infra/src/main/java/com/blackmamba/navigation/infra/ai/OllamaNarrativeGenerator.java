@@ -7,6 +7,8 @@ import com.blackmamba.navigation.domain.route.MobilityType;
 import com.blackmamba.navigation.domain.route.Route;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
@@ -52,11 +54,25 @@ public class OllamaNarrativeGenerator implements NarrativeGenerator {
             """;
 
     private final ChatClient chatClient;
+    private final Counter successCounter;
+    private final Counter fallbackCounter;
+    private final Counter hallucinationCounter;
 
-    public OllamaNarrativeGenerator(ChatModel chatModel) {
+    public OllamaNarrativeGenerator(ChatModel chatModel, MeterRegistry meterRegistry) {
         this.chatClient = ChatClient.builder(chatModel)
                 .defaultSystem(SYSTEM_PROMPT)
                 .build();
+        this.successCounter = Counter.builder("navigation.rag.narrative.generated")
+                .description("LLM narrative 생성 성공 건수")
+                .register(meterRegistry);
+        this.fallbackCounter = Counter.builder("navigation.rag.narrative.fallback")
+                .description("LLM narrative 폴백(원본 유지) 건수")
+                .tag("reason", "error_or_short")
+                .register(meterRegistry);
+        this.hallucinationCounter = Counter.builder("navigation.rag.narrative.fallback")
+                .description("할루시네이션 감지로 인한 폴백 건수")
+                .tag("reason", "hallucination")
+                .register(meterRegistry);
     }
 
     @Override
@@ -79,12 +95,18 @@ public class OllamaNarrativeGenerator implements NarrativeGenerator {
             // 할루시네이션 감지: 출력 숫자가 실제 경로 수치와 크게 다르면 폴백
             String validated = validateAgainstRoute(cleaned, route);
             if (validated.isEmpty()) {
-                return "";  // 폴백 신호: 호출자가 원본 narrative 유지
+                // cleaned 가 빈 문자열이 아니라면 할루시네이션 또는 너무 짧음 → hallucinationCounter
+                // cleaned 가 빈 문자열이면 LLM 응답이 애초에 빈 것 → fallbackCounter
+                if (cleaned == null || cleaned.isBlank()) fallbackCounter.increment();
+                else hallucinationCounter.increment();
+                return "";
             }
+            successCounter.increment();
             log.debug("[RAG4] narrative 생성: \"{}\"", validated);
             return validated;
         } catch (Exception e) {
             log.warn("[RAG4] narrative 생성 실패 — 폴백(원본 유지). err={}", e.getMessage());
+            fallbackCounter.increment();
             return "";
         }
     }

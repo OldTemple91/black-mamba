@@ -7,6 +7,8 @@ import com.blackmamba.navigation.application.route.port.ScoredRouteHistoryEntry;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Route;
 import com.blackmamba.navigation.domain.route.RouteComparison;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.annotation.Observed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,11 +50,18 @@ public class RouteNarrativeEnhancer {
 
     private final NarrativeGenerator narrativeGenerator; // 없을 수 있음
     private final RouteHistoryPort routeHistoryPort;      // 없을 수 있음
+    private final DistributionSummary similarHitSummary;
 
     public RouteNarrativeEnhancer(ObjectProvider<NarrativeGenerator> generatorProvider,
-                                  ObjectProvider<RouteHistoryPort> historyProvider) {
+                                  ObjectProvider<RouteHistoryPort> historyProvider,
+                                  MeterRegistry meterRegistry) {
         this.narrativeGenerator = generatorProvider.getIfAvailable();
         this.routeHistoryPort = historyProvider.getIfAvailable();
+        this.similarHitSummary = DistributionSummary.builder("navigation.rag.narrative.similar_hit")
+                .description("narrative 생성 시 참고한 유사 이력 건수 분포")
+                .publishPercentiles(0.5, 0.95)
+                .register(meterRegistry);
+
         if (narrativeGenerator == null || routeHistoryPort == null) {
             log.info("[RAG4] 비활성화 — generator={}, historyPort={}",
                     narrativeGenerator != null, routeHistoryPort != null);
@@ -85,6 +94,7 @@ public class RouteNarrativeEnhancer {
         try {
             // Retrieval: Qdrant 에서 유사 이력 조회
             List<ScoredRouteHistoryEntry> similar = fetchSimilar(route, origin, destination, preference);
+            similarHitSummary.record(similar.size());
 
             // Augmented + Generation: LLM 호출 (boundedElastic 으로 블로킹 격리)
             String originalNarrative = route.carComparison() == null ? null : route.carComparison().narrative();
