@@ -5,6 +5,12 @@ import com.blackmamba.navigation.domain.route.Leg;
 import com.blackmamba.navigation.infra.common.GeohashKeyGenerator;
 import com.blackmamba.navigation.infra.odsay.dto.OdsayRouteResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
+import io.github.resilience4j.reactor.retry.RetryOperator;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryRegistry;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.annotation.Observed;
@@ -44,6 +50,9 @@ public class OdsayRouteClient {
     // B-3: Geohash 기반 키 → 150m 격자 내 좌표는 동일 키로 캐시 공유
     private final ConcurrentHashMap<String, CacheEntry<List<Leg>>> routeCache = new ConcurrentHashMap<>();
     private final long routeCacheTtlMs;
+    // T-3: Resilience4j — 회로 차단 + 재시도 + 최종 폴백
+    private final CircuitBreaker circuitBreaker;
+    private final Retry retry;
 
     public OdsayRouteClient(
             WebClient.Builder webClientBuilder,
@@ -51,13 +60,17 @@ public class OdsayRouteClient {
             ObjectMapper objectMapper,
             @Value("${odsay.api-key}") String apiKey,
             @Value("${navigation.cache.odsay-route-ttl-ms:30000}") long routeCacheTtlMs,
-            MeterRegistry meterRegistry
+            MeterRegistry meterRegistry,
+            CircuitBreakerRegistry circuitBreakerRegistry,
+            RetryRegistry retryRegistry
     ) {
         this.mapper = mapper;
         this.objectMapper = objectMapper;
         this.apiKey = apiKey;
         this.routeCacheTtlMs = routeCacheTtlMs;
         this.webClient = webClientBuilder.baseUrl(BASE_URL).build();
+        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("odsay");
+        this.retry = retryRegistry.retry("odsay");
         this.transitRouteErrorFallbackCounter = meterRegistry.counter(
                 "navigation.odsay.fallback.total",
                 "type", "transit_route",
@@ -174,9 +187,12 @@ public class OdsayRouteClient {
                         return Mono.just(List.<Leg>of());
                     }
                 })
+                // T-3: Retry (안쪽) + CircuitBreaker (바깥) → 최종 onErrorResume 으로 폴백
+                .transformDeferred(RetryOperator.of(retry))
+                .transformDeferred(CircuitBreakerOperator.of(circuitBreaker))
                 .onErrorResume(ex -> {
                     transitRouteErrorFallbackCounter.increment();
-                    log.warn("[ODsay] 호출 실패 → 빈 리스트 반환. 원인: {}", ex.getMessage());
+                    log.warn("[ODsay] 호출 실패(최종) → 빈 리스트 반환. 원인: {}", ex.getMessage());
                     return Mono.just(List.of());
                 }));
     }

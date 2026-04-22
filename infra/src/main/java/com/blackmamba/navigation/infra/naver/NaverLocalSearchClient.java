@@ -1,6 +1,12 @@
 package com.blackmamba.navigation.infra.naver;
 
 import com.blackmamba.navigation.infra.naver.dto.NaverLocalSearchResponse;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
+import io.github.resilience4j.reactor.retry.RetryOperator;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryRegistry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -23,11 +29,16 @@ public class NaverLocalSearchClient {
 
     private final WebClient webClient;
     private final boolean enabled;
+    // T-3: Resilience4j
+    private final CircuitBreaker circuitBreaker;
+    private final Retry retry;
 
     public NaverLocalSearchClient(
             WebClient.Builder builder,
             @Value("${naver.search.client-id:}") String clientId,
-            @Value("${naver.search.client-secret:}") String clientSecret
+            @Value("${naver.search.client-secret:}") String clientSecret,
+            CircuitBreakerRegistry circuitBreakerRegistry,
+            RetryRegistry retryRegistry
     ) {
         this.enabled = clientId != null && !clientId.isBlank();
         this.webClient = builder
@@ -35,6 +46,8 @@ public class NaverLocalSearchClient {
                 .defaultHeader("X-Naver-Client-Id", clientId != null ? clientId : "")
                 .defaultHeader("X-Naver-Client-Secret", clientSecret != null ? clientSecret : "")
                 .build();
+        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("naver-local");
+        this.retry = retryRegistry.retry("naver-local");
     }
 
     /**
@@ -78,6 +91,8 @@ public class NaverLocalSearchClient {
                             .filter(p -> p != null)
                             .toList();
                 })
+                .transformDeferred(RetryOperator.of(retry))
+                .transformDeferred(CircuitBreakerOperator.of(circuitBreaker))
                 .onErrorReturn(List.of());
     }
 

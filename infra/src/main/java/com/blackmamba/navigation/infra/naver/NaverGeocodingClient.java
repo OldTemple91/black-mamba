@@ -1,6 +1,12 @@
 package com.blackmamba.navigation.infra.naver;
 
 import com.blackmamba.navigation.infra.naver.dto.NaverGeocodingResponse;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
+import io.github.resilience4j.reactor.retry.RetryOperator;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryRegistry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -15,17 +21,24 @@ public class NaverGeocodingClient {
     private static final String BASE_URL = "https://naveropenapi.apigw.ntruss.com";
 
     private final WebClient webClient;
+    // T-3: Resilience4j
+    private final CircuitBreaker circuitBreaker;
+    private final Retry retry;
 
     public NaverGeocodingClient(
             WebClient.Builder builder,
             @Value("${naver.client-id}") String clientId,
-            @Value("${naver.client-secret}") String clientSecret
+            @Value("${naver.client-secret}") String clientSecret,
+            CircuitBreakerRegistry circuitBreakerRegistry,
+            RetryRegistry retryRegistry
     ) {
         this.webClient = builder
                 .baseUrl(BASE_URL)
                 .defaultHeader("X-NCP-APIGW-API-KEY-ID", clientId)
                 .defaultHeader("X-NCP-APIGW-API-KEY", clientSecret)
                 .build();
+        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("naver-geocoding");
+        this.retry = retryRegistry.retry("naver-geocoding");
     }
 
     /**
@@ -56,6 +69,8 @@ public class NaverGeocodingClient {
                     var addr = response.addresses().get(0);
                     return Optional.of(new double[]{addr.lat(), addr.lng()});
                 })
+                .transformDeferred(RetryOperator.of(retry))
+                .transformDeferred(CircuitBreakerOperator.of(circuitBreaker))
                 .onErrorReturn(Optional.empty());
     }
 
@@ -88,6 +103,8 @@ public class NaverGeocodingClient {
                             })
                             .toList();
                 })
+                .transformDeferred(RetryOperator.of(retry))
+                .transformDeferred(CircuitBreakerOperator.of(circuitBreaker))
                 .onErrorReturn(List.of());
     }
 

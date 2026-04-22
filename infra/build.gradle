@@ -13,4 +13,10 @@ dependencies {
     implementation 'org.springframework.ai:spring-ai-vector-store'
     // RAG Phase 4: Spring AI Chat API (OllamaNarrativeGenerator 에서 ChatClient 사용)
     implementation 'org.springframework.ai:spring-ai-client-chat'
+
+    // T-3: Resilience4j — 외부 API 장애 대응 (CircuitBreaker / Retry / Bulkhead)
+    // Reactor 모듈은 Mono/Flux 리턴 타입에 operator 를 자동 연결
+    implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.2.0'
+    implementation 'io.github.resilience4j:resilience4j-reactor:2.2.0'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
 }

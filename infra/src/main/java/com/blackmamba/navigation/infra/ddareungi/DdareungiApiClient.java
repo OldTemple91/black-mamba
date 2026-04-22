@@ -2,6 +2,12 @@ package com.blackmamba.navigation.infra.ddareungi;
 
 import com.blackmamba.navigation.infra.ddareungi.dto.DdareungiStation;
 import com.blackmamba.navigation.infra.ddareungi.dto.DdareungiStationResponse;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
+import io.github.resilience4j.reactor.retry.RetryOperator;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryRegistry;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.annotation.Observed;
@@ -41,6 +47,9 @@ public class DdareungiApiClient {
     private final long snapshotCacheTtlMs;
     private final long requestTimeoutMs;
     private final long refreshBackoffMs;
+    // T-3: Resilience4j
+    private final CircuitBreaker circuitBreaker;
+    private final Retry retry;
 
     public DdareungiApiClient(
             WebClient.Builder webClientBuilder,
@@ -48,12 +57,16 @@ public class DdareungiApiClient {
             @Value("${navigation.cache.ddareungi-snapshot-ttl-ms:30000}") long snapshotCacheTtlMs,
             @Value("${navigation.ddareungi.request-timeout-ms:5000}") long requestTimeoutMs,
             @Value("${navigation.ddareungi.refresh-backoff-ms:30000}") long refreshBackoffMs,
-            MeterRegistry meterRegistry
+            MeterRegistry meterRegistry,
+            CircuitBreakerRegistry circuitBreakerRegistry,
+            RetryRegistry retryRegistry
     ) {
         this.apiKey = apiKey;
         this.snapshotCacheTtlMs = snapshotCacheTtlMs;
         this.requestTimeoutMs = requestTimeoutMs;
         this.refreshBackoffMs = refreshBackoffMs;
+        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("ddareungi");
+        this.retry = retryRegistry.retry("ddareungi");
         HttpClient httpClient = HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) requestTimeoutMs)
                 .responseTimeout(Duration.ofMillis(requestTimeoutMs));
@@ -159,6 +172,9 @@ public class DdareungiApiClient {
                         snapshotMode.set("LIVE");
                         stationSnapshot.set(new SnapshotCache(Mono.just(stations).cache(), System.currentTimeMillis() + snapshotCacheTtlMs));
                     })
+                    // T-3: Retry(안쪽) + CircuitBreaker(바깥) → 최종 onErrorResume 에서 stale snapshot fallback
+                    .transformDeferred(RetryOperator.of(retry))
+                    .transformDeferred(CircuitBreakerOperator.of(circuitBreaker))
                     .onErrorResume(ex -> {
                         long blockedUntil = System.currentTimeMillis() + refreshBackoffMs;
                         refreshBlockedUntilMs.set(blockedUntil);

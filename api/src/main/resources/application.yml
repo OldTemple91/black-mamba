@@ -77,7 +77,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info,metrics,prometheus,circuitbreakers,circuitbreakerevents
   endpoint:
     health:
       show-details: always
@@ -120,3 +120,59 @@ navigation:
     mobility-availability-ttl-ms: 20000
     tmap-pedestrian-route-ttl-ms: 300000
     tmap-rate-limit-backoff-ms: 3600000
+
+# T-3: Resilience4j — 외부 API 장애 자동 대응
+# - CircuitBreaker: 실패 임계값 초과 시 회로 차단 → fallback 메서드 호출
+# - Retry: 네트워크 일시 장애 자동 재시도 (지수 백오프)
+# Prometheus 메트릭도 자동 노출되어 Grafana 에서 회로 상태 모니터링 가능.
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 10            # 최근 10회 호출을 기준으로
+        minimumNumberOfCalls: 5          # 최소 5회 호출 이후 계산 시작
+        failureRateThreshold: 50         # 실패율 50% 이상 → OPEN
+        waitDurationInOpenState: 10s     # OPEN 상태 10초 유지 후 HALF_OPEN
+        permittedNumberOfCallsInHalfOpenState: 3  # HALF_OPEN 에서 3회 시도
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        recordExceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+          - org.springframework.web.reactive.function.client.WebClientResponseException$InternalServerError
+          - org.springframework.web.reactive.function.client.WebClientResponseException$ServiceUnavailable
+          - org.springframework.web.reactive.function.client.WebClientResponseException$GatewayTimeout
+          - org.springframework.web.reactive.function.client.WebClientRequestException
+    instances:
+      odsay:
+        baseConfig: default
+      tmap:
+        baseConfig: default
+      ddareungi:
+        baseConfig: default
+      naver-geocoding:
+        baseConfig: default
+      naver-local:
+        baseConfig: default
+  retry:
+    configs:
+      default:
+        maxAttempts: 3
+        waitDuration: 300ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+          - org.springframework.web.reactive.function.client.WebClientRequestException
+    instances:
+      odsay:
+        baseConfig: default
+      tmap:
+        baseConfig: default
+      ddareungi:
+        baseConfig: default
+      naver-geocoding:
+        baseConfig: default
+      naver-local:
+        baseConfig: default

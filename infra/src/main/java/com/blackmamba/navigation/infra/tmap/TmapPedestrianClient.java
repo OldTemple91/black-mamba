@@ -3,6 +3,12 @@ package com.blackmamba.navigation.infra.tmap;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.infra.common.GeohashKeyGenerator;
 import com.blackmamba.navigation.infra.tmap.dto.TmapPedestrianResponse;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
+import io.github.resilience4j.reactor.retry.RetryOperator;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryRegistry;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.annotation.Observed;
@@ -43,18 +49,25 @@ public class TmapPedestrianClient {
     private final long routeCacheTtlMs;
     private final long quotaBackoffMs;
     private final AtomicLong quotaBlockedUntilMs = new AtomicLong(0L);
+    // T-3: Resilience4j
+    private final CircuitBreaker circuitBreaker;
+    private final Retry retry;
 
     public TmapPedestrianClient(
             WebClient.Builder webClientBuilder,
             @Value("${tmap.app-key}") String appKey,
             @Value("${navigation.cache.tmap-pedestrian-route-ttl-ms:300000}") long routeCacheTtlMs,
             @Value("${navigation.cache.tmap-rate-limit-backoff-ms:3600000}") long quotaBackoffMs,
-            MeterRegistry meterRegistry
+            MeterRegistry meterRegistry,
+            CircuitBreakerRegistry circuitBreakerRegistry,
+            RetryRegistry retryRegistry
     ) {
         this.webClient = webClientBuilder.baseUrl(BASE_URL).build();
         this.appKey = appKey;
         this.routeCacheTtlMs = routeCacheTtlMs;
         this.quotaBackoffMs = quotaBackoffMs;
+        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("tmap");
+        this.retry = retryRegistry.retry("tmap");
         this.fallbackCounter = meterRegistry.counter(
                 "navigation.tmap.fallback.total", "reason", "error");
         this.quotaFallbackCounter = meterRegistry.counter(
@@ -129,6 +142,9 @@ public class TmapPedestrianClient {
                             origin.name(), destination.name());
                     return Optional.<TmapRouteData>empty();
                 })
+                // T-3: Retry(안쪽) + CircuitBreaker(바깥). 최종 onErrorResume 으로 해버사인 fallback.
+                .transformDeferred(RetryOperator.of(retry))
+                .transformDeferred(CircuitBreakerOperator.of(circuitBreaker))
                 .onErrorResume(ex -> {
                     if (isTooManyRequests(ex)) {
                         quotaFallbackCounter.increment();
@@ -138,7 +154,7 @@ public class TmapPedestrianClient {
                         return Mono.just(Optional.empty());
                     }
                     fallbackCounter.increment();
-                    log.warn("[TMAP] 보행자 경로 조회 실패 → haversine fallback. 원인: {}", ex.getMessage());
+                    log.warn("[TMAP] 보행자 경로 조회 실패(최종) → haversine fallback. 원인: {}", ex.getMessage());
                     return Mono.just(Optional.empty());
                 });
     }
