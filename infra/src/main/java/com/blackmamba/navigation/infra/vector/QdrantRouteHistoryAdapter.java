@@ -1,5 +1,6 @@
 package com.blackmamba.navigation.infra.vector;
 
+import com.blackmamba.navigation.application.route.port.RagSearchRequest;
 import com.blackmamba.navigation.application.route.port.RouteHistoryPort;
 import com.blackmamba.navigation.application.route.port.ScoredRouteHistoryEntry;
 import com.blackmamba.navigation.domain.location.Location;
@@ -15,6 +16,7 @@ import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder.Op;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -22,18 +24,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
  * Qdrant 기반 {@link RouteHistoryPort} 구현 (RAG Phase 2).
- * <p>
- * Spring AI {@link VectorStore} 를 래핑해:
- * <ol>
- *   <li><b>save</b>: Route → 자연어 서술 → bge-m3 임베딩(1024차원) → Qdrant upsert</li>
- *   <li><b>findSimilar</b>: 쿼리 → 임베딩 → 코사인 유사도 top-K</li>
- *   <li><b>findSimilarInGeohash</b>: payload filter 조합 (격자 단위 유사 검색)</li>
- * </ol>
  *
  * <h3>Payload 스키마</h3>
  * <pre>
@@ -41,18 +35,25 @@ import java.util.stream.Collectors;
  *   "routeId": "uuid",
  *   "originGeohash": "wydm6rk",
  *   "destinationGeohash": "wydm9tq",
- *   "mobilityTypes": "DDAREUNGI,PERSONAL_EBIKE",
+ *   "mobilityTypes": "DDAREUNGI,PERSONAL_EBIKE",  // 기록용 (사람이 읽기 쉬움)
+ *   "has_DDAREUNGI": true,                        // 필터용 (EQ 조건)
+ *   "has_PERSONAL_EBIKE": true,
  *   "routeType": "MOBILITY_FIRST_TRANSIT",
  *   "totalMinutes": 36,
- *   "totalCostWon": 1650,
- *   "preference": "RELIABILITY",
- *   "createdAt": 1745193600
+ *   ...
  * }
  * </pre>
  *
+ * <h3>검색 축 3개 + 임계값</h3>
+ * <ol>
+ *   <li>의미 유사도: bge-m3 임베딩 → 코사인 유사도 (벡터)</li>
+ *   <li>공간 필터: originGeohash / destinationGeohash (payload EQ, AND)</li>
+ *   <li>이동수단 필터: has_&lt;MobilityType&gt; (payload EQ, OR)</li>
+ *   <li>품질 임계값: similarityThreshold 미만 제외 (Spring AI 자체 지원)</li>
+ * </ol>
+ *
  * <h3>장애 대응</h3>
- * save() 는 어떤 예외도 위로 던지지 않는다. 임베딩/Qdrant 장애가 경로 탐색 본 요청을
- * 막으면 안 되기 때문. 대신 경고 로그 + 메트릭(추후 M-1).
+ * save/search 공통: 예외 삼키고 warn 로그만. 본 요청 응답 흐름 보호.
  */
 @Component
 public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
@@ -69,18 +70,22 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
     static final String META_ORIGIN_LNG = "originLng";
     static final String META_DEST_LAT = "destinationLat";
     static final String META_DEST_LNG = "destinationLng";
-    static final String META_MOBILITY_TYPES = "mobilityTypes";  // comma-separated
+    static final String META_MOBILITY_TYPES = "mobilityTypes";  // comma-separated (기록용)
     static final String META_ROUTE_TYPE = "routeType";
     static final String META_TOTAL_MINUTES = "totalMinutes";
     static final String META_TOTAL_COST = "totalCostWon";
     static final String META_PREFERENCE = "preference";
-    static final String META_CREATED_AT = "createdAt";         // epoch seconds
+    static final String META_CREATED_AT = "createdAt";          // epoch seconds
+    /** 이동수단 boolean 플래그 접두사 — 필터용. ex) has_DDAREUNGI=true */
+    static final String META_MOBILITY_FLAG_PREFIX = "has_";
 
     private final VectorStore vectorStore;
 
     public QdrantRouteHistoryAdapter(VectorStore vectorStore) {
         this.vectorStore = vectorStore;
     }
+
+    // ─── 쓰기 ─────────────────────────────────────
 
     @Override
     public void save(Route route, Location origin, Location destination, String preference) {
@@ -108,6 +113,12 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
             metadata.put(META_MOBILITY_TYPES, mobilityTypes.stream()
                     .map(Enum::name)
                     .collect(Collectors.joining(",")));
+            // 각 MobilityType 마다 "Y" 문자열 플래그.
+            // "true" 같이 boolean 파싱 가능한 값은 Spring AI 가 자동으로 bool 변환해
+            // Qdrant 에 bool 타입으로 저장 → string EQ 필터가 안 먹힘. "Y" 는 절대 bool 로 변환 안 됨.
+            for (MobilityType m : mobilityTypes) {
+                metadata.put(META_MOBILITY_FLAG_PREFIX + m.name(), "Y");
+            }
             metadata.put(META_ROUTE_TYPE, route.type() == null ? "" : route.type().name());
             metadata.put(META_TOTAL_MINUTES, route.totalMinutes());
             metadata.put(META_TOTAL_COST, route.totalCostWon());
@@ -119,50 +130,27 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
             log.info("[RAG] 경로 이력 저장: routeId={} desc=\"{}\" ({}→{})",
                     route.routeId(), description, originGeohash, destGeohash);
         } catch (Exception e) {
-            // 본 요청을 막지 않는다
             log.warn("[RAG] Qdrant 저장 실패 — 본 요청에는 영향 없음. routeId={}, err={}",
                     route.routeId(), e.getMessage());
         }
     }
 
-    @Override
-    public List<ScoredRouteHistoryEntry> findSimilar(String query, int topK) {
-        return search(query, topK, null);
-    }
+    // ─── 읽기 ─────────────────────────────────────
 
     @Override
-    public List<ScoredRouteHistoryEntry> findSimilarInGeohash(String query, int topK,
-                                                               String originGeohash,
-                                                               String destinationGeohash) {
-        FilterExpressionBuilder b = new FilterExpressionBuilder();
-        boolean hasOrigin = originGeohash != null && !originGeohash.isBlank();
-        boolean hasDest = destinationGeohash != null && !destinationGeohash.isBlank();
-
-        Filter.Expression expr = null;
-        if (hasOrigin && hasDest) {
-            expr = b.and(
-                    b.eq(META_ORIGIN_GEOHASH, originGeohash),
-                    b.eq(META_DEST_GEOHASH, destinationGeohash)
-            ).build();
-        } else if (hasOrigin) {
-            expr = b.eq(META_ORIGIN_GEOHASH, originGeohash).build();
-        } else if (hasDest) {
-            expr = b.eq(META_DEST_GEOHASH, destinationGeohash).build();
-        }
-        return search(query, topK, expr);
-    }
-
-    // ─── 내부 검색 ─────────────────────────────
-
-    private List<ScoredRouteHistoryEntry> search(String query, int topK, Filter.Expression filter) {
-        if (query == null || query.isBlank()) return List.of();
+    public List<ScoredRouteHistoryEntry> search(RagSearchRequest request) {
+        if (request == null) return List.of();
         try {
-            SearchRequest.Builder requestBuilder = SearchRequest.builder()
-                    .query(query)
-                    .topK(topK);
-            if (filter != null) requestBuilder.filterExpression(filter);
+            SearchRequest.Builder builder = SearchRequest.builder()
+                    .query(request.query())
+                    .topK(request.topK());
+            if (request.similarityThreshold() > 0.0) {
+                builder.similarityThreshold(request.similarityThreshold());
+            }
+            Filter.Expression filter = buildFilter(request);
+            if (filter != null) builder.filterExpression(filter);
 
-            List<Document> results = vectorStore.similaritySearch(requestBuilder.build());
+            List<Document> results = vectorStore.similaritySearch(builder.build());
             if (results == null || results.isEmpty()) return List.of();
 
             List<ScoredRouteHistoryEntry> scored = new ArrayList<>(results.size());
@@ -177,31 +165,46 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
             }
             return scored;
         } catch (Exception e) {
-            log.warn("[RAG] Qdrant 검색 실패. query=\"{}\", err={}", query, e.getMessage());
+            log.warn("[RAG] Qdrant 검색 실패. query=\"{}\", err={}",
+                    request.query(), e.getMessage());
             return List.of();
         }
     }
 
     /**
-     * Spring AI Document 에서 유사도 점수 추출.
+     * RagSearchRequest → Qdrant payload filter expression.
      * <p>
-     * 우선순위: Document.getScore() → metadata "distance" → 0.0.
-     * Qdrant 는 distance 가 아니라 score 를 반환 (코사인 유사도는 높을수록 유사).
+     * geohash AND (mobilityFilter 중 OR). 아무 필터도 없으면 null.
      */
-    private static double extractScore(Document doc) {
-        try {
-            Double s = doc.getScore();
-            if (s != null) return s;
-        } catch (Throwable ignore) {
-            // Spring AI 버전차: getScore() 없으면 metadata 폴백
+    private Filter.Expression buildFilter(RagSearchRequest request) {
+        FilterExpressionBuilder b = new FilterExpressionBuilder();
+        List<Op> parts = new ArrayList<>();
+
+        if (request.hasOriginGeohash()) {
+            parts.add(b.eq(META_ORIGIN_GEOHASH, request.originGeohash()));
         }
-        Object dist = doc.getMetadata().get("distance");
-        if (dist instanceof Number n) {
-            // distance 기반이라면 (1 - distance) 로 유사도 환산 (cosine distance 전제)
-            return 1.0 - n.doubleValue();
+        if (request.hasDestinationGeohash()) {
+            parts.add(b.eq(META_DEST_GEOHASH, request.destinationGeohash()));
         }
-        return 0.0;
+        if (request.hasMobilityFilter()) {
+            // OR of has_XXX flags
+            Op orOfMobility = null;
+            for (MobilityType m : request.mobilityFilter()) {
+                Op flag = b.eq(META_MOBILITY_FLAG_PREFIX + m.name(), "Y");
+                orOfMobility = (orOfMobility == null) ? flag : b.or(orOfMobility, flag);
+            }
+            if (orOfMobility != null) parts.add(orOfMobility);
+        }
+
+        if (parts.isEmpty()) return null;
+        Op combined = parts.get(0);
+        for (int i = 1; i < parts.size(); i++) {
+            combined = b.and(combined, parts.get(i));
+        }
+        return combined.build();
     }
+
+    // ─── Document → Entry ─────────────────────────
 
     private RouteHistoryEntry toEntry(Document doc) {
         Map<String, Object> md = doc.getMetadata();
@@ -221,7 +224,6 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
         String preference = asString(md.get(META_PREFERENCE), "RELIABILITY");
         long createdEpoch = asLong(md.get(META_CREATED_AT));
 
-        // doc.getText() 는 Spring AI 1.0 부터 지원 (이전엔 getContent)
         String description = safeDocumentText(doc);
 
         return new RouteHistoryEntry(
@@ -239,7 +241,25 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
                 createdEpoch > 0 ? Instant.ofEpochSecond(createdEpoch) : Instant.now());
     }
 
-    // ─── helpers ─────────────────────────────
+    /**
+     * Spring AI Document 에서 유사도 점수 추출.
+     * 우선순위: Document.getScore() → metadata "distance" → 0.0.
+     */
+    private static double extractScore(Document doc) {
+        try {
+            Double s = doc.getScore();
+            if (s != null) return s;
+        } catch (Throwable ignore) {
+            // Spring AI 버전차: getScore() 없으면 metadata 폴백
+        }
+        Object dist = doc.getMetadata().get("distance");
+        if (dist instanceof Number n) {
+            return 1.0 - n.doubleValue();
+        }
+        return 0.0;
+    }
+
+    // ─── helpers ─────────────────────────────────
 
     private static String safeName(Location loc) {
         return loc.name() == null ? "" : loc.name();
@@ -290,8 +310,4 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
         if (name == null || name.isBlank()) return null;
         try { return RouteType.valueOf(name); } catch (Exception e) { return null; }
     }
-
-    // MobilityType set import helper (used only for type checker not to warn)
-    @SuppressWarnings("unused")
-    private static final Set<?> _UNUSED = Set.of();
 }

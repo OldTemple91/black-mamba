@@ -12,47 +12,26 @@ import java.util.List;
  * <ul>
  *   <li>application/domain 은 벡터 DB/geohash 라이브러리 존재를 모름</li>
  *   <li>Entry 로의 변환 + geohash 계산 + 임베딩은 모두 adapter(infra) 내부에서 처리</li>
- *   <li>application 은 "Route 저장 요청" 만, 결과(find)만 Entry 로 받아 그대로 API 응답으로 전달</li>
+ *   <li>검색은 {@link RagSearchRequest} 파라미터 객체로 통합 — 축이 늘어나도 시그니처 불변</li>
  * </ul>
  * <p>
- * 구현체는 infra 에 있다:
+ * 구현체:
  * <ul>
  *   <li>{@code QdrantRouteHistoryAdapter} — Spring AI VectorStore 래퍼 (운영)</li>
- *   <li>{@code NoopRouteHistoryAdapter} — Qdrant 미기동 시 폴백 (local/test profile)</li>
+ *   <li>Qdrant 빈 부재 시엔 주입 자체가 없음 — {@code ObjectProvider} 로 Optional 처리</li>
  * </ul>
  */
 public interface RouteHistoryPort {
 
     /**
-     * 경로를 벡터 DB 에 upsert.
-     * <p>
-     * 구현체 내부에서 Route → {@link RouteHistoryEntry} 변환, 텍스트 서술 생성,
-     * geohash 계산, 임베딩(bge-m3), Qdrant upsert 수행.
-     * <p>
-     * 실패해도 본 요청은 성공해야 하므로 구현체는 비동기/로그 형태로 예외를 삼킬 것을 권장.
+     * 경로를 벡터 DB 에 upsert. 실패해도 본 요청은 성공해야 함.
      */
     void save(Route route, Location origin, Location destination, String preference);
 
     /**
-     * 자연어 쿼리와 유사한 과거 경로를 top-K 개 조회 (의미 유사도).
+     * 유사 경로 이력 조회 (의미 + payload 필터 하이브리드).
      *
-     * @param query 자연어 설명 (예: "강남에서 홍대까지 빠르게")
-     * @param topK  반환 개수 (보통 3~10)
-     * @return 유사도 내림차순. 각 항목에 0~1 사이의 similarityScore 포함.
+     * @return 유사도 내림차순. {@link RagSearchRequest#similarityThreshold} 미만은 제외.
      */
-    List<ScoredRouteHistoryEntry> findSimilar(String query, int topK);
-
-    /**
-     * geohash 필터를 적용한 유사 검색.
-     * "출발/도착 격자가 같은 과거 경로 중 의미적으로 유사한 것" 을 찾을 때 사용.
-     *
-     * @param query              자연어 쿼리
-     * @param topK               반환 개수
-     * @param originGeohash      출발지 geohash7 (null → 필터 안 함)
-     * @param destinationGeohash 도착지 geohash7 (null → 필터 안 함)
-     * @return 유사도 내림차순. 각 항목에 similarityScore 포함.
-     */
-    List<ScoredRouteHistoryEntry> findSimilarInGeohash(String query, int topK,
-                                                        String originGeohash,
-                                                        String destinationGeohash);
+    List<ScoredRouteHistoryEntry> search(RagSearchRequest request);
 }
