@@ -80,37 +80,20 @@ Week 2:
 
 ---
 
-### A-1. 🔥🔥🔥🔥 실시간 경로 재탐색 (SSE Streaming)
+### A-1. ✅ 실시간 경로 재탐색 (SSE Streaming) — 완료
 
-**현재:** 요청 → 응답 → 끝 (1회성)  
-**개선:** 이동 중에도 실시간 재탐색 스트림
+> 2026-04-22 완료. [개선 기록](../improvements/2026-04-22-A1-sse-route-stream.md)
 
-#### 시나리오
-```
-"강남→홍대" 검색 → 따릉이 이용 중
-    ↓
-따릉이 재고 급감 (다른 사용자 이용)
-    ↓
-대체 경로 자동 제안 (SSE push)
-    ↓
-"가까운 정류소 재고 부족 → 다음 역까지 도보로 이동 권장"
-```
+**성과:**
+- `/api/routes/stream` SSE 엔드포인트 — Reactor Flux 기반
+- 초기 응답 → 30초 재탐색 → 변화 감지 시 UPDATE push, 없으면 HEARTBEAT
+- 5분 자동 종료, 클라이언트 연결 끊김 감지 (`doOnCancel`)
+- Spring MVC 유지하며 `Flux<ServerSentEvent<T>>` 반환 (WebFlux 전환 불필요)
+- Prometheus 메트릭 3종 (active gauge, opened/event counter) + @Observed span
+- 단위 테스트 6개 + 수동 E2E 검증 완료
 
-#### 구현
-- `/api/routes/stream` SSE 엔드포인트
-- 초기 응답 후 30초 간격 재탐색
-- `Flux<ServerSentEvent<Route>>` 로 WebFlux 활용
-- 재고 변화 감지 시만 이벤트 push (변화 없으면 heartbeat만)
-
-#### 파일
-- `api/src/main/java/.../api/route/RouteStreamController.java`
-- `application/src/main/java/.../route/RouteStreamService.java`
-
-#### 공수
-2일
-
-#### 발표 포인트
-> "Reactive Programming을 활용해 실시간 경로 변경을 SSE로 스트리밍합니다. 도착 실패 방지가 핵심 가치입니다."
+**한계 (후속):**
+- 30초 폴링 기반 → **B-1 Event-Driven** 에서 즉시 push 로 확장 예정
 
 ---
 
@@ -807,19 +790,18 @@ Claude에게:
 - [x] **RAG-1 자연어 경로 검색 (Ollama + Spring AI)** — (자동차 제조사) 공고 대응, 자연어 진입점 — [개선 기록](../improvements/2026-04-20-RAG1-nlp-route-search.md)
 - [x] **RAG-2 Qdrant 벡터 DB + 유사 경로 검색** — bge-m3 임베딩(1024차원) + 3축 하이브리드 검색 + @Observed 관측성 통합 — [개선 기록](../improvements/2026-04-22-RAG2-qdrant-similar-routes.md)
 - [x] **RAG-4 LLM narrative 생성 (RAG 시리즈 완결)** — `/api/routes` 추천 경로에 R+A+G 파이프라인 자동 적용 — [개선 기록](../improvements/2026-04-22-RAG4-llm-narrative.md)
+- [x] **T-3 Resilience4j — 외부 API 5개 회로 차단 + 재시도** — Retry + CircuitBreaker + Fallback 3층 방어선
+- [x] **T-2 WireMock E2E — ODsay 클라이언트 HTTP 레벨 통합 테스트**
+- [x] **A-1 경로 탐색 실시간 SSE 스트림** — Reactor Flux 30초 재탐색 + 변화 push + HEARTBEAT — [개선 기록](../improvements/2026-04-22-A1-sse-route-stream.md)
 
 ### 다음 진행 예정 (우선순위 순)
-- [ ] **RAG-3** POI Semantic Search (pgvector + 임베딩) — 장소 추천 영역 확장 (선택, RAG 시리즈는 완결됨)
-- [ ] **M-1** Alerting + Discord 웹훅
-- [ ] **M-4** 로그 레벨 정리
-- [ ] **A-4** 날씨 인식
-- [ ] **T-2** WireMock E2E 테스트
-- [x] **T-1** ADR 작성 (6건 완료) — [docs/adr/](../adr/)
-- [ ] **T-4 Phase 2**: Java 21 → Java 25 LTS 전환 (Phase 1 완료, Phase 2 대기)
-- [ ] **B-1** Event-Driven 재탐색
-- [ ] **A-1** SSE 실시간 재탐색
+- [ ] **M-1** Alerting + Discord 웹훅 (관측성 스택 마무리)
+- [ ] **A-2** 도착 시간 신뢰도 구간
+- [ ] **A-4** 날씨 인식 경로
+- [ ] **RAG-3** POI Semantic Search (pgvector + 임베딩) — 선택
+- [ ] **B-1** Event-Driven 재탐색 (A-1 폴링 → 이벤트 기반 push)
 - [ ] **D-1** 멀티 지역 확장
-- [ ] **T-3** Resilience4j
+- [ ] **T-4 Phase 2**: Java 21 → Java 25 LTS 전환
 
 > ⚠️ **C-1 EV 충전소 연동 보류**: MaaS(대중교통+공유모빌리티) 정체성과 결이 다른 것으로 재평가되어, 자가용 비교(F-1)/접근성(C-3)/RAG(AI) 방향으로 피봇.
 

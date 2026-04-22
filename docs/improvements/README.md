@@ -86,6 +86,7 @@ YYYY-MM-DD-<카테고리>-<제목>.md
 | 8 | 2026-04-22 | RAG-4 | [LLM narrative 생성 (RAG 시리즈 완결)](./2026-04-22-RAG4-llm-narrative.md) | `/api/routes` 추천 경로에 **Retrieval + Augmented + Generation** 자동 적용, 블랙박스 추천 → 설명 가능한 MaaS |
 | 9 | 2026-04-22 | RAG-5 | [RAG 품질 보강 (데이터 게이트/서술 다양화/할루시네이션 감지)](./2026-04-22-RAG5-quality-reinforcement.md) | 3가지 방어선 추가 — **실측 중 LLM 이 40분 경로를 4분으로 지어낸 것을 자동 포착해 폴백** 동작 증명 |
 | 10 | 2026-04-22 | RAG-6 | [데이터 규모 확장 + 운영 메트릭](./2026-04-22-RAG6-data-scale-and-metrics.md) | 시드 20 → **200건** (OD×시간대×선호도 3차원), 유사도 score 0.56 → **0.72**, Prometheus 메트릭 8종 노출 |
+| 11 | 2026-04-22 | A-1 | [경로 탐색 실시간 SSE 스트림](./2026-04-22-A1-sse-route-stream.md) | Reactor Flux 기반 SSE — 30초 재탐색 + 변화 감지 push + HEARTBEAT + 자동 종료 (5m). Spring MVC 유지하며 스트리밍 |
 
 ---
 
