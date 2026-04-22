@@ -6,6 +6,10 @@ import com.blackmamba.navigation.domain.route.LegType;
 import com.blackmamba.navigation.domain.route.MobilityType;
 import com.blackmamba.navigation.domain.route.Route;
 
+import java.time.DayOfWeek;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -31,21 +35,50 @@ import java.util.Set;
  */
 public final class RouteHistoryDescriber {
 
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
     private RouteHistoryDescriber() {}
 
+    /**
+     * 기본 서술 — {@link Instant#now()} 기준 시간대/요일 태그 자동 부여.
+     */
     public static String describe(Route route, Location origin, Location destination, String preference) {
+        return describeAt(route, origin, destination, preference, Instant.now());
+    }
+
+    /**
+     * 테스트/재현성 용: 특정 시각 기준 서술.
+     * <p>
+     * 임베딩 소스에 "평일 저녁 러시" 같은 맥락 태그를 추가해
+     * 벡터 공간에서 경로 간 <b>구분력</b> 을 높인다.
+     * (기존엔 OD + 소요시간만 달라 문서가 뭉침 → score 0.5~0.6 수준 수렴)
+     */
+    public static String describeAt(Route route, Location origin, Location destination,
+                                    String preference, Instant when) {
         StringBuilder sb = new StringBuilder();
 
-        // 1. 출발/도착 (문맥의 닻)
+        // 0. 맥락 태그 (시간대 + 요일)
+        String contextTag = contextTag(when);
+        if (!contextTag.isEmpty()) {
+            sb.append(contextTag).append(", ");
+        }
+
+        // 1. 출발/도착
         sb.append(formatLocation(origin)).append("에서 ")
                 .append(formatLocation(destination)).append("까지 ");
 
-        // 2. 경로 방식 요약 (TRANSIT / MOBILITY / 조합)
+        // 2. 경로 방식 요약
         sb.append(summarizeLegs(route.legs()));
 
         // 3. 정량 요약
         sb.append(", ").append(route.totalMinutes()).append("분 ")
                 .append(String.format(Locale.ROOT, "%,d", route.totalCostWon())).append("원");
+
+        // 3-1. 도보 시간 합 (고유성 정보 — 벡터 공간 분산에 기여)
+        int walkMinutes = sumWalkMinutes(route.legs());
+        if (walkMinutes > 0) {
+            sb.append(", 도보 ").append(walkMinutes).append("분 포함");
+        }
 
         // 4. 선호도 / 추천 사유
         if (preference != null) {
@@ -67,6 +100,39 @@ public final class RouteHistoryDescriber {
             sb.append(". ").append(preferenceNarrative(preference));
         }
         return sb.toString();
+    }
+
+    // ─── 맥락 태그 ───────────────────────────────
+
+    /**
+     * 요일(평일/주말) + 시간대(아침 러시/점심/저녁 러시/심야 등) 조합.
+     * 벡터 임베딩 시 "러시아워 경로" 같은 맥락 쿼리가 매칭되도록 유도.
+     */
+    static String contextTag(Instant when) {
+        LocalDateTime ldt = LocalDateTime.ofInstant(when, KST);
+        DayOfWeek dow = ldt.getDayOfWeek();
+        int hour = ldt.getHour();
+
+        boolean isWeekend = dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY;
+        String timeBand = switch (hour) {
+            case 6, 7, 8, 9 -> "아침 러시아워";
+            case 10 -> "오전";
+            case 11, 12, 13 -> "점심";
+            case 14, 15, 16 -> "오후";
+            case 17, 18, 19, 20 -> "저녁 러시아워";
+            case 21 -> "야간";
+            case 22, 23, 0, 1, 2, 3, 4, 5 -> "심야";
+            default -> "주간";
+        };
+        return (isWeekend ? "주말 " : "평일 ") + timeBand;
+    }
+
+    private static int sumWalkMinutes(List<Leg> legs) {
+        if (legs == null) return 0;
+        return legs.stream()
+                .filter(leg -> leg.type() == LegType.WALK)
+                .mapToInt(Leg::durationMinutes)
+                .sum();
     }
 
     // ─── 세부 포맷터 ─────────────────────────────
@@ -105,7 +171,13 @@ public final class RouteHistoryDescriber {
         if (modes.isEmpty()) return "도보";
 
         String combined = String.join("+", modes);
-        String transfer = transitCount <= 1 ? " 직행" : " " + (transitCount - 1) + "회 환승";
+        // 환승 횟수 = (TRANSIT leg 수 - 1), 최소 0
+        int transfers = Math.max(0, transitCount - 1);
+        String transfer = switch (transfers) {
+            case 0 -> transitCount == 1 ? " 직행" : "";     // TRANSIT 없으면 환승 표시 생략
+            case 1 -> " 1회 환승";
+            default -> " " + transfers + "회 환승";
+        };
         return combined + transfer;
     }
 

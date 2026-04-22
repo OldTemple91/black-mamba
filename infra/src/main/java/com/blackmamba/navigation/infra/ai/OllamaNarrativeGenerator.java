@@ -12,6 +12,8 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
 
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -74,12 +76,75 @@ public class OllamaNarrativeGenerator implements NarrativeGenerator {
                     .call()
                     .content();
             String cleaned = cleanOutput(raw);
-            log.debug("[RAG4] narrative 생성: \"{}\"", cleaned);
-            return cleaned;
+            // 할루시네이션 감지: 출력 숫자가 실제 경로 수치와 크게 다르면 폴백
+            String validated = validateAgainstRoute(cleaned, route);
+            if (validated.isEmpty()) {
+                return "";  // 폴백 신호: 호출자가 원본 narrative 유지
+            }
+            log.debug("[RAG4] narrative 생성: \"{}\"", validated);
+            return validated;
         } catch (Exception e) {
             log.warn("[RAG4] narrative 생성 실패 — 폴백(원본 유지). err={}", e.getMessage());
             return "";
         }
+    }
+
+    // ─── 할루시네이션 감지 ──────────────────────────
+
+    /** 분 수치 차이 허용 — 5분 초과 시 할루시네이션으로 간주 */
+    private static final int ALLOWED_MINUTES_DELTA = 5;
+    /** 원 수치 차이 허용 — 1,000원 초과 시 할루시네이션으로 간주 */
+    private static final int ALLOWED_COST_DELTA = 1_000;
+    /** 품질 하한 — 50자 미만은 정보성 부족으로 폴백 */
+    private static final int MIN_NARRATIVE_LENGTH = 50;
+
+    private static final Pattern MINUTES_PATTERN = Pattern.compile("(\\d+)\\s*분");
+    // "1,650원" / "1650원" 둘 다 매칭
+    private static final Pattern WON_PATTERN = Pattern.compile("([\\d,]+)\\s*원");
+
+    /**
+     * LLM 출력에 포함된 숫자가 실제 경로 수치와 큰 차이가 있으면 빈 문자열 반환(폴백).
+     * <p>
+     * 예: 경로가 39분인데 LLM 이 "약 45분" 이라 썼다면 5분 초과 차이 → 할루시네이션으로 간주.
+     * 길이가 50자 미만이면 정보성 부족으로 동일 폴백.
+     */
+    static String validateAgainstRoute(String narrative, Route route) {
+        if (narrative == null || narrative.isBlank()) return "";
+        if (narrative.length() < MIN_NARRATIVE_LENGTH) {
+            log.debug("[RAG4] narrative 너무 짧음({}자) → 폴백", narrative.length());
+            return "";
+        }
+
+        int expectedMinutes = route.totalMinutes();
+        int expectedCost = route.totalCostWon();
+
+        // 1) 분 검증
+        Matcher mm = MINUTES_PATTERN.matcher(narrative);
+        while (mm.find()) {
+            try {
+                int minutes = Integer.parseInt(mm.group(1));
+                if (Math.abs(minutes - expectedMinutes) > ALLOWED_MINUTES_DELTA) {
+                    log.warn("[RAG4] 할루시네이션 감지 (분): 출력 {}분 vs 실제 {}분 → 폴백",
+                            minutes, expectedMinutes);
+                    return "";
+                }
+            } catch (NumberFormatException ignored) {}
+        }
+
+        // 2) 비용(원) 검증
+        Matcher wm = WON_PATTERN.matcher(narrative);
+        while (wm.find()) {
+            try {
+                int won = Integer.parseInt(wm.group(1).replace(",", ""));
+                if (Math.abs(won - expectedCost) > ALLOWED_COST_DELTA) {
+                    log.warn("[RAG4] 할루시네이션 감지 (원): 출력 {}원 vs 실제 {}원 → 폴백",
+                            won, expectedCost);
+                    return "";
+                }
+            } catch (NumberFormatException ignored) {}
+        }
+
+        return narrative;
     }
 
     // ─── 프롬프트 작성 ─────────────────────────────

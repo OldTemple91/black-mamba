@@ -84,6 +84,7 @@ YYYY-MM-DD-<카테고리>-<제목>.md
 | 6 | 2026-04-20 | RAG-1 | [자연어 경로 검색 (Ollama + Spring AI)](./2026-04-20-RAG1-nlp-route-search.md) | LLM 의도 파싱 + 기존 엔진 결합, 자연어 진입점 추가 |
 | 7 | 2026-04-22 | RAG-2 | [Qdrant 벡터 DB + 유사 경로 검색](./2026-04-22-RAG2-qdrant-similar-routes.md) | bge-m3 임베딩(1024차원) + 의미/공간/이동수단 **3축 하이브리드 검색** + @Observed 관측성 통합 |
 | 8 | 2026-04-22 | RAG-4 | [LLM narrative 생성 (RAG 시리즈 완결)](./2026-04-22-RAG4-llm-narrative.md) | `/api/routes` 추천 경로에 **Retrieval + Augmented + Generation** 자동 적용, 블랙박스 추천 → 설명 가능한 MaaS |
+| 9 | 2026-04-22 | RAG-5 | [RAG 품질 보강 (데이터 게이트/서술 다양화/할루시네이션 감지)](./2026-04-22-RAG5-quality-reinforcement.md) | 3가지 방어선 추가 — **실측 중 LLM 이 40분 경로를 4분으로 지어낸 것을 자동 포착해 폴백** 동작 증명 |
 
 ---
 
