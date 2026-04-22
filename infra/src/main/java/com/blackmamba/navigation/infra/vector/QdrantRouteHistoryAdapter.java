@@ -1,6 +1,7 @@
 package com.blackmamba.navigation.infra.vector;
 
 import com.blackmamba.navigation.application.route.port.RouteHistoryPort;
+import com.blackmamba.navigation.application.route.port.ScoredRouteHistoryEntry;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.MobilityType;
 import com.blackmamba.navigation.domain.route.Route;
@@ -125,14 +126,14 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
     }
 
     @Override
-    public List<RouteHistoryEntry> findSimilar(String query, int topK) {
+    public List<ScoredRouteHistoryEntry> findSimilar(String query, int topK) {
         return search(query, topK, null);
     }
 
     @Override
-    public List<RouteHistoryEntry> findSimilarInGeohash(String query, int topK,
-                                                        String originGeohash,
-                                                        String destinationGeohash) {
+    public List<ScoredRouteHistoryEntry> findSimilarInGeohash(String query, int topK,
+                                                               String originGeohash,
+                                                               String destinationGeohash) {
         FilterExpressionBuilder b = new FilterExpressionBuilder();
         boolean hasOrigin = originGeohash != null && !originGeohash.isBlank();
         boolean hasDest = destinationGeohash != null && !destinationGeohash.isBlank();
@@ -153,7 +154,7 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
 
     // ─── 내부 검색 ─────────────────────────────
 
-    private List<RouteHistoryEntry> search(String query, int topK, Filter.Expression filter) {
+    private List<ScoredRouteHistoryEntry> search(String query, int topK, Filter.Expression filter) {
         if (query == null || query.isBlank()) return List.of();
         try {
             SearchRequest.Builder requestBuilder = SearchRequest.builder()
@@ -164,19 +165,42 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
             List<Document> results = vectorStore.similaritySearch(requestBuilder.build());
             if (results == null || results.isEmpty()) return List.of();
 
-            List<RouteHistoryEntry> entries = new ArrayList<>(results.size());
+            List<ScoredRouteHistoryEntry> scored = new ArrayList<>(results.size());
             for (Document doc : results) {
                 try {
-                    entries.add(toEntry(doc));
+                    RouteHistoryEntry entry = toEntry(doc);
+                    double score = extractScore(doc);
+                    scored.add(new ScoredRouteHistoryEntry(entry, score));
                 } catch (Exception e) {
                     log.warn("[RAG] 검색 결과 파싱 실패 — 무시. id={}, err={}", doc.getId(), e.getMessage());
                 }
             }
-            return entries;
+            return scored;
         } catch (Exception e) {
             log.warn("[RAG] Qdrant 검색 실패. query=\"{}\", err={}", query, e.getMessage());
             return List.of();
         }
+    }
+
+    /**
+     * Spring AI Document 에서 유사도 점수 추출.
+     * <p>
+     * 우선순위: Document.getScore() → metadata "distance" → 0.0.
+     * Qdrant 는 distance 가 아니라 score 를 반환 (코사인 유사도는 높을수록 유사).
+     */
+    private static double extractScore(Document doc) {
+        try {
+            Double s = doc.getScore();
+            if (s != null) return s;
+        } catch (Throwable ignore) {
+            // Spring AI 버전차: getScore() 없으면 metadata 폴백
+        }
+        Object dist = doc.getMetadata().get("distance");
+        if (dist instanceof Number n) {
+            // distance 기반이라면 (1 - distance) 로 유사도 환산 (cosine distance 전제)
+            return 1.0 - n.doubleValue();
+        }
+        return 0.0;
     }
 
     private RouteHistoryEntry toEntry(Document doc) {

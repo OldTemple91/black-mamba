@@ -2,7 +2,6 @@ package com.blackmamba.navigation.application.route.port;
 
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Route;
-import com.blackmamba.navigation.domain.route.RouteHistoryEntry;
 
 import java.util.List;
 
@@ -39,9 +38,9 @@ public interface RouteHistoryPort {
      *
      * @param query 자연어 설명 (예: "강남에서 홍대까지 빠르게")
      * @param topK  반환 개수 (보통 3~10)
-     * @return 유사도 내림차순
+     * @return 유사도 내림차순. 각 항목에 0~1 사이의 similarityScore 포함.
      */
-    List<RouteHistoryEntry> findSimilar(String query, int topK);
+    List<ScoredRouteHistoryEntry> findSimilar(String query, int topK);
 
     /**
      * geohash 필터를 적용한 유사 검색.
@@ -51,8 +50,9 @@ public interface RouteHistoryPort {
      * @param topK               반환 개수
      * @param originGeohash      출발지 geohash7 (null → 필터 안 함)
      * @param destinationGeohash 도착지 geohash7 (null → 필터 안 함)
+     * @return 유사도 내림차순. 각 항목에 similarityScore 포함.
      */
-    List<RouteHistoryEntry> findSimilarInGeohash(String query, int topK,
-                                                  String originGeohash,
-                                                  String destinationGeohash);
+    List<ScoredRouteHistoryEntry> findSimilarInGeohash(String query, int topK,
+                                                        String originGeohash,
+                                                        String destinationGeohash);
 }
