@@ -82,6 +82,7 @@ YYYY-MM-DD-<카테고리>-<제목>.md
 | 4 | 2026-04-20 | F-1 | [vs 자가용 비교 응답 (MaaS 정체성 전환)](./2026-04-20-F1-vs-car-comparison.md) | 경로별 시간/비용/탄소 3축 자가용 비교 + narrative 생성 |
 | 5 | 2026-04-20 | C-3 | [Accessibility 경로 (포용성)](./2026-04-20-C3-accessibility.md) | 휠체어/노인 옵션 + Post-Process 패턴 도입 |
 | 6 | 2026-04-20 | RAG-1 | [자연어 경로 검색 (Ollama + Spring AI)](./2026-04-20-RAG1-nlp-route-search.md) | LLM 의도 파싱 + 기존 엔진 결합, 자연어 진입점 추가 |
+| 7 | 2026-04-22 | RAG-2 | [Qdrant 벡터 DB + 유사 경로 검색](./2026-04-22-RAG2-qdrant-similar-routes.md) | bge-m3 임베딩(1024차원) + 의미/공간/이동수단 **3축 하이브리드 검색** + @Observed 관측성 통합 |
 
 ---
 

@@ -703,35 +703,21 @@ public Mono<List<Leg>> getTransitRoute(...) { ... }
 
 ---
 
-### RAG-2. 🔥🔥🔥🔥 Qdrant 벡터 DB + 경로 이력 유사 검색
+### RAG-2. ✅ Qdrant 벡터 DB + 경로 이력 유사 검색 — 완료
 
-**현재:** 경로 이력 저장/검색 없음
-**개선:** 경로 이력을 벡터로 임베딩 → 유사 경로 추천
+> 2026-04-22 완료. [개선 기록](../improvements/2026-04-22-RAG2-qdrant-similar-routes.md)
 
-#### 시나리오
-```
-"오늘 강남역에서 회사까지 어떻게 갈까?"
-  ↓
-과거 유사 OD 경로 5건 조회 (코사인 유사도)
-  ↓
-"보통은 2호선 직행을 이용하셨고, 평균 38분 소요했습니다"
-```
+**성과:**
+- 경로 탐색 결과를 **bge-m3(1024차원) 임베딩** 으로 비동기 누적 저장 (Qdrant)
+- **3축 하이브리드 검색** 완성: 의미(벡터) + 공간(geohash AND) + 이동수단(payload OR)
+- `similarityThreshold` 로 무관 쿼리 정직한 빈 응답
+- `@Observed` 로 기존 3축 관측성(Loki/Tempo/Prometheus) 에 자동 편입
+- Hexagonal Port 로 Qdrant → Milvus/pgvector 교체 가능
 
-#### 기술
-- Qdrant (벡터 DB, Docker 1줄)
-- Spring AI VectorStore 추상화
-- 경로 특징(거리/환승/이동수단/시간대)을 임베딩으로 변환
-
-#### 파일
-- `infra/.../vector/QdrantRouteHistoryAdapter.java`
-- `application/.../rag/SimilarRouteService.java`
-- docker-compose에 qdrant 서비스 추가
-
-#### 공수
-3~4일
-
-#### 발표 포인트
-> "(자동차 제조사) 공고의 **'벡터 DB, Embedding 기반 검색 활용'** 요건을 Qdrant로 직접 구현했습니다. 경로 이력을 임베딩하고 코사인 유사도로 유사 경로를 추천합니다."
+**한계 (RAG-4 에서 해결):**
+- 현재는 독립 엔드포인트 (`/api/rag/similar-routes`) — Retrieval 검증 용도
+- 실제 제품 가치는 `/api/routes` 응답에 narrative 로 통합돼야 발현
+  → Phase 4 에서 LLM 으로 "비슷한 구간 N건" 근거 설명 자동 생성
 
 ---
 
@@ -820,11 +806,11 @@ Claude에게:
 - [x] **F-1 vs 자가용 비교 응답 (MaaS 정체성 전환)** — [개선 기록](../improvements/2026-04-20-F1-vs-car-comparison.md)
 - [x] **C-3 Accessibility 경로 (휠체어/노인 옵션)** — [개선 기록](../improvements/2026-04-20-C3-accessibility.md)
 - [x] **RAG-1 자연어 경로 검색 (Ollama + Spring AI)** — (자동차 제조사) 공고 대응, 자연어 진입점 — [개선 기록](../improvements/2026-04-20-RAG1-nlp-route-search.md)
+- [x] **RAG-2 Qdrant 벡터 DB + 유사 경로 검색** — bge-m3 임베딩(1024차원) + 3축 하이브리드 검색 + @Observed 관측성 통합 — [개선 기록](../improvements/2026-04-22-RAG2-qdrant-similar-routes.md)
 
 ### 다음 진행 예정 (우선순위 순)
-- [ ] **RAG-2** Qdrant 경로 이력 + 유사 경로 검색 (벡터 DB 실전 — (자동차 제조사) 공고 매칭)
-- [ ] **RAG-3** POI Semantic Search (pgvector + 임베딩)
-- [ ] **RAG-4** LLM 기반 narrative 생성 (템플릿 → LLM)
+- [ ] **RAG-4** LLM narrative 생성 (템플릿 → LLM) — RAG-2 를 `/api/routes` 에 통합, **RAG 시리즈 완결**
+- [ ] **RAG-3** POI Semantic Search (pgvector + 임베딩) — 장소 추천 영역 확장
 - [ ] **M-1** Alerting + Discord 웹훅
 - [ ] **M-4** 로그 레벨 정리
 - [ ] **A-4** 날씨 인식
