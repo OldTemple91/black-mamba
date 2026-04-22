@@ -24,6 +24,31 @@
 
 👉 **[개선 기록 11건](docs/improvements/README.md)** / **[ADR 6건](docs/adr/)** / **[로드맵](docs/roadmap/ROADMAP.md)**
 
+## 📸 실측 증거 (Observability · Vector DB)
+
+Docker Compose 로 전체 스택 기동 후 실측 트래픽 발생 상태에서 자동 캡처.
+
+### Grafana — 3축 관측성 대시보드
+
+**Overview** (요청 수 / p95 / 캐시 Hit률 / JVM)
+![Grafana Overview](docs/images/01-grafana-overview.png)
+
+**Route Performance** (응답시간 히트맵, 처리량 by outcome)
+![Grafana Route Performance](docs/images/02-grafana-route-performance.png)
+
+**External APIs** (ODsay/Tmap/따릉이 호출 + 캐시 Hit률 + Fallback)
+![Grafana External APIs](docs/images/03-grafana-external-apis.png)
+
+### Qdrant — 벡터 DB 실데이터
+
+200+ points 저장, 각 포인트에 1024차원 bge-m3 벡터 + payload (doc_content,
+geohash, preference 등) 확인 가능.
+
+![Qdrant Dashboard](docs/images/04-qdrant-dashboard.png)
+
+> 📁 캡처 스크립트: [`scripts/screenshots/capture.mjs`](scripts/screenshots/capture.mjs)
+> (Playwright 헤드리스, Docker + Ollama 기동 후 실행)
+
 ## 🎯 원래 목적: 신뢰도 중심 MaaS 라우팅
 
 대중교통, 공공자전거, 개인 이동수단을 결합해 도착 성공 가능성이 높은 경로를 추천하는 도시형 멀티모달 라우팅 엔진입니다. 기본 `OPTIMAL` 추천은 MaaS 시나리오에 맞춰 대중교통과 공공/공유 수단 중심으로 구성하고, 개인 이동수단은 사용자가 명시적으로 선택한 경우에만 탐색합니다.
@@ -471,16 +496,3 @@ open http://localhost:3200     # Tempo
 - EV charging-aware routing
 - PBV / mobility hub 시나리오 확장
 
-## 16. Why This Project Matters
-
-이 프로젝트는 단순 길찾기 앱이 아니라, 불완전한 실시간 데이터 환경에서 실제 도시 이동의 제약을 다루는 의사결정 엔진을 지향합니다.
-
-특히 아래에 집중했습니다.
-
-- 환승 허브 기반 후보 생성
-- 이동수단 가용성과 반납 가능성 검증
-- 신뢰도 중심 경로 추천
-- 설명 가능한 결과 제공
-- 확장 가능한 도메인 구조 설계
-
-자동차/모빌리티 회사 관점에서는, 이 프로젝트를 통해 멀티모달 이동, 허브 기반 환승, 운영 신뢰성, 데이터 제약 환경을 동시에 다루는 백엔드 설계 역량을 보여주는 것을 목표로 합니다.
