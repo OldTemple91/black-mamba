@@ -88,6 +88,7 @@ YYYY-MM-DD-<카테고리>-<제목>.md
 | 10 | 2026-04-22 | RAG-6 | [데이터 규모 확장 + 운영 메트릭](./2026-04-22-RAG6-data-scale-and-metrics.md) | 시드 20 → **200건** (OD×시간대×선호도 3차원), 유사도 score 0.56 → **0.72**, Prometheus 메트릭 8종 노출 |
 | 11 | 2026-04-22 | A-1 | [경로 탐색 실시간 SSE 스트림](./2026-04-22-A1-sse-route-stream.md) | Reactor Flux 기반 SSE — 30초 재탐색 + 변화 감지 push + HEARTBEAT + 자동 종료 (5m). Spring MVC 유지하며 스트리밍 |
 | 12 | 2026-04-23 | A-5 | [현실 시나리오 벤치마크 (역 편향 제거)](./2026-04-23-A5-real-user-benchmark.md) | OD 30쌍 자동 배치 — **Mixed 채택률 43%, 평균 3.4분 단축, 최대 8분.** 아파트 출발 70% Mixed 승리 |
+| 13 | 2026-04-23 | A-6 | [장소 자동완성 POI+주소 2단계 폴백](./2026-04-23-A6-place-autocomplete-fallback.md) | `/api/places` 에 Geocoding 폴백 체인 추가 — 프론트 수정 0줄, 자동완성 UX 가 결과 페이지와 일관 |
 
 ---
 
