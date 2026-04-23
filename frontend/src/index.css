@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Tailwind v4: dark mode class 전략 활성화 (html.dark 에서만 dark: variants 적용) */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /*
  * 페이지 전체 배경 — subtle gradient mesh.
  * MaaS 의 '이동감' 을 연상시키는 청록→보라 그라디언트를 옅게 깔아 브랜드 일관성을 잡는다.
@@ -11,6 +14,33 @@ body {
     radial-gradient(at 90% 20%, rgba(139, 92, 246, 0.06) 0px, transparent 50%),
     radial-gradient(at 50% 100%, rgba(6, 182, 212, 0.05) 0px, transparent 50%);
   min-height: 100vh;
+  color: #1e293b;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Dark mode — 슬레이트 계열 깊은 배경 + 네온성 포인트 */
+.dark body,
+html.dark body {
+  background-color: #0b1220;
+  background-image:
+    radial-gradient(at 15% 10%, rgba(59, 130, 246, 0.18) 0px, transparent 50%),
+    radial-gradient(at 90% 20%, rgba(139, 92, 246, 0.14) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(6, 182, 212, 0.10) 0px, transparent 50%);
+  color: #e2e8f0;
+}
+
+/* .glass-panel 다크모드 */
+.dark .glass-panel {
+  background: rgba(30, 41, 59, 0.62);
+  border-color: rgba(51, 65, 85, 0.6);
+}
+
+/* 스크롤바 다크 */
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.45);
 }
 
 /* 시스템 폰트 스택으로 한글 가독성 확보 */

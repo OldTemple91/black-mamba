@@ -95,6 +95,7 @@ YYYY-MM-DD-<카테고리>-<제목>.md
 | 17 | 2026-04-23 | A-4 | [날씨 인식 경로 (Weather-aware Routing)](./2026-04-23-A4-weather-aware-routing.md) | C-3 후처리 패턴 재사용. RAIN 에서 공유 모빌리티 × 0.85, SNOW × 0.70, 실측 0.422 → 0.330 정확 적용 |
 | 18 | 2026-04-23 | ADR-007 / M-4/5/6 / Front | [운영 마감 Polish Pack](./2026-04-23-polish-pack.md) | ADR-007 알고리즘 설계 결정 공식화 + 로그/보안/보존 정책 + 프론트 Carbon 배지 · Weather UI · RAIN 시나리오 스크린샷 |
 | 19 | 2026-04-23 | UI/UX | [프론트엔드 리뉴얼 (2026 트렌드)](./2026-04-23-frontend-polish.md) | 데스크톱 split layout + Hero + Glassmorphism + 추천 카드 gradient ring + Sticky OD 헤더 + 메타 라인 통합 + CSS +14kB(gzip +2kB) |
+| 20 | 2026-04-23 | UI/UX | [프론트 고도화 (Timeline + Dark + Skeleton)](./2026-04-23-frontend-advanced.md) | Route Leg Timeline Bar (서울 지하철 15개 라인 공식색) + Dark Mode (Tailwind v4 `@custom-variant`) + Skeleton Loading + Error state 리뉴얼 · gzip +1.1kB |
 
 ---
 

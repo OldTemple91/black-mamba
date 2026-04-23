@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import LegItem from './LegItem'
+import RouteTimelineBar from './RouteTimelineBar'
 import {
   getComparisonBars,
   getCostBreakdown,
@@ -71,10 +72,10 @@ export default function RouteCard({
       onClick={onClick}
       className={`group relative cursor-pointer rounded-2xl border p-4 transition-all animate-fade-in-up
         ${selected
-          ? 'border-blue-500 bg-blue-50/70 shadow-lg shadow-blue-500/10 ring-2 ring-blue-300/40'
+          ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-900/30 shadow-lg shadow-blue-500/10 ring-2 ring-blue-300/40 dark:ring-blue-500/40'
           : route.recommended
-            ? 'border-transparent bg-white shadow-md shadow-indigo-500/5 recommended-ring'
-            : 'border-slate-200 bg-white/90 hover:border-slate-300 hover:shadow-sm'}`}
+            ? 'border-transparent bg-white dark:bg-slate-800/80 shadow-md shadow-indigo-500/5 recommended-ring'
+            : 'border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-sm'}`}
     >
       {/* ──────── 헤더: 배지 + 경로 타입 + 시간/비용 ──────── */}
       <div className="flex items-start justify-between gap-3">
@@ -87,7 +88,7 @@ export default function RouteCard({
                 ⭐ 추천
               </span>
             )}
-            <span className="text-[11px] font-medium tracking-wide text-slate-500">
+            <span className="text-[11px] font-medium tracking-wide text-slate-500 dark:text-slate-400">
               {routeLabel}
             </span>
             {risks.map(risk => (
@@ -96,30 +97,33 @@ export default function RouteCard({
               </span>
             ))}
           </div>
-          {/* 이동수단 체인 */}
-          <p className="truncate text-[13px] text-slate-600">
+          {/* 이동수단 체인 (요약 텍스트) */}
+          <p className="truncate text-[13px] text-slate-600 dark:text-slate-400">
             {route.legs.map(summarizeLeg).join(' → ')}
           </p>
         </div>
         <div className="shrink-0 text-right">
           <div className="flex items-baseline gap-0.5">
-            <span className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
+            <span className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50 tabular-nums">
               {route.totalMinutes}
             </span>
-            <span className="text-xs font-medium text-slate-500">분</span>
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">분</span>
           </div>
           {route.totalCostWon > 0 && (
-            <p className="text-[11px] font-medium text-slate-500 tabular-nums">
+            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 tabular-nums">
               {route.totalCostWon.toLocaleString()}원
             </p>
           )}
           {costBreakdown.length > 0 && (
-            <p className="mt-0.5 max-w-[160px] text-right text-[10px] text-slate-400">
+            <p className="mt-0.5 max-w-[160px] text-right text-[10px] text-slate-400 dark:text-slate-500">
               {costBreakdown.map(item => `${item.label} ${item.amountWon.toLocaleString()}`).join(' · ')}
             </p>
           )}
         </div>
       </div>
+
+      {/* ──────── Route Leg Timeline Bar (Citymapper 스타일) ──────── */}
+      <RouteTimelineBar legs={route.legs} />
 
       {/* ──────── 절약 시간 & Carbon 배지 — 하나의 메타 라인에 ──────── */}
       {(route.comparison?.savedMinutes > 0 || route.carbon) && (

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import NaverMap from '../components/map/NaverMap'
 import MobilitySelector from '../components/search/MobilitySelector'
+import ThemeToggle from '../components/common/ThemeToggle'
 
 // 자동완성: 네이버 지역 검색 API (POI 키워드 지원 — "강남역", "홍대입구" 등)
 async function fetchSuggestions(query) {
@@ -144,21 +145,28 @@ export default function MainPage() {
         <div className="lg:sticky lg:top-10 lg:h-fit space-y-6">
           {/* Hero */}
           <div>
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl
-                              bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500
-                              shadow-lg shadow-indigo-500/30">
-                <span className="text-2xl">🐍</span>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl
+                                bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500
+                                shadow-lg shadow-indigo-500/30">
+                  <span className="text-2xl">🐍</span>
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">
+                    Black Mamba
+                  </h1>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 tracking-wider uppercase">
+                    MaaS Routing Engine
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Black Mamba</h1>
-                <p className="text-[11px] text-slate-500 tracking-wider uppercase">MaaS Routing Engine</p>
-              </div>
+              <ThemeToggle />
             </div>
-            <p className="mt-4 text-[15px] text-slate-600 leading-relaxed">
+            <p className="mt-4 text-[15px] text-slate-600 dark:text-slate-300 leading-relaxed">
               대중교통 + 공공자전거 + 개인 이동수단을 결합해
               <br />
-              <span className="font-semibold text-slate-800">
+              <span className="font-semibold text-slate-800 dark:text-slate-100">
                 "자가용 대체 가능한 경로"
               </span>
               를 설명 가능하게 추천합니다.
@@ -166,13 +174,14 @@ export default function MainPage() {
           </div>
 
           {/* ──────── 검색 패널 (Glass) ──────── */}
-          <div className="glass-panel rounded-3xl p-5 shadow-xl shadow-slate-200/50">
+          <div className="glass-panel rounded-3xl p-5 shadow-xl shadow-slate-200/50
+                          dark:shadow-slate-950/40">
             {/* 출발/목적지 입력 — 세로 스택 + 중간 swap 버튼 */}
             <div className="relative space-y-2" onMouseDown={e => e.stopPropagation()}>
               {/* 출발지 */}
               <div className="relative">
-                <div className="flex items-center gap-2 rounded-2xl border border-slate-200
-                                bg-white/80 px-3 py-2.5 transition
+                <div className="flex items-center gap-2 rounded-2xl border border-slate-200 dark:border-slate-700
+                                bg-white/80 dark:bg-slate-800/60 px-3 py-2.5 transition
                                 focus-within:border-blue-400 focus-within:shadow-md focus-within:shadow-blue-500/10">
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center
                                    rounded-full bg-blue-100 text-sm">🟢</span>
@@ -181,8 +190,8 @@ export default function MainPage() {
                     onChange={handleOriginChange}
                     onFocus={() => { setActiveSuggestField('origin'); triggerSuggest(origin, 'origin') }}
                     placeholder="출발지 · 주소 · 좌표"
-                    className="flex-1 bg-transparent text-[14px] text-slate-800
-                               placeholder-slate-400 focus:outline-none"
+                    className="flex-1 bg-transparent text-[14px] text-slate-800 dark:text-slate-100
+                               placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none"
                   />
                   <button
                     onClick={() => toggleMapMode('origin')}
@@ -230,8 +239,8 @@ export default function MainPage() {
 
               {/* 목적지 */}
               <div className="relative">
-                <div className="flex items-center gap-2 rounded-2xl border border-slate-200
-                                bg-white/80 px-3 py-2.5 transition
+                <div className="flex items-center gap-2 rounded-2xl border border-slate-200 dark:border-slate-700
+                                bg-white/80 dark:bg-slate-800/60 px-3 py-2.5 transition
                                 focus-within:border-blue-400 focus-within:shadow-md focus-within:shadow-blue-500/10">
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center
                                    rounded-full bg-rose-100 text-sm">🔴</span>
@@ -240,8 +249,8 @@ export default function MainPage() {
                     onChange={handleDestChange}
                     onFocus={() => { setActiveSuggestField('destination'); triggerSuggest(destination, 'destination') }}
                     placeholder="목적지 · 주소 · 좌표"
-                    className="flex-1 bg-transparent text-[14px] text-slate-800
-                               placeholder-slate-400 focus:outline-none"
+                    className="flex-1 bg-transparent text-[14px] text-slate-800 dark:text-slate-100
+                               placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none"
                   />
                   <button
                     onClick={() => toggleMapMode('destination')}
@@ -287,8 +296,8 @@ export default function MainPage() {
             </div>
 
             {/* 날씨 옵션 */}
-            <div className="mt-4 rounded-2xl bg-slate-50/70 p-3">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            <div className="mt-4 rounded-2xl bg-slate-50/70 dark:bg-slate-800/50 p-3">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 ☁️ 날씨 (선택)
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -301,7 +310,7 @@ export default function MainPage() {
                     className={`flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                       weather === opt.key
                         ? 'border-blue-500 bg-blue-500 text-white shadow-sm shadow-blue-500/30'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'
                     }`}
                   >
                     <span>{opt.emoji}</span>
@@ -310,7 +319,7 @@ export default function MainPage() {
                 ))}
               </div>
               {weather && (
-                <p className="mt-2 text-[11px] text-slate-500">
+                <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
                   ✨ {WEATHER_OPTIONS.find(o => o.key === weather)?.hint}
                 </p>
               )}
@@ -323,7 +332,7 @@ export default function MainPage() {
               className={`mt-5 w-full rounded-2xl py-3 text-sm font-semibold text-white transition
                           ${canSearch
                             ? 'bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 hover:brightness-110 active:scale-[0.99] animate-gentle-pulse'
-                            : 'bg-slate-300 cursor-not-allowed'}`}
+                            : 'bg-slate-300 dark:bg-slate-700 dark:text-slate-400 cursor-not-allowed'}`}
             >
               {canSearch ? '🚀 경로 탐색' : '출발지 / 목적지를 입력하세요'}
             </button>
@@ -334,13 +343,19 @@ export default function MainPage() {
             {[
               { label: '관측 축',       value: '4',   suffix: '축' },
               { label: '자체 알고리즘', value: '8',   suffix: '종' },
-              { label: '개선 기록',     value: '18',  suffix: '건' },
+              { label: '개선 기록',     value: '20',  suffix: '건' },
             ].map(s => (
               <div key={s.label}
-                   className="rounded-2xl border border-slate-200 bg-white/70 px-3 py-2">
-                <div className="text-[11px] uppercase tracking-wider text-slate-500">{s.label}</div>
-                <div className="mt-0.5 text-xl font-bold text-slate-800">
-                  {s.value}<span className="ml-0.5 text-xs font-normal text-slate-400">{s.suffix}</span>
+                   className="rounded-2xl border border-slate-200 dark:border-slate-700
+                              bg-white/70 dark:bg-slate-800/50 px-3 py-2">
+                <div className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {s.label}
+                </div>
+                <div className="mt-0.5 text-xl font-bold text-slate-800 dark:text-slate-100">
+                  {s.value}
+                  <span className="ml-0.5 text-xs font-normal text-slate-400 dark:text-slate-500">
+                    {s.suffix}
+                  </span>
                 </div>
               </div>
             ))}
@@ -349,16 +364,17 @@ export default function MainPage() {
 
         {/* ──────── 우측: 지도 (데스크톱 sticky) ──────── */}
         <div className="mt-6 lg:mt-0">
-          <div className="map-container overflow-hidden rounded-3xl border border-slate-200 bg-white/70
+          <div className="map-container overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-700
+                          bg-white/70 dark:bg-slate-800/50
                           lg:sticky lg:top-10 lg:h-[calc(100vh-5rem)]">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-white/80 px-4 py-2.5
-                            backdrop-blur">
-              <p className="text-xs font-semibold text-slate-600">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700
+                            bg-white/80 dark:bg-slate-900/70 px-4 py-2.5 backdrop-blur">
+              <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                 {mapMode === 'origin'  ? '🟢 지도에서 출발지를 클릭하세요' :
                  mapMode === 'destination' ? '🔴 지도에서 목적지를 클릭하세요' :
                  '🗺 서울 지하철 + 버스 노선'}
               </p>
-              <p className="text-[10px] text-slate-400">Naver Maps</p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500">Naver Maps</p>
             </div>
             <div className="h-[400px] lg:h-full">
               <NaverMap onMapClick={handleMapClick} mapMode={mapMode} />
