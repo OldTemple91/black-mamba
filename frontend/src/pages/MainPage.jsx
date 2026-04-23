@@ -345,7 +345,7 @@ export default function MainPage() {
             {[
               { label: '관측 축',       value: '4',   suffix: '축' },
               { label: '자체 알고리즘', value: '8',   suffix: '종' },
-              { label: '개선 기록',     value: '20',  suffix: '건' },
+              { label: 'Core 개선',     value: '14',  suffix: '건' },
             ].map(s => (
               <div key={s.label}
                    className="rounded-2xl border border-slate-200 dark:border-slate-700

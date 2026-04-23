@@ -30,7 +30,7 @@
 | 📊 **성능 튜닝** | Geohash 공간 캐싱 — ODsay 히트율 46.9% → 80.4% |
 | 🌱 **MaaS 정체성** | 경로별 **탄소 배출량** (이동수단별 정밀 계수) + **날씨 인식** (RAIN/SNOW 공유 모빌리티 페널티) + 접근성 (휠체어/노인) |
 
-👉 **[자체 알고리즘 카탈로그](docs/architecture/routing-algorithm.md)** / **[개선 기록 23건](docs/improvements/README.md)** / **[ADR 7건](docs/adr/)** / **[로드맵](docs/roadmap/ROADMAP.md)**
+👉 **[자체 알고리즘 카탈로그](docs/architecture/routing-algorithm.md)** / **[Core 개선 기록 14건](docs/improvements/README.md)** / **[ADR 7건](docs/adr/)** / **[로드맵](docs/roadmap/ROADMAP.md)**
 
 ## 🏛 시스템 아키텍처
 
@@ -562,7 +562,7 @@ open http://localhost:3200     # Tempo
 
 ## 13. 구현 상태 & 개선 이력
 
-핵심 기능은 **[개선 기록 21건](docs/improvements/README.md)** 에 누적 기록되어 있다. 상위 카테고리:
+핵심 설계 · 의사결정은 **[Core 개선 기록 14건](docs/improvements/README.md#-core-engineering-decisions)** 에 기록되어 있다. 상위 카테고리:
 
 - **🧭 Orchestration 알고리즘** — Baseline-Guided Recomposition, 2-Phase Hub, 6-Dim Scoring 등 8종 ([카탈로그](docs/architecture/routing-algorithm.md))
 - **🧠 AI/RAG Phase 1~6** — Ollama + Qdrant + 하이브리드 검색 + LLM narrative + 할루시네이션 감지

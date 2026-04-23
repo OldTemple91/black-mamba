@@ -1,108 +1,65 @@
 # 개선 이력 (Improvements Log)
 
-> Black Mamba 프로젝트의 리팩토링/고도화 작업 기록.
-> 각 개선마다 **배경 → 구현 → 성과 → 배운 점**을 일관된 형식으로 남깁니다.
+> Black Mamba 프로젝트의 설계·개선 기록.
+> **Core** 는 발표에서 1분 안에 설명할 수 있는 기술적 의사결정.
+> **Supporting** 은 UI/UX · 문서화 · 자동화 등 완성도 보강 작업.
 
 ---
 
-## 📁 파일 명명 규칙
+## ⭐ Core Engineering Decisions
 
-```
-YYYY-MM-DD-<카테고리>-<제목>.md
+실제 **설계 원리 · 대안 비교 · 정량 개선** 이 담긴 14건.
 
-예시:
-2026-04-18-B3-geohash-spatial-caching.md
-2026-04-20-C1-ev-charging-integration.md
-2026-04-22-M1-alertmanager-discord.md
-```
+| # | 분류 | 제목 | 핵심 성과 |
+|---|-----|------|----------|
+| 1 | 성능 | [B-3 Geohash 공간 캐싱](./2026-04-17-B3-geohash-spatial-caching.md) | 좌표를 150m 격자로 양자화 → ODsay 히트율 **46.9% → 80.4%** (1.71×) |
+| 2 | 도메인 | [F-1 vs 자가용 비교](./2026-04-20-F1-vs-car-comparison.md) | "빠른 경로" → **"자가용 대체"** 로 MaaS 정체성 전환 (시간/비용/탄소 3축) |
+| 3 | 설계 패턴 | [C-3 Accessibility 경로](./2026-04-20-C3-accessibility.md) | **Post-Process 패턴** 도입 — 탐색 로직 비침투 옵션 확장 |
+| 4 | AI | [RAG-1 자연어 경로 검색](./2026-04-20-RAG1-nlp-route-search.md) | "LLM 은 의도 파싱만, 경로 계산은 결정론적" 설계 — 설명 가능성 + 테스트 용이성 |
+| 5 | AI | [RAG-2 Qdrant 하이브리드 검색](./2026-04-22-RAG2-qdrant-similar-routes.md) | bge-m3 1024차원 + **의미·공간·이동수단 3축 하이브리드** 필터 |
+| 6 | AI | [RAG-4 LLM narrative (R+A+G 완결)](./2026-04-22-RAG4-llm-narrative.md) | `/api/routes` 추천 경로에 Retrieval + Augmented + Generation 자동 적용 |
+| 7 | AI | [RAG-5 할루시네이션 감지](./2026-04-22-RAG5-quality-reinforcement.md) | 실측에서 **LLM 이 40분 경로를 4분으로 지어낸 것을 자동 포착 · 폴백** 증명 |
+| 8 | 실시간 | [A-1 SSE 스트림](./2026-04-22-A1-sse-route-stream.md) | Reactor Flux — 30초 재탐색 + 2분 임계값 변화 push + HEARTBEAT + 5분 자동 종료 |
+| 9 | 방법론 | [A-5 역 편향 제거 벤치마크](./2026-04-23-A5-real-user-benchmark.md) | OD 30쌍 현실 시나리오 — **Mixed 채택률 43%, 평균 3.4분 / 최대 8분 단축** (아파트 출발 70% 승리) |
+| 10 | 운영 | [T-7 TAGO 런타임 킬 스위치](./2026-04-23-T7-tago-kill-switch.md) | 외부 API 장애/미제공 회피책 — 응답 500ms → **<10ms**, `TAGO_ENABLED` env 한 줄로 복구 |
+| 11 | 관측성 | [M-1/M-2/M-3 관측성 4축](./2026-04-23-M1-M2-M3-alerts-slo.md) | Logs/Metrics/Traces → **+Alerts +SLO**. Burn Rate 다중 윈도우 (Google SRE Workbook 패턴) |
+| 12 | 도메인 | [C-2 Carbon Footprint](./2026-04-23-C2-carbon-footprint.md) | 이동수단별 정밀 계수 (지하철 41 / 버스 68 / 공유킥보드 22 g/km) + Prometheus 히스토그램 |
+| 13 | 설계 패턴 | [A-4 Weather-aware Routing](./2026-04-23-A4-weather-aware-routing.md) | C-3 **후처리 패턴 재사용 증명** — RAIN × 0.85, SNOW × 0.70, 실측 계수 정확 적용 |
+| 14 | 운영 | [T-8 RAG 킬 스위치 + Graceful Degradation](./2026-04-23-T8-rag-kill-switch.md) | `@ConditionalOnBean` + `SPRING_AUTOCONFIGURE_EXCLUDE` — Qdrant/Ollama 장애 시 3초 기동, 핵심 라우팅 정상, RAG 만 비활성 |
 
-**카테고리 약어:**
-- `A` 기능 / `B` 아키텍처 / `C` 모빌리티 / `D` 확장성
-- `E` ML·AI / `F` MaaS 정체성 / `M` 모니터링 / `RAG` 생성형 AI · 검색 / `T` 테스트·설계
-
----
-
-## 📝 글 작성 템플릿
-
-각 개선 문서는 아래 섹션을 포함합니다.
-실제 작업 전·후의 **"무엇을 why로 바꿨고, 수치로 얼마나 개선됐는지"** 를 남깁니다.
-
-```markdown
-# <카테고리>-<번호>: <제목>
-
-> 작업일: YYYY-MM-DD ~ YYYY-MM-DD
-> 담당 Phase: ROADMAP.md #<번호>
-> 공수: 실측 X시간
-> 커밋: abc123 ~ def456
-
-## 1. 배경 (Why)
-- 현재 무엇이 문제였나?
-- 정량적 지표로 표현 (p95 = X초, 히트율 Y%, ...)
-
-## 2. 기존 구조 (Before)
-- 아키텍처 다이어그램 / 코드 스니펫
-- 한계가 어떤 식으로 드러났는지
-
-## 3. 개선 방향 (How)
-- 설계 결정 근거
-- 대안 후보와 트레이드오프
-- 최종 채택 이유
-
-## 4. 구현 (What)
-### 4-1. 변경된 파일
-### 4-2. 핵심 코드 변경점
-### 4-3. 테스트 추가/수정
-
-## 5. 검증 & 성과 (Result)
-### Before vs After 지표
-| 지표 | Before | After | 개선율 |
-|------|--------|-------|-------|
-| p95 응답시간 | ... | ... | ... |
-
-### 측정 방법
-- 어떤 쿼리/스크립트로 측정했나?
-
-## 6. 사이드 이펙트 & 한계
-- 예상 못 한 문제
-- 남은 개선 여지
-
-## 7. 발표 스토리텔링
-- 이 개선을 1분 안에 설명할 수 있는 버전
-```
+**관련 ADR**: [ADR-007 Baseline-Guided Multimodal Recomposition](../adr/007-baseline-guided-recomposition.md) — 알고리즘 설계 결정을 공식 기록으로.
 
 ---
 
-## 📚 개선 이력 목록
+## 📋 Supporting Work
 
-| # | 날짜 | 카테고리 | 제목 | 성과 요약 |
-|---|------|---------|------|----------|
-| 1 | 2026-04-17 | B-3 | [Geohash 공간 인덱스 캐시](./2026-04-17-B3-geohash-spatial-caching.md) | ODsay 히트율 **46.9% → 80.4%** (1.71배) |
-| 2 | 2026-04-17 | OTel | [Zipkin/JSON → OTLP/Protobuf 트레이스 전송](./2026-04-17-C-otlp-protobuf-tracing.md) | OpenTelemetry 표준 준수 + Protobuf 직렬화 전환 |
-| 3 | 2026-04-20 | T-4 Phase 1 | [Spring Boot 3.5.13 + OTLP/gRPC 완전 전환](./2026-04-20-T4-phase1-springboot-3.5-otlp-grpc.md) | OSS 지원 유지 + gRPC transport 공식 활성화 + Gradle 8.14 |
-| 4 | 2026-04-20 | F-1 | [vs 자가용 비교 응답 (MaaS 정체성 전환)](./2026-04-20-F1-vs-car-comparison.md) | 경로별 시간/비용/탄소 3축 자가용 비교 + narrative 생성 |
-| 5 | 2026-04-20 | C-3 | [Accessibility 경로 (포용성)](./2026-04-20-C3-accessibility.md) | 휠체어/노인 옵션 + Post-Process 패턴 도입 |
-| 6 | 2026-04-20 | RAG-1 | [자연어 경로 검색 (Ollama + Spring AI)](./2026-04-20-RAG1-nlp-route-search.md) | LLM 의도 파싱 + 기존 엔진 결합, 자연어 진입점 추가 |
-| 7 | 2026-04-22 | RAG-2 | [Qdrant 벡터 DB + 유사 경로 검색](./2026-04-22-RAG2-qdrant-similar-routes.md) | bge-m3 임베딩(1024차원) + 의미/공간/이동수단 **3축 하이브리드 검색** + @Observed 관측성 통합 |
-| 8 | 2026-04-22 | RAG-4 | [LLM narrative 생성 (RAG 시리즈 완결)](./2026-04-22-RAG4-llm-narrative.md) | `/api/routes` 추천 경로에 **Retrieval + Augmented + Generation** 자동 적용, 블랙박스 추천 → 설명 가능한 MaaS |
-| 9 | 2026-04-22 | RAG-5 | [RAG 품질 보강 (데이터 게이트/서술 다양화/할루시네이션 감지)](./2026-04-22-RAG5-quality-reinforcement.md) | 3가지 방어선 추가 — **실측 중 LLM 이 40분 경로를 4분으로 지어낸 것을 자동 포착해 폴백** 동작 증명 |
-| 10 | 2026-04-22 | RAG-6 | [데이터 규모 확장 + 운영 메트릭](./2026-04-22-RAG6-data-scale-and-metrics.md) | 시드 20 → **200건** (OD×시간대×선호도 3차원), 유사도 score 0.56 → **0.72**, Prometheus 메트릭 8종 노출 |
-| 11 | 2026-04-22 | A-1 | [경로 탐색 실시간 SSE 스트림](./2026-04-22-A1-sse-route-stream.md) | Reactor Flux 기반 SSE — 30초 재탐색 + 변화 감지 push + HEARTBEAT + 자동 종료 (5m). Spring MVC 유지하며 스트리밍 |
-| 12 | 2026-04-23 | A-5 | [현실 시나리오 벤치마크 (역 편향 제거)](./2026-04-23-A5-real-user-benchmark.md) | OD 30쌍 자동 배치 — **Mixed 채택률 43%, 평균 3.4분 단축, 최대 8분.** 아파트 출발 70% Mixed 승리 |
-| 13 | 2026-04-23 | A-6 | [장소 자동완성 POI+주소 2단계 폴백](./2026-04-23-A6-place-autocomplete-fallback.md) | `/api/places` 에 Geocoding 폴백 체인 추가 — 프론트 수정 0줄, 자동완성 UX 가 결과 페이지와 일관 |
-| 14 | 2026-04-23 | T-7 | [TAGO API 런타임 킬 스위치](./2026-04-23-T7-tago-kill-switch.md) | 서울 미제공 엔드포인트 외부 호출 스킵 — 응답 500ms → **<10ms**, 로그 노이즈 제거, 재개 시 env 한 줄로 복구 |
-| 15 | 2026-04-23 | M-1/M-2/M-3 | [관측성 4축 완성 (Alertmanager + SLO + 호스트 메트릭)](./2026-04-23-M1-M2-M3-alerts-slo.md) | 3축(Logs/Metrics/Traces) → **4축(+Alerts, +SLO)**. Alert 7 + Recording 9 룰 + Burn Rate 다중 윈도우 + cAdvisor/Node Exporter |
-| 16 | 2026-04-23 | C-2 | [경로별 탄소 배출량 (Carbon Footprint)](./2026-04-23-C2-carbon-footprint.md) | 이동수단별 정밀 계수 (지하철 41 / 버스 68 / 공유킥보드 22 / 전기자전거 10) + `Route.carbon` 응답 + Prometheus 히스토그램 2종 |
-| 17 | 2026-04-23 | A-4 | [날씨 인식 경로 (Weather-aware Routing)](./2026-04-23-A4-weather-aware-routing.md) | C-3 후처리 패턴 재사용. RAIN 에서 공유 모빌리티 × 0.85, SNOW × 0.70, 실측 0.422 → 0.330 정확 적용 |
-| 18 | 2026-04-23 | ADR-007 / M-4/5/6 / Front | [운영 마감 Polish Pack](./2026-04-23-polish-pack.md) | ADR-007 알고리즘 설계 결정 공식화 + 로그/보안/보존 정책 + 프론트 Carbon 배지 · Weather UI · RAIN 시나리오 스크린샷 |
-| 19 | 2026-04-23 | UI/UX | [프론트엔드 리뉴얼 (2026 트렌드)](./2026-04-23-frontend-polish.md) | 데스크톱 split layout + Hero + Glassmorphism + 추천 카드 gradient ring + Sticky OD 헤더 + 메타 라인 통합 + CSS +14kB(gzip +2kB) |
-| 20 | 2026-04-23 | UI/UX | [프론트 고도화 (Timeline + Dark + Skeleton)](./2026-04-23-frontend-advanced.md) | Route Leg Timeline Bar (서울 지하철 15개 라인 공식색) + Dark Mode (Tailwind v4 `@custom-variant`) + Skeleton Loading + Error state 리뉴얼 · gzip +1.1kB |
-| 21 | 2026-04-23 | Tier S | [Tier S 통신력 (Mermaid + 모바일 + 데모 GIF)](./2026-04-23-tier-s-communication.md) | Mermaid 시스템·모듈 다이어그램 2종 + 모바일 iPhone 14 뷰 4장 + 20초 데모 GIF 1.85 MB (ffmpeg fps 8 + palette 48색 + bayer dither 3단계 튜닝) |
-| 22 | 2026-04-23 | Audit | [프론트 전수 감사 (지도 버그 + 다크 누락)](./2026-04-23-frontend-audit.md) | 사용자 피드백 한 줄에서 시작 — 지도 3버그 (TRANSIT 직선/h-96 고정/fitBounds 누락) + 다크 미지원 5개 파일 일괄 수정 · gzip +0.16 kB |
-| 23 | 2026-04-23 | T-8 | [RAG 킬 스위치 (Qdrant 장애 회피)](./2026-04-23-T8-rag-kill-switch.md) | CI 실패 원인 진단 → `@ConditionalOnBean` + `SPRING_AUTOCONFIGURE_EXCLUDE` 환경변수로 런타임 회피. 기동 3초, 핵심 라우팅 100% 정상, RAG 만 선택적 비활성 |
+완성도 · 통신력 · UX 보강 작업. 히스토리 보존용.
+
+| 분류 | 작업 | 기록 |
+|-----|-----|-----|
+| 관측성 | OTLP/Protobuf 트레이스 전송 표준화 | [2026-04-17](./2026-04-17-C-otlp-protobuf-tracing.md) |
+| 업그레이드 | Spring Boot 3.5.13 + OTLP/gRPC + Gradle 8.14 | [2026-04-20 T-4](./2026-04-20-T4-phase1-springboot-3.5-otlp-grpc.md) |
+| RAG 데이터 | 시드 20 → 200건 (3축) + Prometheus 메트릭 | [2026-04-22 RAG-6](./2026-04-22-RAG6-data-scale-and-metrics.md) |
+| UX | 장소 자동완성 POI + 주소 2단계 폴백 | [2026-04-23 A-6](./2026-04-23-A6-place-autocomplete-fallback.md) |
+| 운영 마감 | 로그레벨 / Grafana 보안 / Tempo·Loki 보존 정책 | [2026-04-23 Polish Pack](./2026-04-23-polish-pack.md) |
+| UI/UX | Split layout + Glassmorphism + Hero motion | [2026-04-23 Polish 1~2차](./2026-04-23-frontend-polish.md) |
+| UI/UX | Route Timeline Bar + Dark Mode + Skeleton | [2026-04-23 Advanced](./2026-04-23-frontend-advanced.md) |
+| UI/UX | 지도 TRANSIT passThroughStations 연결 + 다크 전수 완결 | [2026-04-23 Audit](./2026-04-23-frontend-audit.md) |
+| 통신력 | Mermaid 다이어그램 + 모바일 뷰 + 20초 데모 GIF | [2026-04-23 Tier S](./2026-04-23-tier-s-communication.md) |
+
+---
+
+## 📐 작성 템플릿
+
+각 개선기록은 **배경(Why) → 기존 구조(Before) → 개선 방향(How) → 구현(What) → 검증/성과(Result) → 한계 → 발표 스토리** 의 일관된 형식.
+
+핵심은 **"무엇을 why 로 바꿨고, 수치로 얼마나 개선됐는지"** — 단순 "기능 추가함" 이 아닌 **의사결정의 근거**.
 
 ---
 
 ## 🔗 관련 문서
 
 - [ROADMAP.md](../roadmap/ROADMAP.md) — 전체 개선 계획
+- [ADR 7건](../adr/) — 설계 결정 공식 기록
+- [자체 알고리즘 카탈로그](../architecture/routing-algorithm.md) — Orchestration 8종 의사코드
 - [observability-stack.md](../monitoring/observability-stack.md) — 모니터링 인프라
