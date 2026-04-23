@@ -15,6 +15,7 @@
 
 | 영역 | 내용 |
 |------|------|
+| 🧭 **자체 라우팅 알고리즘** | Baseline-Guided Recomposition (5패턴) + 2-Phase Hub Selection + 6-Dim Weighted Scoring ⋯ → [상세](docs/architecture/routing-algorithm.md) |
 | 🧠 **AI/RAG (Phase 1~6)** | 자연어 경로 검색 + Qdrant 벡터 DB + bge-m3(1024차원) 하이브리드 검색 + LLM narrative + 할루시네이션 감지 |
 | ⚡ **실시간 스트림 (A-1)** | Reactor Flux 기반 SSE — 30초 재탐색, 변화 감지 push, HEARTBEAT, 자동 종료 |
 | 🛡️ **장애 대응 (T-3)** | Resilience4j CircuitBreaker + Retry + Fallback — 외부 API 5개 3층 방어선 |
@@ -22,7 +23,25 @@
 | 🏗️ **Clean Architecture** | Hexagonal Port/Adapter, 4-module gradle (domain/application/infra/api) |
 | 📊 **성능 튜닝** | Geohash 공간 캐싱 — ODsay 히트율 46.9% → 80.4% |
 
-👉 **[개선 기록 11건](docs/improvements/README.md)** / **[ADR 6건](docs/adr/)** / **[로드맵](docs/roadmap/ROADMAP.md)**
+👉 **[자체 알고리즘 카탈로그](docs/architecture/routing-algorithm.md)** / **[개선 기록 13건](docs/improvements/README.md)** / **[ADR 6건](docs/adr/)** / **[로드맵](docs/roadmap/ROADMAP.md)**
+
+## 🧭 "무엇을 우리가 직접 만들었나" — Orchestration 층
+
+> A\*/Dijkstra 같은 **도로 그래프 최단경로** 는 ODsay/Tmap 이 처리.
+> 우리는 그 위에서 **다중 이동수단을 재조합 · 평가 · 설명하는 Orchestration 층** 을 자체 설계.
+
+| # | 알고리즘 | 한 줄 설명 | 코드 |
+|---|---------|-----------|-----|
+| ① | **Baseline-Guided Multimodal Recomposition** | 순수 대중교통 baseline 을 설계도 삼아 5패턴 (A/B/C/D/E) 병렬 탐색 | `OptimalSearchStrategy` |
+| ② | **Two-Phase Hub Selection** | Primary(이상 조건) → Fallback(완화 60%) — 밀집·공백 지역 대응 | `HubSelector` |
+| ③ | **30~80% Candidate Window + 120m 중복 제거** | Baseline 의 중간 구간에서 후보 정류장 추출 | `CandidatePointSelector` |
+| ④ | **Two-Phase Walking (Haversine → Tmap)** | 후보 필터는 직선거리로 싸게, 확정 후 Tmap 보행 API 로 정밀 | `MobilitySegmentBuilder` |
+| ⑤ | **6-Dim Weighted Scoring** | time/transfer/cost/walk/accessWalk/reliability × 2 프로파일 + 7 벌점 | `RouteScoreCalculator` |
+| ⑥ | **Geohash Spatial Cache (precision 7)** | 150m 격자로 좌표 양자화 → ODsay 히트율 46.9% → **80.4%** | `GeohashKeyGenerator` |
+| ⑦ | **Accessibility Post-Processor** | 휠체어/노인 옵션을 라우팅 로직에 침투시키지 않고 결과 후처리로 해결 | `AccessibilityPostProcessor` |
+| ⑧ | **SSE Change Detection** | 30초 폴링 + 2분 임계값 이상 변화만 UPDATE, 나머지는 HEARTBEAT | `RouteStreamService#changeReason` |
+
+**👉 [자체 라우팅 알고리즘 카탈로그](docs/architecture/routing-algorithm.md)** — 의사코드, 임계값 근거, 성과 지표, A\*/Dijkstra를 쓰지 않은 이유 (Design Non-Goals) 포함.
 
 ## 📸 실측 증거 (Observability · Vector DB)
 
