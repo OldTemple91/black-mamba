@@ -421,7 +421,7 @@ baseline 대중교통 경로를 먼저 만든 뒤, 그 경로를 따라 퍼스�
 ### AI / RAG (Phase 1~6)
 - **Spring AI 1.0.2** (`ChatClient` / `VectorStore` 추상화)
 - **Ollama** — `llama3.2:3b` (Chat) + `bge-m3` (Embedding, 1024차원)
-- **Qdrant v1.17** — 벡터 DB (gRPC, HNSW 인덱스, Cosine 유사도, 3축 하이브리드 필터)
+- **Qdrant v1.13** — 벡터 DB (gRPC, HNSW 인덱스, Cosine 유사도, 3축 하이브리드 필터). Spring AI 1.0.2 번들 클라이언트(v1.13)와 정확히 호환되는 버전으로 고정.
 
 ### 장애 대응
 - **Resilience4j 2.2** — CircuitBreaker + Retry + Fallback, Reactor Operator

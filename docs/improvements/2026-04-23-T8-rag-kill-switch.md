@@ -92,34 +92,39 @@ environment:
 
 `SPRING_AUTOCONFIGURE_EXCLUDE` 로 AutoConfig 를 제외하면 `VectorStore` 빈은 안 만들어지지만, **`@Component` 스캔은 여전히 `QdrantRouteHistoryAdapter` 를 등록하려 시도 → 의존성 부재로 NoSuchBeanDefinitionException.**
 
+`@Component` 대신 `@Configuration + @Bean + @ConditionalOnBean` 으로 재구성한 이유:
+`@Component` + `@ConditionalOnBean` 조합은 컴포넌트 스캔 시점에 평가돼서
+Spring AI `QdrantVectorStoreAutoConfiguration` 이 실행되기 전에 조건을 보게 됨 → 불안정.
+
 ```java
-@Component
-@ConditionalOnBean(VectorStore.class)   // VectorStore 빈 없으면 이 어댑터도 등록 안 됨
-public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
+// infra/.../QdrantRouteHistoryConfig.java
+@Configuration
+@AutoConfigureAfter(name = "org.springframework.ai.vectorstore.qdrant.autoconfigure.QdrantVectorStoreAutoConfiguration")
+public class QdrantRouteHistoryConfig {
+    @Bean
+    @ConditionalOnBean(VectorStore.class)
+    public QdrantRouteHistoryAdapter qdrantRouteHistoryAdapter(VectorStore vectorStore) {
+        return new QdrantRouteHistoryAdapter(vectorStore);
+    }
+}
 ```
 
-이 한 줄이 연쇄 차단의 핵심. `@ConditionalOnBean` 없으면 Spring 은 `QdrantRouteHistoryAdapter` 를 기어이 만들려다 실패.
+### 2-5. CI 에서의 킬 스위치 실제 활용
 
-### 2-5. CI Docker Build Verification — Qdrant sidecar
+CI (`Docker Build Verification`) 는 _앱이 기동 가능한지_ 만 검증. Ollama (bge-m3 1.2GB) 를
+CI 에 띄우는 건 비현실적이므로 **킬 스위치를 CI 환경변수로 전달**:
 
 ```yaml
-- name: Start Qdrant sidecar
-  run: |
-    docker network create black-mamba-ci
-    docker run -d --name qdrant-ci --network black-mamba-ci \
-      qdrant/qdrant:v1.17.1
-    # ready 대기 최대 40초
-
-- name: Verify image starts
+# .github/workflows/ci.yml
+- name: Verify image starts and responds to health check
   run: |
     docker run -d --name black-mamba-test \
-      --network black-mamba-ci \
-      -e QDRANT_HOST=qdrant-ci \
-      -e QDRANT_PORT=6334 \
-      ...
+      -e SPRING_AUTOCONFIGURE_EXCLUDE=org.springframework.ai.vectorstore.qdrant.autoconfigure.QdrantVectorStoreAutoConfiguration \
+      -e ODSAY_API_KEY=dummy ... \
+      "$IMAGE"
 ```
 
-CI 는 **정상 시나리오** (Qdrant 있음) 를 테스트. 킬 스위치는 운영자가 수동으로 발동하는 긴급 회피책.
+**부산물**: CI 가 통과하면 **T-8 킬 스위치가 실제로 동작함을 CI 레벨에서 증명**.
 
 ---
 

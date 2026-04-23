@@ -17,7 +17,7 @@ Spring AI 기반 RAG 파이프라인 + Reactor SSE 실시간 스트림 + Resilie
 
 ── 핵심 기술 스택 ──────────────────────────────
 • Java 21, Spring Boot 3.5.13, Gradle 8.14 (4-module: domain/application/infra/api)
-• Spring AI 1.0.2 + Ollama(llama3.2:3b + bge-m3) + Qdrant v1.17
+• Spring AI 1.0.2 + Ollama(llama3.2:3b + bge-m3) + Qdrant v1.13
 • Resilience4j 2.2, Reactor, WebClient
 • Prometheus + Grafana + Loki + Tempo (OTLP/gRPC)
 • WireMock(HTTP 통합 테스트), JUnit 5

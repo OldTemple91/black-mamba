@@ -46,7 +46,9 @@
 | pgvector | 기존 Postgres 스택 재활용 | 확장·필터 기능 상대적 약함 | 차후 POI용 (RAG-3) |
 
 **판단 기준:** 이력 20~수만 건 스케일 + Docker 1줄 + Spring AI 공식 지원.
-`qdrant/qdrant:v1.17.1` 으로 docker-compose 에 붙여 **gRPC 6334** 포트 하나로 운영.
+`qdrant/qdrant:v1.13.6` 으로 docker-compose 에 붙여 **gRPC 6334** 포트 하나로 운영.
+(Spring AI 1.0.2 번들 클라이언트 v1.13 과 정확히 호환되는 버전으로 고정 — 버전 스큐 경고 0.
+ 추후 Spring AI 업그레이드 시 Qdrant 서버도 같이 올리면 됨.)
 
 ### 2-2. 왜 `bge-m3` 인가
 
