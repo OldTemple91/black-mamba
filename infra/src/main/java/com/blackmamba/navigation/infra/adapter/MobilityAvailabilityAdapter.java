@@ -33,16 +33,19 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
     private final ConcurrentHashMap<SegmentAvailabilityKey, CacheEntry<Optional<MobilityInfo>>> segmentAvailabilityCache = new ConcurrentHashMap<>();
     private final long availabilityCacheTtlMs;
     private final int searchRadiusMeters;
+    private final boolean tagoEnabled;
 
     public MobilityAvailabilityAdapter(DdareungiApiClient ddareungiClient,
                                        KickboardApiClient kickboardClient,
                                        @org.springframework.beans.factory.annotation.Value("${navigation.mobility.search-radius-meters:700}") int searchRadiusMeters,
                                        @org.springframework.beans.factory.annotation.Value("${navigation.cache.mobility-availability-ttl-ms:20000}") long availabilityCacheTtlMs,
+                                       @org.springframework.beans.factory.annotation.Value("${tago.enabled:false}") boolean tagoEnabled,
                                        MeterRegistry meterRegistry) {
         this.ddareungiClient = ddareungiClient;
         this.kickboardClient = kickboardClient;
         this.searchRadiusMeters = searchRadiusMeters;
         this.availabilityCacheTtlMs = availabilityCacheTtlMs;
+        this.tagoEnabled = tagoEnabled;
         this.ddareungiFallbackErrorCounter = meterRegistry.counter(
                 "navigation.mobility.fallback.total",
                 "mobility", "ddareungi",
@@ -235,6 +238,13 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
     }
 
     private Mono<Optional<MobilityInfo>> findNearbyKickboard(double lat, double lng) {
+        // TAGO API 비활성화 설정 시 외부 호출 스킵하고 synthetic 폴백으로 즉시 반환.
+        // 현재(2026-04) 서울 데이터 미제공 상태이므로 기본값 false. 서울 제공 시 yml 한 줄로 복구.
+        if (!tagoEnabled) {
+            kickboardFallbackEmptyCounter.increment();
+            log.debug("[킥보드] TAGO 비활성화(tago.enabled=false) → synthetic 폴백 (호출 스킵)");
+            return Mono.just(Optional.of(syntheticKickboard(lat, lng)));
+        }
         return kickboardClient.getNearbyDevices(lat, lng, searchRadiusMeters)
                 .map(devices -> {
                     log.info("[킥보드] 검색 lat={}, lng={}, 반경={}m → 반경 내 배터리≥20% 기기 {}개",
