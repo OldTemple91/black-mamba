@@ -30,7 +30,7 @@
 | 📊 **성능 튜닝** | Geohash 공간 캐싱 — ODsay 히트율 46.9% → 80.4% |
 | 🌱 **MaaS 정체성** | 경로별 **탄소 배출량** (이동수단별 정밀 계수) + **날씨 인식** (RAIN/SNOW 공유 모빌리티 페널티) + 접근성 (휠체어/노인) |
 
-👉 **[자체 알고리즘 카탈로그](docs/architecture/routing-algorithm.md)** / **[개선 기록 22건](docs/improvements/README.md)** / **[ADR 7건](docs/adr/)** / **[로드맵](docs/roadmap/ROADMAP.md)**
+👉 **[자체 알고리즘 카탈로그](docs/architecture/routing-algorithm.md)** / **[개선 기록 23건](docs/improvements/README.md)** / **[ADR 7건](docs/adr/)** / **[로드맵](docs/roadmap/ROADMAP.md)**
 
 ## 🏛 시스템 아키텍처
 
@@ -482,6 +482,22 @@ docker compose up -d qdrant # 벡터 DB
 ```bash
 curl -X POST http://localhost:8081/api/rag/admin/seed
 ```
+
+### 🛡 RAG 킬 스위치 (Qdrant 장애 시 서비스 지속)
+
+Qdrant 장애 발생 시 **환경변수 한 줄로 앱을 RAG 없이 기동** 가능 (T-7 TAGO 와 동일한 철학).
+
+```bash
+# docker-compose 운영 시
+SPRING_PROFILES_ACTIVE=docker,no-rag docker compose up -d app
+```
+
+**영향:**
+- ✅ `/api/routes`, `/api/routes/stream`, `/api/nlp/routes`, `/api/places` — **완전 정상**
+- ⚠️ 추천 경로 `narrative` → LLM 설명 대신 **템플릿 narrative** 로 폴백
+- ❌ `/api/rag/similar-routes`, `/api/rag/admin/seed` → `503` 또는 스킵 메시지
+
+외부 의존성(Qdrant) 이 핵심 서비스(라우팅)를 끌어내리지 않도록 설계. 상세: [`application-no-rag.yml`](api/src/main/resources/application-no-rag.yml)
 
 ### 주요 엔드포인트
 

@@ -17,6 +17,7 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder.Op;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -53,9 +54,15 @@ import java.util.stream.Collectors;
  * </ol>
  *
  * <h3>장애 대응</h3>
- * save/search 공통: 예외 삼키고 warn 로그만. 본 요청 응답 흐름 보호.
+ * <ul>
+ *   <li>save/search 공통: 예외 삼키고 warn 로그만. 본 요청 응답 흐름 보호.</li>
+ *   <li>기동 시점에 {@code VectorStore} 빈이 없으면 ({@code SPRING_AUTOCONFIGURE_EXCLUDE}
+ *       로 Qdrant 자동구성 제외된 경우) 이 어댑터 자체가 컨테이너에 등록되지 않아
+ *       {@link RouteHistoryPort} 가 빈 Optional 이 됨 → 소비자들이 graceful 비활성.</li>
+ * </ul>
  */
 @Component
+@ConditionalOnBean(VectorStore.class)
 public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
 
     private static final Logger log = LoggerFactory.getLogger(QdrantRouteHistoryAdapter.class);

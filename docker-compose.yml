@@ -8,6 +8,14 @@ services:
     ports:
       - "8081:8081"
     environment:
+      # RAG 킬 스위치 (Qdrant 장애 시 회피책).
+      # 기본: 비어있음 → 전체 AutoConfig 활성 (Qdrant 필요).
+      # Qdrant 장애 시:
+      #   SPRING_AUTOCONFIGURE_EXCLUDE=org.springframework.ai.vectorstore.qdrant.autoconfigure.QdrantVectorStoreAutoConfiguration
+      #   docker compose up -d app
+      # → VectorStore 빈 생성 스킵 → RouteHistoryPort 빈 부재 → RAG 기능 graceful 비활성
+      # → /api/routes 기본 탐색은 완전 정상, narrative 만 템플릿으로 폴백
+      - SPRING_AUTOCONFIGURE_EXCLUDE=${SPRING_AUTOCONFIGURE_EXCLUDE:-}
       - ODSAY_API_KEY=${ODSAY_API_KEY}
       - DDAREUNGI_API_KEY=${DDAREUNGI_API_KEY}
       - TAGO_API_KEY=${TAGO_API_KEY}

@@ -36,6 +36,7 @@ EXPOSE 8081
 # React SPA fallback + Spring Boot 컨트롤러 우선순위 유지
 # static-locations: 정적 파일 위치 / spring.mvc.static-path-pattern: /** (기본값)
 # → /api 컨트롤러는 매핑 우선, 나머지는 static에서 서빙
+# SPRING_PROFILES_ACTIVE / SPRING_AUTOCONFIGURE_EXCLUDE 등 환경변수로 런타임 제어 가능.
+ENV SPRING_PROFILES_ACTIVE=local,docker
 ENTRYPOINT ["java", "-jar", "/app/app.jar", \
-    "--spring.profiles.active=local,docker", \
     "--spring.web.resources.static-locations=file:/app/static/"]
