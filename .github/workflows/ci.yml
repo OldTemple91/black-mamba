@@ -123,39 +123,23 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Start Qdrant sidecar (RAG Phase 2 필수 의존성)
-        run: |
-          docker network create black-mamba-ci
-          docker run -d --name qdrant-ci \
-            --network black-mamba-ci \
-            -e QDRANT__SERVICE__GRPC_PORT=6334 \
-            qdrant/qdrant:v1.13.6
-
-          # Qdrant 준비 대기 (gRPC 는 HTTP health 로 간접 확인)
-          for i in $(seq 1 20); do
-            if docker exec qdrant-ci sh -c 'wget -qO- http://localhost:6333/readyz 2>/dev/null | grep -q "all shards are ready"' 2>/dev/null \
-               || docker exec qdrant-ci sh -c 'wget -qO- http://localhost:6333/ 2>/dev/null | grep -q qdrant' 2>/dev/null; then
-              echo "Qdrant ready at attempt $i"
-              break
-            fi
-            echo "Qdrant warming up... ($i/20)"
-            sleep 2
-          done
-
       - name: Verify image starts and responds to health check
         env:
           IMAGE: ${{ env.IMAGE_TAG }}
         run: |
+          # CI 는 "앱 기동 가능 여부" 만 검증.
+          # RAG 는 Ollama (bge-m3 1.2GB) + Qdrant 가 필요한데 CI 에 띄우는 건 비현실적.
+          # → T-8 RAG 킬 스위치를 CI 에서 실제 사용:
+          #   SPRING_AUTOCONFIGURE_EXCLUDE 로 Qdrant VectorStore AutoConfig 제외.
+          #   RAG 기능만 graceful 비활성, 핵심 라우팅은 정상 동작.
           docker run -d --name black-mamba-test \
-            --network black-mamba-ci \
+            -e SPRING_AUTOCONFIGURE_EXCLUDE=org.springframework.ai.vectorstore.qdrant.autoconfigure.QdrantVectorStoreAutoConfiguration \
             -e ODSAY_API_KEY=dummy \
             -e DDAREUNGI_API_KEY=dummy \
             -e TAGO_API_KEY=dummy \
             -e TMAP_APP_KEY=dummy \
             -e NAVER_CLIENT_ID=dummy \
             -e NAVER_CLIENT_SECRET=dummy \
-            -e QDRANT_HOST=qdrant-ci \
-            -e QDRANT_PORT=6334 \
             -p 8081:8081 \
             "$IMAGE"
 
@@ -163,7 +147,7 @@ jobs:
             if curl -sf http://localhost:8081/actuator/health > /dev/null 2>&1; then
               echo "Health check OK at attempt $i"
               docker logs black-mamba-test --tail 20
-              docker stop black-mamba-test qdrant-ci
+              docker stop black-mamba-test
               exit 0
             fi
             echo "Waiting... ($i/18)"
@@ -172,7 +156,4 @@ jobs:
 
           echo "Health check failed — printing app logs"
           docker logs black-mamba-test
-          echo ""
-          echo "Qdrant sidecar logs:"
-          docker logs qdrant-ci --tail 30
           exit 1
