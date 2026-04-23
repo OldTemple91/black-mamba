@@ -199,7 +199,7 @@ services:
   # 경로 이력을 1024차원 벡터(bge-m3)로 임베딩해 저장.
   # 사용자 자연어 쿼리를 벡터화해 코사인 유사도로 유사 경로를 검색.
   qdrant:
-    image: qdrant/qdrant:v1.17.1
+    image: qdrant/qdrant:v1.13.6
     container_name: black-mamba-qdrant
     ports:
       - "6333:6333"   # REST API (대시보드: http://localhost:6333/dashboard)

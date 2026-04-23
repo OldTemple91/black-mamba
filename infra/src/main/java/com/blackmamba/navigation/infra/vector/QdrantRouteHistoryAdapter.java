@@ -17,8 +17,6 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder.Op;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -60,9 +58,12 @@ import java.util.stream.Collectors;
  *       로 Qdrant 자동구성 제외된 경우) 이 어댑터 자체가 컨테이너에 등록되지 않아
  *       {@link RouteHistoryPort} 가 빈 Optional 이 됨 → 소비자들이 graceful 비활성.</li>
  * </ul>
+ *
+ * <h3>Bean 등록 방식</h3>
+ * {@code @Component} 대신 {@link QdrantRouteHistoryConfig} 에서 {@code @Bean} 으로 등록.
+ * 이유: {@code @ConditionalOnBean(VectorStore.class)} 가 컴포넌트 스캔 시점에는
+ * 아직 Spring AI AutoConfig 가 실행되지 않아 불안정. AutoConfig 사이클에 편입.
  */
-@Component
-@ConditionalOnBean(VectorStore.class)
 public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
 
     private static final Logger log = LoggerFactory.getLogger(QdrantRouteHistoryAdapter.class);

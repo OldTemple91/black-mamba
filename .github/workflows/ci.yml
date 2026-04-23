@@ -129,7 +129,7 @@ jobs:
           docker run -d --name qdrant-ci \
             --network black-mamba-ci \
             -e QDRANT__SERVICE__GRPC_PORT=6334 \
-            qdrant/qdrant:v1.17.1
+            qdrant/qdrant:v1.13.6
 
           # Qdrant 준비 대기 (gRPC 는 HTTP health 로 간접 확인)
           for i in $(seq 1 20); do
