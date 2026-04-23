@@ -205,13 +205,22 @@ export default function NaverMap({ selectedRoute, onMapClick, mapMode }) {
       overlaysRef.current.push(marker, infoWindow)
     })
 
-    // leg별 폴리라인: routeCoordinates 있으면 실제 도로 경로, 없으면 직선
+    // leg별 폴리라인:
+    //  1) routeCoordinates (Tmap 도보/자전거/킥보드 실제 도로 좌표) 있으면 그대로
+    //  2) TRANSIT 은 passThroughStations (ODsay 경유 정류장) 을 순서대로 연결 — 지하철/버스 노선을 근사
+    //  3) 아무 것도 없으면 start↔end 직선
     selectedRoute.legs.forEach(leg => {
       const color = LEG_COLOR[leg.type] ?? '#0052A4'
-      const hasRoadPath = Array.isArray(leg.routeCoordinates) && leg.routeCoordinates.length > 1
-      const coords = hasRoadPath
-        ? leg.routeCoordinates
-        : [leg.start, leg.end].filter(isValid)
+      let coords
+      if (Array.isArray(leg.routeCoordinates) && leg.routeCoordinates.length > 1) {
+        coords = leg.routeCoordinates
+      } else if (leg.type === 'TRANSIT'
+                 && Array.isArray(leg.transitInfo?.passThroughStations)
+                 && leg.transitInfo.passThroughStations.length > 0) {
+        coords = [leg.start, ...leg.transitInfo.passThroughStations, leg.end].filter(isValid)
+      } else {
+        coords = [leg.start, leg.end].filter(isValid)
+      }
 
       if (coords.length > 1) {
         const polyline = drawPolyline(coords, color)

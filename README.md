@@ -47,7 +47,7 @@ flowchart TB
         PC["PlaceController<br/>/api/places"]
     end
 
-    subgraph App["⚙️ Application Layer (Orchestration · 자체 설계)"]
+    subgraph App["⚙️ Application Layer (Orchestration)"]
         ROS["RouteOptimizationService"]
         OS["OptimalSearchStrategy<br/>5패턴 병렬 (A/B/C/D/E)"]
         SS["SpecificMobilityStrategy"]
@@ -113,8 +113,8 @@ flowchart TB
 ```
 
 **3층 구조:**
-- **L1 외부 엔진** (ODsay / Tmap / 따릉이) — 도로 그래프 최단경로 이미 해결됨
-- **L2 Orchestration (우리가 설계)** — 5패턴 재조합 + 2-Phase Hub + 6차원 스코어링 + 후처리
+- **L1 외부 엔진** (ODsay / Tmap / 따릉이) — 도로 그래프 · 시간표 기반 최단경로 제공
+- **L2 Orchestration 층** — L1 결과를 재조합해 5패턴 병렬 생성 + 2-Phase Hub + 6차원 스코어링 + 후처리 (본 프로젝트 자체 구현)
 - **L3 AI + Observability** — RAG narrative / Qdrant 유사 검색 / 4축 관측성
 
 ### 📦 모듈 의존 (Clean Architecture)
@@ -137,10 +137,10 @@ flowchart LR
 - **infra** 가 Port 를 구현 (의존성 역전)
 - **api** 는 application 의 유스케이스만 호출
 
-## 🧭 "무엇을 우리가 직접 만들었나" — Orchestration 층
+## 🧭 자체 설계한 Orchestration 알고리즘 8종
 
-> A\*/Dijkstra 같은 **도로 그래프 최단경로** 는 ODsay/Tmap 이 처리.
-> 우리는 그 위에서 **다중 이동수단을 재조합 · 평가 · 설명하는 Orchestration 층** 을 자체 설계.
+> A\*/Dijkstra 같은 **도로 그래프 최단경로** 는 ODsay/Tmap 이 담당.
+> 그 위에서 **다중 이동수단을 재조합 · 평가 · 설명하는 Orchestration 층** 을 직접 설계·구현했다.
 
 | # | 알고리즘 | 한 줄 설명 | 코드 |
 |---|---------|-----------|-----|
@@ -159,7 +159,7 @@ flowchart LR
 
 Docker Compose 로 전체 스택 기동 후 실측 트래픽 발생 상태에서 자동 캡처.
 
-### Grafana — 3축 관측성 대시보드
+### Grafana — 4축 관측성 대시보드 (Logs · Metrics · Traces · Alerts/SLO)
 
 **Overview** (요청 수 / p95 / 캐시 Hit률 / JVM)
 ![Grafana Overview](docs/images/01-grafana-overview.png)
@@ -224,25 +224,22 @@ geohash, preference 등) 확인 가능.
                                      총 28분 · 3개 구간
 ```
 
-### Route Recommendation — 현실 시나리오: 역이 아닌 위치 간 이동
-
-**시나리오:** 서초동 아파트 단지(37.4850, 127.0320) → 성수 카페거리(37.5420, 127.0554)
+### Route Recommendation — 현실 시나리오
 
 실사용 OD 는 보통 **"역 ↔ 역"** 이 아니라 **집 / 오피스 / 카페 → 공원 / 상권** 같이 지하철역에서
 수백 m ~ 1 km 떨어진 위치끼리 연결된다. 이런 조건에서 **퍼스트마일/라스트마일을 자전거로 대체**
-하면 대중교통 직행 대비 시간 단축이 발생한다. 본 추천 결과가 그 증거:
+하면 대중교통 직행 대비 시간 단축이 발생한다.
 
-| 순위 | 경로 타입 | 소요 | 추천 여부 |
-|-----|----------|------|----------|
+**시나리오:** 서초동 아파트 단지 (37.4850, 127.0320) → 성수 카페거리 (37.5420, 127.0554)
+
+| 순위 | 경로 타입 | 소요 | 비고 |
+|-----|----------|------|-----|
 | #1 | `TRANSIT_WITH_BIKE` | **28분** | ✅ 추천 |
 | #2~3 | `TRANSIT_WITH_BIKE` | 33분, 34분 | |
 | **#4** | **`TRANSIT_ONLY`** | **36분** | ← 전통적 대중교통 직행 (8분 더 걸림) |
 | #5 | `TRANSIT_WITH_BIKE` | 37분 | |
 
-→ **Mixed 경로가 TRANSIT_ONLY 보다 8분 단축.** MaaS 엔진이 실사용 OD 에서 복합 경로의
-가치를 추천으로 실제 제시한다는 시각적 증거.
-
-![Route Recommendation UI](output/playwright/routes-page.png)
+→ **Mixed 경로가 TRANSIT_ONLY 보다 8분 단축.** A-5 실측 벤치마크에서 이런 케이스 30쌍 자동 배치 — 상세: [14. 실측 평가](#14-실측-평가-a-5-real-user-benchmark).
 
 ## 1. Project Overview
 
@@ -323,79 +320,24 @@ baseline 대중교통 경로를 먼저 만든 뒤, 그 경로를 따라 퍼스�
 
 즉, "가장 빠른 경로"보다 "실제로 성공 가능성이 높은 경로"를 우선 추천하는 방향으로 설계했습니다.
 
-## 4. Key Features
+## 4. 경로 타입 · 탐색 흐름
 
-- 대중교통 baseline 경로 생성
-- 대중교통 + 자전거 조합 경로 생성
-- 이동수단 + 대중교통 조합 경로 생성
-- 이동수단 + 대중교통 + 이동수단 조합 경로 생성
-- 자전거 대여/반납 정류소 검증
-- 이동수단 접근/이탈 도보 구간 반영
-- 지도 마커 기반 탑승/환승 설명 UI
-- 추천 이유 및 리스크 배지 제공
-- 설명 가능한 추천 결과 제공
+상단 [시스템 아키텍처 Mermaid](#-시스템-아키텍처) 에 레이어와 데이터 플로우가 모두 표현되어 있다. 여기서는 경로 모델만 요약.
 
-## 5. System Architecture
+**지원하는 경로 타입 (`RouteType`):**
 
-- `api`
-  - 경로 검색 API 제공
-- `application`
-  - 경로 탐색 전략, 후보 생성, 점수 계산, 인사이트 생성
-- `domain`
-  - `Route`, `Leg`, `MobilityInfo` 등 핵심 도메인 모델
-- `infra`
-  - ODsay, TMAP, 따릉이 등 외부 API 연동
-- `frontend`
-  - 경로 비교, 지도 시각화, 추천 이유/리스크 노출
+| 타입 | 구성 |
+|------|------|
+| `TRANSIT_ONLY`              | 순수 대중교통 (ODsay baseline 그대로) |
+| `TRANSIT_WITH_BIKE`         | 대중교통 + 따릉이 라스트마일 |
+| `TRANSIT_WITH_KICKBOARD`    | 대중교통 + 킥보드 라스트마일 |
+| `MOBILITY_FIRST_TRANSIT`    | 이동수단 퍼스트마일 + 대중교통 |
+| `MOBILITY_TRANSIT_MOBILITY` | 이동수단 + 대중교통 + 이동수단 (양쪽 모두) |
+| `MOBILITY_ONLY`             | 이동수단만 (직선거리 < 최대 범위) |
 
-```mermaid
-flowchart LR
-    UI["Frontend (React / Vite)"] --> API["Route API"]
-    API --> APP["Application Layer"]
-    APP --> STRATEGY["RouteSearchStrategy"]
-    APP --> SCORE["RouteScoreCalculator"]
-    APP --> INSIGHT["RouteInsightFactory"]
-    STRATEGY --> DOMAIN["Route / Leg / MobilityInfo"]
-    STRATEGY --> ODSAY["ODsay Adapter"]
-    STRATEGY --> TMAP["TMAP Adapter"]
-    STRATEGY --> BIKE["Ddareungi Adapter"]
-```
+**탐색 파이프라인 개요:** baseline 생성 → 후보 지점 선택 → pickup/dropoff 검증 → 재조합 → 6차원 스코어링 → 후처리(Accessibility/Weather/Carbon) → 랭킹.
 
-## 6. Routing Flow
-
-### Baseline
-
-- 출발지 -> 목적지 대중교통 경로 생성
-
-### Candidate Generation
-
-- baseline 경로에서 라스트마일/퍼스트마일 후보 지점 선택
-- 출발지/목적지 인근 이동수단 가용성 조회
-- 자전거는 실제 대여 정류소와 반납 정류소를 모두 확인
-- 완전 자유 멀티모달 탐색 대신, baseline 주변 허브만 재조합해 외부 API 호출량을 제어
-
-### Route Composition
-
-현재 지원하는 경로 타입:
-
-- `TRANSIT_ONLY`
-- `TRANSIT_WITH_BIKE`
-- `TRANSIT_WITH_KICKBOARD`
-- `MOBILITY_FIRST_TRANSIT`
-- `MOBILITY_TRANSIT_MOBILITY`
-- `MOBILITY_ONLY`
-
-```mermaid
-flowchart TD
-    A["Origin / Destination"] --> B["Baseline Transit Route"]
-    B --> C["Candidate Point Selection"]
-    C --> D["Mobility Availability Check"]
-    D --> E["Pickup / Dropoff Validation"]
-    E --> F["Route Composition"]
-    F --> G["Reliability-Aware Ranking"]
-    G --> H["Recommendation Reasons / Risk Badges"]
-    H --> I["Explainable UI"]
-```
+상세 의사코드와 임계값 근거: [자체 알고리즘 카탈로그](docs/architecture/routing-algorithm.md).
 
 ## 7. Reliability-Aware Recommendation
 
@@ -474,27 +416,45 @@ flowchart TD
 - **Java 21** (LTS, records / sealed interface / pattern matching 활용)
 - **Spring Boot 3.5.13** + Gradle 8.14
 - **Reactor** (Mono/Flux) — WebClient + 비동기 체인
+- **Micrometer Observation + `@Observed`** — 트레이싱/메트릭 통합
 
 ### AI / RAG (Phase 1~6)
-- **Spring AI 1.0.2** (ChatClient / VectorStore 추상화)
+- **Spring AI 1.0.2** (`ChatClient` / `VectorStore` 추상화)
 - **Ollama** — `llama3.2:3b` (Chat) + `bge-m3` (Embedding, 1024차원)
-- **Qdrant v1.17** — 벡터 DB (gRPC, HNSW 인덱스, Cosine 유사도)
+- **Qdrant v1.17** — 벡터 DB (gRPC, HNSW 인덱스, Cosine 유사도, 3축 하이브리드 필터)
 
-### 장애 대응 / 관측성
-- **Resilience4j 2.2** — CircuitBreaker, Retry, Reactor Operator
-- **Prometheus + Grafana 12** — Micrometer, Exemplars
-- **Loki 3.7** — loki4j 2.0, structured metadata
+### 장애 대응
+- **Resilience4j 2.2** — CircuitBreaker + Retry + Fallback, Reactor Operator
+- 외부 API 5개 (ODsay / Tmap / 따릉이 / Naver Geocoding / Naver Local) 3층 방어선
+- TAGO 런타임 킬 스위치 (`tago.enabled` env 토글)
+
+### 관측성 (4축)
+- **Prometheus v3.11** + **Grafana v12.4** — Micrometer, Exemplars (메트릭→트레이스 점프)
+- **Loki 3.7** — loki4j 2.0, structured metadata (stack_trace 펼치기)
 - **Tempo 2.10** — OTLP/gRPC, Micrometer Tracing Bridge (OTel)
+- **Alertmanager v0.28** — Discord 웹훅 + SLO Burn Rate (Google SRE 패턴, 1h 14.4× / 6h 6×)
+- **cAdvisor v0.55** + **Node Exporter v1.9** — 호스트/컨테이너 메트릭
+
+### MaaS 정체성
+- **Carbon Footprint** — 이동수단별 정밀 계수 (지하철 41 / 버스 68 / 공유 킥보드 22 g/km 등)
+- **Weather-aware Routing** — RAIN/SNOW 시 공유 모빌리티 페널티 (후처리 재사용 패턴)
+- **Accessibility** — 휠체어/노인 옵션 (엘리베이터 없는 역 필터 + 보행속도 재계산)
+- **vs 자가용 비교** — time/cost/CO₂ 3축 narrative
 
 ### Testing
-- JUnit 5 + Mockito + AssertJ
-- **WireMock** (ODsay 클라이언트 HTTP 레벨 통합 테스트)
+- **JUnit 5** + Mockito + AssertJ (단위 테스트 88개)
+- **WireMock** — ODsay 클라이언트 HTTP 레벨 통합 테스트
+- **Playwright** — 프론트 UI 자동 스크린샷 + 데모 비디오 녹화
 
 ### Frontend
-- React + Vite + Naver Map
+- **React 19** + **Vite 7** + **TailwindCSS v4** (`@custom-variant dark` 전략)
+- **Naver Maps** — 실시간 경로 라인 (passThroughStations 기반 경유 정류장 연결)
+- **Dark Mode** — localStorage + `prefers-color-scheme` 우선순위
+- **Route Timeline Bar** — 서울 지하철 15개 노선 공식색
+- **Skeleton Loading** + **Glassmorphism** + **Hero CSS motion** + `prefers-reduced-motion` 대응
 
 ### External APIs
-- ODsay (대중교통), TMAP (보행), 서울시 따릉이, 네이버 지오코딩/로컬검색
+- **ODsay** (대중교통), **TMAP** (보행), 서울시 **따릉이**, **네이버** 지오코딩/로컬검색, **기상청** 예보 (A-4, 선택)
 
 ## 12. Run Locally
 
@@ -584,66 +544,51 @@ open http://localhost:3200     # Tempo
 상세 설계: [`docs/monitoring/observability-stack.md`](docs/monitoring/observability-stack.md)
 관련 기술 블로그: [모니터링 시스템 개발 (Prometheus & Grafana LGTM)](https://www.notion.so/Prometheus-Grafana-LGTM-15b8983855a3807c840addfdbe093342)
 
-## 13. Current Implementation Status
+## 13. 구현 상태 & 개선 이력
 
-현재 구현된 핵심 사항:
+핵심 기능은 **[개선 기록 21건](docs/improvements/README.md)** 에 누적 기록되어 있다. 상위 카테고리:
 
-- 대중교통 경로를 baseline으로 생성
-- 자전거 라스트마일/퍼스트마일 조합 경로 생성
-- 실제 대여 정류소 / 반납 정류소 검증
-- 이동수단 탑승 전후 도보 구간 반영
-- 연속 도보 구간 병합
-- 700m 이내 단거리 검색 제한 및 사용자 재검색 안내
-- 추천 이유/리스크를 API 응답에 포함
-- 지도/카드에서 설명 가능한 추천 UI 제공
+- **🧭 Orchestration 알고리즘** — Baseline-Guided Recomposition, 2-Phase Hub, 6-Dim Scoring 등 8종 ([카탈로그](docs/architecture/routing-algorithm.md))
+- **🧠 AI/RAG Phase 1~6** — Ollama + Qdrant + 하이브리드 검색 + LLM narrative + 할루시네이션 감지
+- **⚡ 실시간** — SSE 30초 재탐색 (A-1)
+- **🌱 MaaS 정체성** — Carbon Footprint (C-2) · Weather-aware (A-4) · Accessibility (C-3) · vs 자가용 비교 (F-1)
+- **🛡 장애 대응** — Resilience4j 3층 방어선 (T-3) · TAGO 런타임 킬 스위치 (T-7)
+- **🔍 관측성** — Prometheus/Loki/Tempo + Alertmanager + SLO Burn Rate (M-1/2/3)
+- **🎨 UI/UX** — Split layout + Glassmorphism + Dark Mode + Route Timeline Bar + Skeleton Loading
+- **📊 성능 튜닝** — Geohash 공간 캐싱, ODsay 히트율 46.9% → 80.4% (B-3)
 
-## 14. Evaluation Plan
+## 14. 실측 평가 (A-5 Real User Benchmark)
 
-향후 아래 지표를 중심으로 평가할 예정입니다.
+역 좌표 편향을 제거한 **실사용자 OD 30쌍** 자동 배치 실험 결과 ([상세](docs/improvements/2026-04-23-A5-real-user-benchmark.md)):
 
-- baseline 대비 평균 시간 절감
-- 평균 도보 거리 변화
-- 접근 도보 평균/최대 거리
-- 반납 정류소 미존재로 제외된 경로 비율
-- 추천 경로의 공유수단 의존 비율
-- API 응답 시간
+| 지표 | 값 |
+|------|-----|
+| **Mixed 경로 채택률** | **43%** (TRANSIT_ONLY 대비) |
+| **평균 시간 단축** | 3.4분 |
+| **최대 시간 단축** | 8분 (서초 아파트 → 성수 카페거리) |
+| **아파트 출발 케이스** | **70%** 가 Mixed 경로 승리 |
 
-추가로, 아래 비교를 목표로 합니다.
+**대표 시나리오** (readme 상단 스크린샷 참조):
+- 서초동 아파트 (37.4850, 127.0320) → 성수 카페거리 (37.5420, 127.0554)
+- `TRANSIT_WITH_BIKE` 28분 vs `TRANSIT_ONLY` 36분 → **8분 단축**
 
-- 최단시간 중심 추천 vs 신뢰도 중심 추천
+추천 기준별 정책 차이:
+- `RELIABILITY` (기본) — 대중교통 안정성 우선
+- `TIME_PRIORITY` — mixed 경로 적극 추천 (평균 3.9분 단축)
 
-배치 실험 스크립트는 추천 결과뿐 아니라 cache hit/miss delta도 함께 기록합니다.
-
-현재까지 확인된 대표 결과:
-
-- `RELIABILITY`에서는 같은 mixed-winning 샘플 세트에서도 추천이 모두 `TRANSIT_ONLY`
-- `TIME_PRIORITY`에서는 mixed-winning 샘플 7건이 모두 mixed 추천으로 전환
-  - 평균 `3.857분` 단축
-  - 평균 비용 변화 `-57원`
-  - `MOBILITY_ONLY`, `TRANSIT_WITH_BIKE` 두 유형 모두 포함
-- 최신 `no-mixed` 샘플 4건에서는 `SAME_PICKUP_DROPOFF`가 사라지고, 진단 코드가 아래처럼 수렴
-  - `NO_PICKUP: 4`
-  - `samplesWithMixedAlternative: 2`
-- warm second-pass 기준으로는 `TMAP` miss가 `0`으로 떨어졌고, `mobility_availability`/`mobility_segment`는 세그먼트 조합 다양성 때문에 miss가 일부 남음
-
-즉 현재 엔진은
-- `RELIABILITY`: 대중교통 유지
-- `TIME_PRIORITY`: 시간 절감이 실제로 있는 mixed 경로 추천
-
-이라는 정책 차이를 실제 결과로 보여줄 수 있다.
+종합 수치와 평가 방법론: [`docs/performance/real-user-benchmark.md`](docs/performance/real-user-benchmark.md)
 
 ## 15. Limitations
 
-현재 한계:
+현재 한계 (향후 개선 대상):
 
-- 공유 킥보드 실시간 데이터 미제공 (TAGO API 서울 데이터 없음 → 호출 차단, 개인 PM으로 전환)
-- 허브 모델이 아직 정류소/후보점 수준에 머무름
-- 점수 모델이 완전한 운영 리스크를 모두 반영하진 않음
-- 실험 데이터셋 기반 정량 평가가 아직 부족함
-- 700m 이내 단거리 구간은 현재 도보 전용 탐색을 제공하지 않음
-- 완전 자유 멀티모달 탐색이 아니라 baseline 기반 허브 재조합이기 때문에, baseline 바깥의 유망한 허브 조합을 놓칠 수 있음
-- 외부 API quota와 rate limit 때문에 후보를 무한정 확장하는 탐색은 현실적으로 어렵고, 현재는 캐시/백오프/pruning으로 대응 중
-- TMAP fallback 상황에서는 도보 관련 지표가 근사치로 계산될 수 있음
+- **완전 자유 탐색이 아닌 baseline 기반 재조합** — baseline 바깥의 유망한 허브 조합을 놓칠 수 있음. 외부 API quota/rate limit 때문에 전수 탐색 대신 캐시/백오프/pruning 으로 품질과 호출량 균형.
+- **허브 모델이 정류소/후보점 수준** — `Hub` 도메인으로 일반화 예정 (SUBWAY_STATION, BUS_STOP, BIKE_STATION, CARSHARE_ZONE, CHARGING_STATION).
+- **점수 모델이 운영 리스크를 전부 반영하진 않음** — 현재 7가지 벌점. 사용자 클릭 로그 기반 가중치 학습은 Phase 2.
+- **700m 이내 단거리 구간은 도보 전용 탐색 미제공** — `400 SHORT_DISTANCE` 로 명시적 안내.
+- **공유 킥보드 실시간 데이터 미제공** — TAGO 서울 데이터 제공 없음. `TAGO_ENABLED=false` 로 외부 호출 스킵, 제공 시작 시 env 한 줄로 복구 가능 ([T-7](docs/improvements/2026-04-23-T7-tago-kill-switch.md)).
+- **TMAP 429 상황에선 도보 지표가 근사치** — 백오프 동안 haversine fallback 으로 서비스 유지.
+- **RAG narrative 는 로컬 LLM (llama3.2:3b) 기준** — 모델 교체는 env 변수 한 줄, 상용 LLM (GPT-4/Claude) 연동은 Spring AI `ChatClient` 추상화로 설정 레벨에서 전환 가능.
 
 ## 16. Roadmap
 
