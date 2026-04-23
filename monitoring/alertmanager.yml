@@ -1,0 +1,59 @@
+## M-1: Alertmanager — Discord 웹훅 알림
+##
+## Alertmanager 0.27+ 부터 discord_configs 네이티브 지원.
+## DISCORD_WEBHOOK_URL 환경변수로 주입 (docker-compose 의 ${DISCORD_WEBHOOK_URL}).
+##
+## 로컬 테스트 시 DISCORD_WEBHOOK_URL 미설정이면 null webhook 으로 로그만 찍힘.
+
+global:
+  resolve_timeout: 1m
+
+route:
+  # 공통 그룹핑: alertname 단위로 모아서 노이즈 감소
+  group_by: ['alertname', 'severity']
+  group_wait: 30s          # 첫 알림 전 30초 대기 (같은 그룹 더 모을 시간)
+  group_interval: 5m       # 같은 그룹 추가 알림 최소 간격
+  repeat_interval: 1h      # 해결 안 된 알림 재송신 간격
+  receiver: 'discord-default'
+
+  routes:
+    # critical 은 즉시 발송
+    - matchers:
+        - severity = "critical"
+      group_wait: 10s
+      repeat_interval: 30m
+      receiver: 'discord-critical'
+
+receivers:
+  - name: 'discord-default'
+    discord_configs:
+      - webhook_url: PLACEHOLDER_DISCORD_WEBHOOK
+        send_resolved: true
+        title: '{{ template "discord.default.title" . }}'
+        message: '{{ template "discord.default.message" . }}'
+
+  - name: 'discord-critical'
+    discord_configs:
+      - webhook_url: PLACEHOLDER_DISCORD_WEBHOOK
+        send_resolved: true
+        title: '🚨 [CRITICAL] {{ .CommonLabels.alertname }}'
+        message: |
+          {{ range .Alerts }}
+          **{{ .Labels.alertname }}** — {{ .Status | toUpper }}
+          {{ .Annotations.summary }}
+
+          {{ if .Annotations.description }}{{ .Annotations.description }}{{ end }}
+          {{ if .Annotations.runbook }}📖 Runbook: {{ .Annotations.runbook }}{{ end }}
+          🕐 started: {{ .StartsAt.Format "15:04:05" }}
+          {{ end }}
+
+templates:
+  - /etc/alertmanager/templates/*.tmpl
+
+# 억제 룰: CRITICAL 이 떠있을 때 같은 job 의 warning 은 숨김
+inhibit_rules:
+  - source_matchers:
+      - severity = "critical"
+    target_matchers:
+      - severity = "warning"
+    equal: ['alertname', 'job']

@@ -1,0 +1,109 @@
+## M-1: Black Mamba 알림 룰 5종
+##
+## 원칙:
+## - for: 는 "얼마나 지속되어야 알람으로 인정하는가" — 순간 스파이크는 무시.
+## - severity: critical(즉시 대응) / warning(팀 채널 참고).
+## - 각 알람은 runbook_url 또는 summary 로 "무엇을 해야 하나" 를 즉시 안내.
+
+groups:
+  - name: black-mamba-alerts
+    interval: 30s
+    rules:
+
+      # ───────────────────────────────────────────────
+      # ① 경로 탐색 p95 지연 > 3초 지속 (5분)
+      # ───────────────────────────────────────────────
+      - alert: RouteSearchHighP95Latency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(navigation_route_duration_seconds_bucket[5m]))
+          ) > 3
+        for: 5m
+        labels:
+          severity: warning
+          service: navigation
+          slo: latency
+        annotations:
+          summary: "🐢 경로 탐색 p95 > 3s (최근 5분 지속)"
+          description: |
+            현재 p95 = {{ $value | humanizeDuration }}.
+            SLO(p95 < 2s) 초과. ODsay/Tmap 응답 지연 또는 내부 병목 점검 필요.
+          runbook: "Grafana Route Performance 대시보드 → p95 히트맵 → Tempo exemplar 트레이스 점프"
+
+      # ───────────────────────────────────────────────
+      # ② 전체 요청의 5xx 비율 > 5% 지속 (5분)
+      # ───────────────────────────────────────────────
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            /
+            sum(rate(http_server_requests_seconds_count[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: navigation
+          slo: availability
+        annotations:
+          summary: "🔥 5xx 에러율 > 5% (5분 지속)"
+          description: |
+            5xx 비율 = {{ $value | humanizePercentage }}.
+            SLO(가용성 99%) 위협. GlobalExceptionHandler 로그 + /actuator/circuitbreakers 확인.
+          runbook: "Loki 에서 stack_trace=* | severity=ERROR 검색 → 트레이스 점프"
+
+      # ───────────────────────────────────────────────
+      # ③ 외부 API Circuit Breaker OPEN 상태
+      # ───────────────────────────────────────────────
+      - alert: CircuitBreakerOpen
+        expr: resilience4j_circuitbreaker_state{state="open"} == 1
+        for: 1m
+        labels:
+          severity: critical
+          service: navigation
+          slo: availability
+        annotations:
+          summary: "⚡ Circuit Breaker OPEN — {{ $labels.name }}"
+          description: |
+            외부 API `{{ $labels.name }}` 의 회로가 차단되었습니다.
+            실패율 임계값(50%) 초과. fallback 경로로 서비스 유지 중이지만 품질 저하.
+          runbook: "/actuator/circuitbreakers 로 현재 상태 + 최근 이벤트 확인"
+
+      # ───────────────────────────────────────────────
+      # ④ 따릉이 Fallback 발동 빈번
+      # ───────────────────────────────────────────────
+      - alert: DdareungiFallbackSpike
+        expr: |
+          sum(rate(navigation_mobility_fallback_total{mobility="ddareungi",reason="error"}[5m])) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          service: navigation
+          mobility: ddareungi
+        annotations:
+          summary: "🚲 따릉이 API fallback 빈도 상승 (>0.2/s)"
+          description: |
+            따릉이 API 호출 실패로 합성 응답 반환이 늘어나는 중입니다.
+            응답 품질 저하 (실시간 재고 정보 없음). 서울시 공공데이터 API 상태 확인.
+          runbook: "External APIs 대시보드 → 따릉이 패널 → Loki 최근 에러 확인"
+
+      # ───────────────────────────────────────────────
+      # ⑤ JVM Heap 사용률 높음 (운영 환경 조기 경보)
+      # ───────────────────────────────────────────────
+      - alert: JvmHeapHigh
+        expr: |
+          sum by (instance) (jvm_memory_used_bytes{area="heap"})
+          /
+          sum by (instance) (jvm_memory_max_bytes{area="heap"})
+          > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          service: navigation
+        annotations:
+          summary: "🧠 JVM Heap 사용률 > 85% (10분 지속)"
+          description: |
+            인스턴스 {{ $labels.instance }} Heap 사용률 {{ $value | humanizePercentage }}.
+            GC pressure 또는 메모리 누수 가능성. Overview 대시보드 JVM 패널 확인.
+          runbook: "Grafana Overview → JVM Heap/GC → jcmd 또는 heap dump 검토"

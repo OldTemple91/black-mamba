@@ -49,6 +49,7 @@ services:
       - "9090:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus-rules:/etc/prometheus/rules:ro
       - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -111,6 +112,74 @@ services:
       - monitoring
 
   # ─────────────────────────────────────────────────────
+  # M-1: Alertmanager (Discord 웹훅 알림)
+  # ─────────────────────────────────────────────────────
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    container_name: black-mamba-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.template.yml:ro
+      - alertmanager-data:/alertmanager
+    # Alertmanager 는 env var 치환을 지원하지 않으므로, 시작 시 sh 로 template → 실제 config 생성.
+    # docker-compose 의 $$ 는 컨테이너 런타임에서 $ 로 해석됨 (이스케이프).
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        sed "s@PLACEHOLDER_DISCORD_WEBHOOK@$$DISCORD_WEBHOOK_URL@g" \
+          /etc/alertmanager/alertmanager.template.yml > /tmp/alertmanager.yml
+        exec /bin/alertmanager \
+          --config.file=/tmp/alertmanager.yml \
+          --storage.path=/alertmanager \
+          --web.external-url=http://localhost:9093
+    environment:
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-https://discord.com/api/webhooks/DISABLED/DISABLED}
+    networks:
+      - monitoring
+
+  # ─────────────────────────────────────────────────────
+  # M-2: 호스트/컨테이너 메트릭
+  # ─────────────────────────────────────────────────────
+  # cAdvisor — 컨테이너별 CPU/Mem/Network/FS 메트릭 수집
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.55.1
+    container_name: black-mamba-cadvisor
+    ports:
+      - "8088:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
+    networks:
+      - monitoring
+
+  # Node Exporter — 호스트 CPU/Mem/Disk/Load
+  # macOS/Docker Desktop 에서는 VM 레벨 값이 보이지만 상대 추이는 유의미.
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+    container_name: black-mamba-node-exporter
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - monitoring
+
+  # ─────────────────────────────────────────────────────
   # RAG Phase 2: Vector DB
   # ─────────────────────────────────────────────────────
   # 경로 이력을 1024차원 벡터(bge-m3)로 임베딩해 저장.
@@ -132,6 +201,7 @@ volumes:
   prometheus-data:
   grafana-data:
   qdrant-data:
+  alertmanager-data:
 
 networks:
   monitoring:

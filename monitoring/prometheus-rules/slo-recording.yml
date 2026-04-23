@@ -1,0 +1,121 @@
+## M-3: SLO Recording Rules + Burn Rate
+##
+## SLO 정의:
+## - 가용성:  성공률 ≥ 99%     (1개월 에러버짓 = 1% ≈ 7h 18m)
+## - 지연:    p95 < 2000ms    (1개월 에러버짓 = 1% 요청이 이 임계값 초과 허용)
+##
+## Recording Rules 를 미리 계산해 대시보드 쿼리 속도↑ + 정의 한 곳에서 관리.
+## Burn Rate: 현재 소비 속도로 에러버짓이 얼마 안에 소진되는지 — SRE 표준 지표.
+
+groups:
+  # ────────────────────────────────────────────────────────
+  # 1) 가용성 SLO — 성공 / 전체
+  # ────────────────────────────────────────────────────────
+  - name: slo-availability
+    interval: 30s
+    rules:
+      # 요청 수 (카디널리티 낮춘 총합)
+      - record: slo:navigation_requests:rate5m
+        expr: sum(rate(http_server_requests_seconds_count{uri!~".*actuator.*"}[5m]))
+
+      # 성공 요청 수 (2xx, 3xx, 4xx 는 서버 장애 아님 — 5xx 만 실패로 카운트)
+      - record: slo:navigation_requests_success:rate5m
+        expr: sum(rate(http_server_requests_seconds_count{uri!~".*actuator.*",status!~"5.."}[5m]))
+
+      # 실시간 가용성
+      - record: slo:navigation_availability:ratio5m
+        expr: |
+          slo:navigation_requests_success:rate5m
+          /
+          (slo:navigation_requests:rate5m > 0)
+
+      # 30일 누적 가용성 (장기 SLO 관측)
+      - record: slo:navigation_availability:ratio30d
+        expr: |
+          (
+            sum(increase(http_server_requests_seconds_count{uri!~".*actuator.*",status!~"5.."}[30d]))
+            /
+            sum(increase(http_server_requests_seconds_count{uri!~".*actuator.*"}[30d]))
+          )
+
+      # 에러버짓 소진율 (burn rate)
+      # 참조: Google SRE Workbook ch.5 — "fast burn (1h 초당 소비율) = 14.4 배면 2일 안에 버짓 소진"
+      - record: slo:navigation_errorbudget_burnrate:1h
+        expr: |
+          (
+            1 - (
+              sum(rate(http_server_requests_seconds_count{uri!~".*actuator.*",status!~"5.."}[1h]))
+              /
+              sum(rate(http_server_requests_seconds_count{uri!~".*actuator.*"}[1h]))
+            )
+          ) / (1 - 0.99)
+
+      - record: slo:navigation_errorbudget_burnrate:6h
+        expr: |
+          (
+            1 - (
+              sum(rate(http_server_requests_seconds_count{uri!~".*actuator.*",status!~"5.."}[6h]))
+              /
+              sum(rate(http_server_requests_seconds_count{uri!~".*actuator.*"}[6h]))
+            )
+          ) / (1 - 0.99)
+
+  # ────────────────────────────────────────────────────────
+  # 2) 지연 SLO — p95 < 2s
+  # ────────────────────────────────────────────────────────
+  - name: slo-latency
+    interval: 30s
+    rules:
+      - record: slo:route_duration_p95:5m
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(navigation_route_duration_seconds_bucket[5m]))
+          )
+
+      - record: slo:route_duration_p99:5m
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum by (le) (rate(navigation_route_duration_seconds_bucket[5m]))
+          )
+
+      # "2초 이내 응답 비율" — 지연 SLO 달성률
+      - record: slo:route_latency_compliance:ratio5m
+        expr: |
+          sum(rate(navigation_route_duration_seconds_bucket{le="2.0"}[5m]))
+          /
+          sum(rate(navigation_route_duration_seconds_count[5m]))
+
+  # ────────────────────────────────────────────────────────
+  # 3) Burn Rate 알림 — 다중 윈도우 + 다중 속도
+  # (Google SRE Workbook Table 5-1 기반)
+  # ────────────────────────────────────────────────────────
+  - name: slo-burnrate-alerts
+    interval: 1m
+    rules:
+      # Fast burn: 1시간 동안 14.4배 속도로 소비 → 2.5일 안에 한 달치 에러버짓 소진
+      - alert: ErrorBudgetFastBurn
+        expr: slo:navigation_errorbudget_burnrate:1h > 14.4
+        for: 2m
+        labels:
+          severity: critical
+          slo: availability
+        annotations:
+          summary: "🔥 에러버짓 Fast Burn — 2일 안 소진 속도"
+          description: |
+            1시간 burn rate = {{ $value | printf "%.1f" }}배 (임계값 14.4).
+            즉시 원인 조사 필요. 이 속도로 6시간 지속 시 한 달 버짓의 대부분이 사라집니다.
+
+      # Slow burn: 6시간 동안 6배 속도 → 5일 안에 소진 속도
+      - alert: ErrorBudgetSlowBurn
+        expr: slo:navigation_errorbudget_burnrate:6h > 6
+        for: 15m
+        labels:
+          severity: warning
+          slo: availability
+        annotations:
+          summary: "🔥 에러버짓 Slow Burn — 5일 소진 속도"
+          description: |
+            6시간 burn rate = {{ $value | printf "%.1f" }}배 (임계값 6).
+            당장 장애는 아니지만 추세가 지속되면 월 SLO 위반 우려.

@@ -90,6 +90,7 @@ YYYY-MM-DD-<카테고리>-<제목>.md
 | 12 | 2026-04-23 | A-5 | [현실 시나리오 벤치마크 (역 편향 제거)](./2026-04-23-A5-real-user-benchmark.md) | OD 30쌍 자동 배치 — **Mixed 채택률 43%, 평균 3.4분 단축, 최대 8분.** 아파트 출발 70% Mixed 승리 |
 | 13 | 2026-04-23 | A-6 | [장소 자동완성 POI+주소 2단계 폴백](./2026-04-23-A6-place-autocomplete-fallback.md) | `/api/places` 에 Geocoding 폴백 체인 추가 — 프론트 수정 0줄, 자동완성 UX 가 결과 페이지와 일관 |
 | 14 | 2026-04-23 | T-7 | [TAGO API 런타임 킬 스위치](./2026-04-23-T7-tago-kill-switch.md) | 서울 미제공 엔드포인트 외부 호출 스킵 — 응답 500ms → **<10ms**, 로그 노이즈 제거, 재개 시 env 한 줄로 복구 |
+| 15 | 2026-04-23 | M-1/M-2/M-3 | [관측성 4축 완성 (Alertmanager + SLO + 호스트 메트릭)](./2026-04-23-M1-M2-M3-alerts-slo.md) | 3축(Logs/Metrics/Traces) → **4축(+Alerts, +SLO)**. Alert 7 + Recording 9 룰 + Burn Rate 다중 윈도우 + cAdvisor/Node Exporter |
 
 ---
 

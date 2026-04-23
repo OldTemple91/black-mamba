@@ -19,7 +19,7 @@
 | 🧠 **AI/RAG (Phase 1~6)** | 자연어 경로 검색 + Qdrant 벡터 DB + bge-m3(1024차원) 하이브리드 검색 + LLM narrative + 할루시네이션 감지 |
 | ⚡ **실시간 스트림 (A-1)** | Reactor Flux 기반 SSE — 30초 재탐색, 변화 감지 push, HEARTBEAT, 자동 종료 |
 | 🛡️ **장애 대응 (T-3)** | Resilience4j CircuitBreaker + Retry + Fallback — 외부 API 5개 3층 방어선 |
-| 🔍 **3축 관측성** | Loki(log) ↔ Tempo(trace) ↔ Prometheus(metric) + Exemplars + OTLP/gRPC |
+| 🔍 **4축 관측성** | Loki(log) ↔ Tempo(trace) ↔ Prometheus(metric) + **Alertmanager(alert) + SLO/Burn Rate** + Exemplars + OTLP/gRPC |
 | 🏗️ **Clean Architecture** | Hexagonal Port/Adapter, 4-module gradle (domain/application/infra/api) |
 | 📊 **성능 튜닝** | Geohash 공간 캐싱 — ODsay 히트율 46.9% → 80.4% |
 
