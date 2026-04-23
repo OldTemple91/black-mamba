@@ -67,9 +67,11 @@ services:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      # M-5: 익명 접근은 Viewer 로 제한.
+      # Admin 작업은 GF_SECURITY_ADMIN_USER / GF_SECURITY_ADMIN_PASSWORD 로만 가능.
       - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
       - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
     volumes:
       - ./monitoring/grafana-datasources:/etc/grafana/provisioning/datasources:ro
@@ -90,6 +92,8 @@ services:
       - "3100:3100"
     volumes:
       - ./monitoring/loki.yml:/etc/loki/local-config.yaml:ro
+      # M-6: 로그 데이터 영속화 (컴팩터가 7일 초과분 자동 삭제).
+      - loki-data:/loki
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - monitoring
@@ -108,6 +112,8 @@ services:
     command: [ "-config.file=/etc/tempo.yml" ]
     volumes:
       - ./monitoring/tempo.yml:/etc/tempo.yml:ro
+      # M-6: 트레이스 데이터를 도커 볼륨에 영속 저장 (재기동 시 유지).
+      - tempo-data:/var/tempo
     networks:
       - monitoring
 
@@ -202,6 +208,8 @@ volumes:
   grafana-data:
   qdrant-data:
   alertmanager-data:
+  tempo-data:   # M-6
+  loki-data:    # M-6
 
 networks:
   monitoring:

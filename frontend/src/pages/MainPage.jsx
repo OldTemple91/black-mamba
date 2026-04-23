@@ -23,6 +23,7 @@ export default function MainPage() {
   const [mobility, setMobility]       = useState([])
   const [searchMode, setSearchMode]   = useState('OPTIMAL')
   const [recommendationPreference, setRecommendationPreference] = useState('RELIABILITY')
+  const [weather, setWeather]         = useState('')  // A-4: CLEAR/RAIN/SNOW/HEAT/COLD/'' (기본)
   const [mapMode, setMapMode]         = useState(null)  // 'origin' | 'destination' | null
 
   // 자동완성
@@ -113,9 +114,10 @@ export default function MainPage() {
       ? `${destCoord.lat.toFixed(6)},${destCoord.lng.toFixed(6)}`
       : destination
 
+    const weatherParam = weather ? `&weather=${weather}` : ''
     navigate(
       `/routes?origin=${encodeURIComponent(originParam)}&dest=${encodeURIComponent(destParam)}` +
-      `&mobility=${mobility.join(',')}&searchMode=${searchMode}&recommendationPreference=${recommendationPreference}`
+      `&mobility=${mobility.join(',')}&searchMode=${searchMode}&recommendationPreference=${recommendationPreference}${weatherParam}`
     )
   }
 
@@ -209,6 +211,35 @@ export default function MainPage() {
             recommendationPreference={recommendationPreference}
             onRecommendationPreferenceChange={setRecommendationPreference}
           />
+
+          {/* A-4: 날씨 힌트 — 공유 모빌리티/장거리 도보에 페널티 반영 */}
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-gray-600 text-xs whitespace-nowrap">☁️ 날씨</span>
+            <div className="flex flex-wrap gap-1">
+              {[
+                { key: '',     label: '기본',  emoji: '—' },
+                { key: 'RAIN', label: '비',    emoji: '🌧' },
+                { key: 'SNOW', label: '눈',    emoji: '❄️' },
+                { key: 'HEAT', label: '폭염',  emoji: '☀️' },
+                { key: 'COLD', label: '혹한',  emoji: '🥶' },
+              ].map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => setWeather(opt.key)}
+                  type="button"
+                  className={`text-xs px-2 py-1 rounded-full border transition ${
+                    weather === opt.key
+                      ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-400'
+                  }`}
+                  title={opt.key === '' ? '날씨 영향 반영 안 함' : `${opt.label} 시 공유 모빌리티 및 장거리 도보 페널티 적용`}
+                >
+                  {opt.emoji} {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <button
             onClick={handleSearch}
             disabled={!origin && !destination}

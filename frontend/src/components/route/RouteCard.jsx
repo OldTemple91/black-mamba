@@ -115,6 +115,36 @@ export default function RouteCard({
         </p>
       )}
 
+      {/* C-2: 경로 자체의 탄소 배출량 (독립 배지) */}
+      {route.carbon && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span
+            className={`text-[11px] font-semibold px-2 py-1 rounded-full border ${
+              route.carbon.eco
+                ? 'border-green-300 bg-green-50 text-green-700'
+                : 'border-slate-200 bg-slate-50 text-slate-600'
+            }`}
+            title={`평균 탄소 강도 ${route.carbon.gramsPerKm.toFixed(1)} g/km`}
+          >
+            🌱 {route.carbon.grams >= 1000
+              ? `${(route.carbon.grams / 1000).toFixed(1)}kg`
+              : `${Math.round(route.carbon.grams)}g`} CO₂
+          </span>
+          {route.carbon.eco && (
+            <span className="text-[11px] font-semibold px-2 py-1 rounded-full border border-green-400 bg-green-100 text-green-800">
+              🌿 친환경 경로
+            </span>
+          )}
+          {route.carbon.savedVsCarGrams > 100 && (
+            <span className="text-[11px] text-emerald-600">
+              자가용 대비 −{route.carbon.savedVsCarGrams >= 1000
+                ? `${(route.carbon.savedVsCarGrams / 1000).toFixed(1)}kg`
+                : `${Math.round(route.carbon.savedVsCarGrams)}g`} 감축
+            </span>
+          )}
+        </div>
+      )}
+
       {/* F-1: 자가용 대비 비교 */}
       {route.carComparison && (
         <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">

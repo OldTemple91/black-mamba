@@ -27,3 +27,13 @@ schema_config:
 limits_config:
   allow_structured_metadata: true
   volume_enabled: true
+  # M-6: 7일 후 로그 자동 삭제 (스토리지 무한 증가 방지).
+  retention_period: 168h
+
+# M-6: compactor 활성화 — retention 정책을 실제로 실행.
+compactor:
+  working_directory: /loki/compactor
+  delete_request_store: filesystem
+  retention_enabled: true
+  retention_delete_delay: 2h
+  retention_delete_worker_count: 150

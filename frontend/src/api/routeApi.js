@@ -11,16 +11,17 @@ export const searchRoutes = async ({
   mobility,
   searchMode = 'SPECIFIC',
   recommendationPreference = 'RELIABILITY',
+  weather = '',
 }) => {
   try {
-    const { data } = await axios.get(`${BASE_URL}/routes`, {
-      params: {
-        originLat, originLng, destLat, destLng,
-        mobility: mobility.join(','),
-        searchMode,
-        recommendationPreference,
-      }
-    })
+    const params = {
+      originLat, originLng, destLat, destLng,
+      mobility: mobility.join(','),
+      searchMode,
+      recommendationPreference,
+    }
+    if (weather) params.weather = weather
+    const { data } = await axios.get(`${BASE_URL}/routes`, { params })
     return data.routes
   } catch (error) {
     const message = error?.response?.data?.message

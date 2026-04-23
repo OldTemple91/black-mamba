@@ -67,5 +67,16 @@
         </root>
     </springProfile>
 
-    <logger name="com.blackmamba.navigation" level="DEBUG"/>
+    <!--
+         M-4: 애플리케이션 로거 레벨은 프로파일별 분리.
+         - local: DEBUG (개발 시 상세 추적 필요)
+         - docker/prod: INFO (Loki 스토리지 비용 절감 + 노이즈 감소)
+         Docker 환경에서 DEBUG 로그가 필요하면 LOGGING_LEVEL_COM_BLACKMAMBA_NAVIGATION=DEBUG 환경변수로 임시 활성화.
+    -->
+    <springProfile name="local">
+        <logger name="com.blackmamba.navigation" level="DEBUG"/>
+    </springProfile>
+    <springProfile name="docker,prod">
+        <logger name="com.blackmamba.navigation" level="INFO"/>
+    </springProfile>
 </configuration>

@@ -23,6 +23,7 @@
 | [004](./004-loki-plaintext-with-structured-metadata.md) | Loki 평문 1라인 + Structured Metadata 분리 | Accepted | 2026-04-17 |
 | [005](./005-reactor-context-propagation-traceid.md) | Reactor Context Propagation 활성화 | Accepted | 2026-04-17 |
 | [006](./006-otlp-grpc-over-http.md) | OTLP/gRPC over OTLP/HTTP (표준 전송) | Accepted | 2026-04-20 |
+| [007](./007-baseline-guided-recomposition.md) | **Baseline-Guided Multimodal Recomposition** (A\*/Dijkstra 대신) | Accepted | 2026-04-23 |
 
 ---
 
