@@ -68,7 +68,23 @@ geohash, preference 등) 확인 가능.
 
 ![Main Search UI](output/playwright/main-page.png)
 
-### Route Recommendation
+### Route Recommendation — 현실 시나리오: 역이 아닌 위치 간 이동
+
+**시나리오:** 서초동 아파트 단지(37.4850, 127.0320) → 성수 카페거리(37.5420, 127.0554)
+
+실사용 OD 는 보통 **"역 ↔ 역"** 이 아니라 **집 / 오피스 / 카페 → 공원 / 상권** 같이 지하철역에서
+수백 m ~ 1 km 떨어진 위치끼리 연결된다. 이런 조건에서 **퍼스트마일/라스트마일을 자전거로 대체**
+하면 대중교통 직행 대비 시간 단축이 발생한다. 본 추천 결과가 그 증거:
+
+| 순위 | 경로 타입 | 소요 | 추천 여부 |
+|-----|----------|------|----------|
+| #1 | `TRANSIT_WITH_BIKE` | **28분** | ✅ 추천 |
+| #2~3 | `TRANSIT_WITH_BIKE` | 33분, 34분 | |
+| **#4** | **`TRANSIT_ONLY`** | **36분** | ← 전통적 대중교통 직행 (8분 더 걸림) |
+| #5 | `TRANSIT_WITH_BIKE` | 37분 | |
+
+→ **Mixed 경로가 TRANSIT_ONLY 보다 8분 단축.** MaaS 엔진이 실사용 OD 에서 복합 경로의
+가치를 추천으로 실제 제시한다는 시각적 증거.
 
 ![Route Recommendation UI](output/playwright/routes-page.png)
 

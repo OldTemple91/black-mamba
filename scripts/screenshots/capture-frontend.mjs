@@ -18,9 +18,13 @@ const OUT_DIR = resolve(__dirname, '../../output/playwright');
 mkdirSync(OUT_DIR, { recursive: true });
 
 const FRONTEND = 'http://localhost:5173';
-// 대표 OD: 서울역 → 강남역 (대중교통 직행 경로가 확실히 나옴)
-const ORIGIN = '서울역';
-const DESTINATION = '강남역';
+// 현실 시나리오: "역이 아닌 위치" 간 이동 (MaaS 의 진짜 가치 시연)
+//   출발: 서초 아파트 단지 (37.4850, 127.0320) — 지하철역에서 500m+ 떨어짐
+//   도착: 성수 카페거리 (37.5420, 127.0554) — 지하철역에서 도보 7~10분
+// 실측: TRANSIT_WITH_BIKE 28분 vs TRANSIT_ONLY 36분 → 8분 단축
+// 프론트는 "lat,lng" 문자열 입력 지원 (MainPage.jsx handleSearch)
+const ORIGIN = '37.4850,127.0320';        // 서초 아파트 단지
+const DESTINATION = '37.5420,127.0554';   // 성수 카페거리
 
 const browser = await chromium.launch();
 const context = await browser.newContext({
@@ -48,34 +52,39 @@ await page.screenshot({
 // ────────────────────────────────────────────────────────────
 console.log('[2/2] 경로 결과 시나리오');
 
-// 출발지 입력
-console.log(`  출발지 입력: "${ORIGIN}"`);
+// 출발지 좌표 입력 (프론트 MainPage 가 "lat,lng" 문자열 그대로 지원)
+console.log(`  출발지 입력: "${ORIGIN}" (서초 아파트)`);
 const originInput = page.getByPlaceholder('출발지를 입력하세요');
 await originInput.click();
 await originInput.fill(ORIGIN);
-// 자동완성 드롭다운 첫 항목 클릭 (좌표 설정 목적)
-console.log('  자동완성 대기 + 첫 항목 선택');
-try {
-  await page.waitForSelector('ul li', { timeout: 5000, state: 'visible' });
-  await page.locator('ul li').first().click();
-} catch (e) {
-  console.log(`  (자동완성 실패 — 입력값 그대로 진행: ${e.message})`);
-}
+// 좌표 입력 후 자동완성이 뜨면 닫기 위해 외부 클릭 (드롭다운 닫힘)
+await page.mouse.click(10, 10);
+await page.waitForTimeout(300);
 
-// 목적지 입력
-console.log(`  목적지 입력: "${DESTINATION}"`);
+// 목적지 좌표 입력
+console.log(`  목적지 입력: "${DESTINATION}" (성수 카페거리)`);
 const destInput = page.getByPlaceholder('목적지를 입력하세요');
 await destInput.click();
 await destInput.fill(DESTINATION);
-try {
-  await page.waitForSelector('ul li', { timeout: 5000, state: 'visible' });
-  await page.locator('ul li').first().click();
-} catch (e) {
-  console.log(`  (자동완성 실패 — 입력값 그대로 진행: ${e.message})`);
-}
+await page.mouse.click(10, 10);
+await page.waitForTimeout(300);
+
+// "최적 탐색" 해제 (개별 mobility 버튼을 활성화하기 위해)
+console.log('  최적 탐색 토글 해제 → SPECIFIC 모드 진입');
+await page.getByRole('button', { name: /최적 탐색/ }).click();
+await page.waitForTimeout(300);
+
+// Mobility 선택: 개인 전기자전거
+console.log('  이동수단 선택: ⚡ 전기자전거');
+await page.getByRole('button', { name: /전기자전거/ }).click();
+await page.waitForTimeout(300);
+
+// Preference: 시간 우선
+console.log('  선호도 선택: ⚡ 시간 우선');
+await page.getByRole('button', { name: /시간 우선/ }).click();
+await page.waitForTimeout(300);
 
 // 짧게 대기 후 탐색 버튼
-await page.waitForTimeout(500);
 console.log('  경로 탐색 버튼 클릭');
 await page.getByRole('button', { name: '경로 탐색' }).click();
 
