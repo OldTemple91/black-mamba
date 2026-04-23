@@ -123,31 +123,56 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Start Qdrant sidecar (RAG Phase 2 필수 의존성)
+        run: |
+          docker network create black-mamba-ci
+          docker run -d --name qdrant-ci \
+            --network black-mamba-ci \
+            -e QDRANT__SERVICE__GRPC_PORT=6334 \
+            qdrant/qdrant:v1.17.1
+
+          # Qdrant 준비 대기 (gRPC 는 HTTP health 로 간접 확인)
+          for i in $(seq 1 20); do
+            if docker exec qdrant-ci sh -c 'wget -qO- http://localhost:6333/readyz 2>/dev/null | grep -q "all shards are ready"' 2>/dev/null \
+               || docker exec qdrant-ci sh -c 'wget -qO- http://localhost:6333/ 2>/dev/null | grep -q qdrant' 2>/dev/null; then
+              echo "Qdrant ready at attempt $i"
+              break
+            fi
+            echo "Qdrant warming up... ($i/20)"
+            sleep 2
+          done
+
       - name: Verify image starts and responds to health check
         env:
           IMAGE: ${{ env.IMAGE_TAG }}
         run: |
           docker run -d --name black-mamba-test \
+            --network black-mamba-ci \
             -e ODSAY_API_KEY=dummy \
             -e DDAREUNGI_API_KEY=dummy \
             -e TAGO_API_KEY=dummy \
             -e TMAP_APP_KEY=dummy \
             -e NAVER_CLIENT_ID=dummy \
             -e NAVER_CLIENT_SECRET=dummy \
+            -e QDRANT_HOST=qdrant-ci \
+            -e QDRANT_PORT=6334 \
             -p 8081:8081 \
             "$IMAGE"
 
-          for i in $(seq 1 12); do
+          for i in $(seq 1 18); do
             if curl -sf http://localhost:8081/actuator/health > /dev/null 2>&1; then
               echo "Health check OK at attempt $i"
               docker logs black-mamba-test --tail 20
-              docker stop black-mamba-test
+              docker stop black-mamba-test qdrant-ci
               exit 0
             fi
-            echo "Waiting... ($i/12)"
+            echo "Waiting... ($i/18)"
             sleep 5
           done
 
-          echo "Health check failed"
+          echo "Health check failed — printing app logs"
           docker logs black-mamba-test
+          echo ""
+          echo "Qdrant sidecar logs:"
+          docker logs qdrant-ci --tail 30
           exit 1
