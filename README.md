@@ -8,8 +8,14 @@
 [![Observability](https://img.shields.io/badge/Observability-Loki%20%7C%20Tempo%20%7C%20Prometheus-F46800)](docs/monitoring/observability-stack.md)
 
 대중교통 + 공공자전거 + 개인 이동수단 멀티모달 경로 엔진에,
-**Spring AI 기반 RAG 파이프라인 / Reactor 기반 SSE 실시간 스트림 / Resilience4j 장애 대응 / 3축 관측성(Logs↔Metrics↔Traces)** 을
+**Spring AI 기반 RAG 파이프라인 / Reactor 기반 SSE 실시간 스트림 / Resilience4j 장애 대응 / 4축 관측성(Logs↔Metrics↔Traces↔Alerts+SLO)** 을
 통합한 "설명 가능한 MaaS" 포트폴리오.
+
+### 🎬 20초 데모
+
+![Demo](output/playwright/demo.gif)
+
+> 테마 토글 → 출발/목적지 입력 → 이동수단 · 선호도 선택 → 🌧 비 날씨 → 경로 탐색 → 결과 카드(Timeline Bar + Carbon 배지) → 카드 클릭 시 지도 연동 → 다크 모드 전환
 
 ## ⚡ 한눈에 보기
 
@@ -24,7 +30,112 @@
 | 📊 **성능 튜닝** | Geohash 공간 캐싱 — ODsay 히트율 46.9% → 80.4% |
 | 🌱 **MaaS 정체성** | 경로별 **탄소 배출량** (이동수단별 정밀 계수) + **날씨 인식** (RAIN/SNOW 공유 모빌리티 페널티) + 접근성 (휠체어/노인) |
 
-👉 **[자체 알고리즘 카탈로그](docs/architecture/routing-algorithm.md)** / **[개선 기록 20건](docs/improvements/README.md)** / **[ADR 7건](docs/adr/)** / **[로드맵](docs/roadmap/ROADMAP.md)**
+👉 **[자체 알고리즘 카탈로그](docs/architecture/routing-algorithm.md)** / **[개선 기록 21건](docs/improvements/README.md)** / **[ADR 7건](docs/adr/)** / **[로드맵](docs/roadmap/ROADMAP.md)**
+
+## 🏛 시스템 아키텍처
+
+```mermaid
+flowchart TB
+    subgraph Client["👤 Client"]
+        UI["React 19 + Vite 7<br/>TailwindCSS v4<br/>Dark Mode · Glassmorphism"]
+    end
+
+    subgraph API["🌐 API Layer (Spring MVC)"]
+        RC["RouteController<br/>/api/routes"]
+        NC["NaturalLanguageController<br/>/api/nlp/routes"]
+        SC["RouteStreamController<br/>/api/routes/stream (SSE)"]
+        PC["PlaceController<br/>/api/places"]
+    end
+
+    subgraph App["⚙️ Application Layer (Orchestration · 자체 설계)"]
+        ROS["RouteOptimizationService"]
+        OS["OptimalSearchStrategy<br/>5패턴 병렬 (A/B/C/D/E)"]
+        SS["SpecificMobilityStrategy"]
+        HS["HubSelector<br/>2-Phase Primary+Fallback"]
+        CPS["CandidatePointSelector<br/>30~80% 윈도우 + 120m 중복제거"]
+        RSC["RouteScoreCalculator<br/>6차원 가중합 × 2 프로파일"]
+        APP_POST["Post-Processors<br/>Accessibility · Weather · Carbon · RAG-narrative"]
+    end
+
+    subgraph Infra["🔌 Infra Layer (Port/Adapter)"]
+        ODS["ODsay Adapter<br/>(대중교통)"]
+        TMAP["Tmap Adapter<br/>(보행자)"]
+        DDR["따릉이 Adapter<br/>(공공자전거)"]
+        NAV["Naver Adapter<br/>(지오코딩/POI)"]
+        CACHE["Geohash Cache<br/>precision 7 · 150m 격자"]
+        CB["Resilience4j<br/>CircuitBreaker + Retry + Fallback"]
+    end
+
+    subgraph AI["🧠 RAG Pipeline"]
+        OLLAMA["Ollama<br/>llama3.2:3b · bge-m3"]
+        QDRANT[("Qdrant Vector DB<br/>1024-dim · OD 이력")]
+    end
+
+    subgraph Obs["🔍 4축 Observability"]
+        PROM[("Prometheus<br/>metrics + SLO")]
+        LOKI[("Loki<br/>logs + traceId")]
+        TEMPO[("Tempo<br/>traces OTLP/gRPC")]
+        ALERT["Alertmanager<br/>→ Discord"]
+        GRAF["Grafana<br/>4 dashboards"]
+    end
+
+    UI -->|HTTPS| RC & NC & SC & PC
+    RC --> ROS
+    NC -->|intent parse| OLLAMA
+    NC --> ROS
+    SC --> ROS
+    PC --> NAV
+
+    ROS --> OS & SS
+    OS & SS --> HS & CPS
+    HS & CPS --> ODS & TMAP & DDR
+    ROS --> APP_POST
+    APP_POST -->|RAG narrative| OLLAMA
+    APP_POST -->|similar routes| QDRANT
+    ODS & TMAP & DDR & NAV -.-> CACHE -.-> CB
+
+    API -.emit.-> PROM & LOKI & TEMPO
+    PROM --> ALERT
+    PROM & LOKI & TEMPO --> GRAF
+
+    classDef client fill:#eff6ff,stroke:#3b82f6,color:#1e3a8a
+    classDef api fill:#f0f9ff,stroke:#0284c7,color:#0c4a6e
+    classDef app fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef infra fill:#f1f5f9,stroke:#64748b,color:#334155
+    classDef ai fill:#f3e8ff,stroke:#9333ea,color:#581c87
+    classDef obs fill:#dcfce7,stroke:#16a34a,color:#14532d
+    class UI client
+    class RC,NC,SC,PC api
+    class ROS,OS,SS,HS,CPS,RSC,APP_POST app
+    class ODS,TMAP,DDR,NAV,CACHE,CB infra
+    class OLLAMA,QDRANT ai
+    class PROM,LOKI,TEMPO,ALERT,GRAF obs
+```
+
+**3층 구조:**
+- **L1 외부 엔진** (ODsay / Tmap / 따릉이) — 도로 그래프 최단경로 이미 해결됨
+- **L2 Orchestration (우리가 설계)** — 5패턴 재조합 + 2-Phase Hub + 6차원 스코어링 + 후처리
+- **L3 AI + Observability** — RAG narrative / Qdrant 유사 검색 / 4축 관측성
+
+### 📦 모듈 의존 (Clean Architecture)
+
+```mermaid
+flowchart LR
+    api[api<br/>Spring MVC] --> application
+    application --> domain[domain<br/>Pure Java 21]
+    infra --> application
+    infra -.implements.-> application
+    api -.-> infra
+
+    classDef core fill:#fef3c7,stroke:#d97706
+    classDef adapter fill:#f1f5f9,stroke:#64748b
+    class domain,application core
+    class api,infra adapter
+```
+
+- **domain / application** = 외부 의존성 0 (Port 인터페이스만)
+- **infra** 가 Port 를 구현 (의존성 역전)
+- **api** 는 application 의 유스케이스만 호출
 
 ## 🧭 "무엇을 우리가 직접 만들었나" — Orchestration 층
 
@@ -93,6 +204,16 @@ geohash, preference 등) 확인 가능.
 
 > 우상단 🌙 / ☀️ 토글 버튼 · localStorage + `prefers-color-scheme` 우선순위 · 0.3s 부드러운 전환
 > Tailwind v4 `@custom-variant dark (&:where(.dark, .dark *))` 전략.
+
+### 📱 Mobile — iPhone 14 viewport
+
+| 라이트 | 다크 |
+|:--:|:--:|
+| ![Mobile Light](output/playwright/mobile-main-light.png) | ![Mobile Dark](output/playwright/mobile-main-dark.png) |
+| ![Mobile Routes Light](output/playwright/mobile-routes-light.png) | ![Mobile Routes Dark](output/playwright/mobile-routes-dark.png) |
+
+> 데스크톱에선 `lg:grid` split layout, 모바일에선 자동으로 vertical stack.
+> 검색 패널 → Mobility/Preference → 날씨 → 검색 버튼 → 통계 뱃지 → 지도 순.
 
 ### 🎨 Citymapper 스타일 Route Timeline Bar
 
