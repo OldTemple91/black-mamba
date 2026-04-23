@@ -97,6 +97,7 @@ YYYY-MM-DD-<카테고리>-<제목>.md
 | 19 | 2026-04-23 | UI/UX | [프론트엔드 리뉴얼 (2026 트렌드)](./2026-04-23-frontend-polish.md) | 데스크톱 split layout + Hero + Glassmorphism + 추천 카드 gradient ring + Sticky OD 헤더 + 메타 라인 통합 + CSS +14kB(gzip +2kB) |
 | 20 | 2026-04-23 | UI/UX | [프론트 고도화 (Timeline + Dark + Skeleton)](./2026-04-23-frontend-advanced.md) | Route Leg Timeline Bar (서울 지하철 15개 라인 공식색) + Dark Mode (Tailwind v4 `@custom-variant`) + Skeleton Loading + Error state 리뉴얼 · gzip +1.1kB |
 | 21 | 2026-04-23 | Tier S | [Tier S 통신력 (Mermaid + 모바일 + 데모 GIF)](./2026-04-23-tier-s-communication.md) | Mermaid 시스템·모듈 다이어그램 2종 + 모바일 iPhone 14 뷰 4장 + 20초 데모 GIF 1.85 MB (ffmpeg fps 8 + palette 48색 + bayer dither 3단계 튜닝) |
+| 22 | 2026-04-23 | Audit | [프론트 전수 감사 (지도 버그 + 다크 누락)](./2026-04-23-frontend-audit.md) | 사용자 피드백 한 줄에서 시작 — 지도 3버그 (TRANSIT 직선/h-96 고정/fitBounds 누락) + 다크 미지원 5개 파일 일괄 수정 · gzip +0.16 kB |
 
 ---
 

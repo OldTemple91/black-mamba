@@ -228,10 +228,26 @@ export default function NaverMap({ selectedRoute, onMapClick, mapMode }) {
       }
     })
 
-    // 지도 중심을 첫 번째 출발지로 이동
-    const firstStart = selectedRoute.legs[0]?.start
-    if (isValid(firstStart)) {
-      mapRef.current.setCenter(new window.naver.maps.LatLng(firstStart.lat, firstStart.lng))
+    // 경로 전체가 화면에 들어오도록 fitBounds — 모든 leg 좌표 + passThroughStations 고려.
+    // 첫 출발지만 setCenter 하면 목적지가 화면 밖으로 나가는 문제 해결.
+    const allCoords = []
+    selectedRoute.legs.forEach(leg => {
+      if (isValid(leg.start)) allCoords.push(leg.start)
+      if (isValid(leg.end)) allCoords.push(leg.end)
+      if (Array.isArray(leg.routeCoordinates)) {
+        leg.routeCoordinates.filter(isValid).forEach(c => allCoords.push(c))
+      }
+      if (leg.type === 'TRANSIT' && Array.isArray(leg.transitInfo?.passThroughStations)) {
+        leg.transitInfo.passThroughStations.filter(isValid).forEach(c => allCoords.push(c))
+      }
+    })
+    if (allCoords.length > 0) {
+      const bounds = new window.naver.maps.LatLngBounds(
+        new window.naver.maps.LatLng(allCoords[0].lat, allCoords[0].lng),
+        new window.naver.maps.LatLng(allCoords[0].lat, allCoords[0].lng)
+      )
+      allCoords.forEach(c => bounds.extend(new window.naver.maps.LatLng(c.lat, c.lng)))
+      mapRef.current.fitBounds(bounds, { top: 60, right: 40, bottom: 60, left: 40 })
     }
 
     return () => {
@@ -246,13 +262,17 @@ export default function NaverMap({ selectedRoute, onMapClick, mapMode }) {
       : null
 
   return (
-    <div className="relative">
+    <div className="relative h-full w-full">
       <div
         id="naver-map"
-        className={`w-full h-96 rounded-lg shadow transition-all ${mapMode ? 'cursor-crosshair ring-2 ring-blue-400' : ''}`}
+        className={`h-full w-full min-h-[360px] rounded-lg shadow transition-all ${mapMode ? 'cursor-crosshair ring-2 ring-blue-400' : ''}`}
       />
-      <div className="absolute left-3 bottom-3 rounded-xl bg-white/95 backdrop-blur border border-slate-200 shadow-lg px-3 py-2">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Legend</p>
+      <div className="absolute left-3 bottom-3 rounded-xl
+                      bg-white/95 dark:bg-slate-900/90
+                      border border-slate-200 dark:border-slate-700
+                      backdrop-blur shadow-lg px-3 py-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em]
+                      text-slate-400 dark:text-slate-500">Legend</p>
         <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
           {Object.entries({
             대중교통: LEG_COLOR.TRANSIT,
@@ -260,7 +280,7 @@ export default function NaverMap({ selectedRoute, onMapClick, mapMode }) {
             킥보드: LEG_COLOR.KICKBOARD,
             도보: LEG_COLOR.WALK,
           }).map(([label, color]) => (
-            <div key={label} className="flex items-center gap-2 text-xs text-slate-600">
+            <div key={label} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
               <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
               <span>{label}</span>
             </div>

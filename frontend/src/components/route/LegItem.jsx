@@ -105,7 +105,7 @@ export default function LegItem({ leg, prevLeg, nextLeg, isLast }) {
         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm text-white ${config.dotColor}`}>
           {config.emoji}
         </div>
-        {!isLast && <div className="w-0.5 flex-1 bg-gray-200 my-1 min-h-[16px]" />}
+        {!isLast && <div className="w-0.5 flex-1 bg-gray-200 dark:bg-slate-700 my-1 min-h-[16px]" />}
       </div>
 
       {/* 내용 */}
@@ -120,15 +120,15 @@ export default function LegItem({ leg, prevLeg, nextLeg, isLast }) {
               {leg.transitInfo.lineName}
             </span>
           )}
-          <span className={`text-sm font-medium ${config.textColor}`}>{label}</span>
-          <span className="text-xs text-gray-400 ml-auto flex-shrink-0">{leg.durationMinutes}분</span>
+          <span className={`text-sm font-medium ${config.textColor} dark:brightness-125`}>{label}</span>
+          <span className="text-xs text-gray-400 dark:text-slate-500 ml-auto flex-shrink-0">{leg.durationMinutes}분</span>
         </div>
 
         {/* 구간: 출발역 */}
         {leg.start?.name && (
           <div className="flex items-center gap-1 mt-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0" />
-            <span className="text-xs text-gray-600">{leg.start.name} {startVerb}</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-slate-500 flex-shrink-0" />
+            <span className="text-xs text-gray-600 dark:text-slate-300">{leg.start.name} {startVerb}</span>
           </div>
         )}
 
@@ -137,17 +137,17 @@ export default function LegItem({ leg, prevLeg, nextLeg, isLast }) {
           <div className="ml-3 mt-0.5">
             <button
               onClick={() => setShowStops(v => !v)}
-              className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
+              className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 flex items-center gap-1"
             >
-              <span className="w-px h-3 bg-gray-300" />
+              <span className="w-px h-3 bg-gray-300 dark:bg-slate-600" />
               {showStops ? `▲ 정류장 숨기기` : `▼ ${midStops.length}개 정류장 경유`}
             </button>
             {showStops && (
-              <div className="mt-1 ml-1 border-l-2 border-dashed border-gray-200 pl-2 space-y-0.5">
+              <div className="mt-1 ml-1 border-l-2 border-dashed border-gray-200 dark:border-slate-700 pl-2 space-y-0.5">
                 {midStops.map((stop, i) => (
                   <div key={i} className="flex items-center gap-1">
-                    <span className="w-1 h-1 rounded-full bg-gray-300 flex-shrink-0" />
-                    <span className="text-xs text-gray-400">{stop.name}</span>
+                    <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-slate-600 flex-shrink-0" />
+                    <span className="text-xs text-gray-400 dark:text-slate-500">{stop.name}</span>
                   </div>
                 ))}
               </div>
@@ -158,20 +158,20 @@ export default function LegItem({ leg, prevLeg, nextLeg, isLast }) {
         {/* 구간: 도착역 */}
         {leg.end?.name && (
           <div className="flex items-center gap-1 mt-0.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-gray-500 flex-shrink-0" />
-            <span className="text-xs text-gray-600">{leg.end.name} {endVerb}</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-500 dark:bg-slate-400 flex-shrink-0" />
+            <span className="text-xs text-gray-600 dark:text-slate-300">{leg.end.name} {endVerb}</span>
           </div>
         )}
 
         {walkHint && (
-          <p className="text-xs text-gray-500 mt-0.5">
+          <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
             {walkHint}
           </p>
         )}
 
         {/* 이동수단 대여 위치 (BIKE/KICKBOARD) */}
         {(leg.type === 'BIKE' || leg.type === 'KICKBOARD') && leg.start?.name && (
-          <div className="text-xs text-gray-500 mt-0.5 space-y-0.5">
+          <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 space-y-0.5">
             <p>
               📍 {leg.start.name}에서 대여 → {leg.end?.name ?? '목적지'}
             </p>
@@ -191,7 +191,10 @@ export default function LegItem({ leg, prevLeg, nextLeg, isLast }) {
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-1">
             {tags.map((tag, i) => (
-              <span key={i} className={`text-xs px-1.5 py-0.5 rounded ${config.bgLight} ${config.textColor}`}>
+              <span key={i}
+                    className={`text-xs px-1.5 py-0.5 rounded
+                                ${config.bgLight} ${config.textColor}
+                                dark:bg-opacity-20 dark:brightness-125`}>
                 {tag}
               </span>
             ))}

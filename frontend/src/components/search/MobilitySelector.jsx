@@ -49,10 +49,10 @@ export default function MobilitySelector({
             title={opt.unavailable ? '현재 데이터 미제공' : undefined}
             className={`px-3 py-1 rounded-full border text-sm transition
               ${isOptimal || opt.unavailable
-                ? 'opacity-40 cursor-not-allowed bg-white text-gray-400 border-gray-200'
+                ? 'opacity-40 cursor-not-allowed bg-white dark:bg-slate-800 text-gray-400 dark:text-slate-500 border-gray-200 dark:border-slate-700'
                 : selected.includes(opt.id)
                   ? 'bg-blue-500 text-white border-blue-500'
-                  : 'bg-white text-gray-600 border-gray-300'}`}
+                  : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border-gray-300 dark:border-slate-600'}`}
           >
             {opt.label}{opt.unavailable ? ' (준비중)' : ''}
           </button>
@@ -62,14 +62,16 @@ export default function MobilitySelector({
           className={`px-3 py-1 rounded-full border text-sm transition
             ${isOptimal
               ? 'bg-purple-500 text-white border-purple-500'
-              : 'bg-white text-purple-600 border-purple-300'}`}
+              : 'bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-300 border-purple-300 dark:border-purple-800/60'}`}
         >
           🔍 최적 탐색
         </button>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Recommendation Preference</p>
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-700
+                      bg-slate-50 dark:bg-slate-800/50 px-3 py-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em]
+                      text-slate-400 dark:text-slate-500">Recommendation Preference</p>
         <div className="mt-2 grid grid-cols-2 gap-2">
           {PREFERENCE_OPTIONS.map(option => {
             const isSelected = recommendationPreference === option.id
@@ -80,13 +82,17 @@ export default function MobilitySelector({
                 onClick={() => onRecommendationPreferenceChange(option.id)}
                 className={`rounded-xl border px-3 py-3 text-left transition ${
                   isSelected
-                    ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
-                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                    ? 'border-slate-900 dark:border-slate-200 bg-slate-900 dark:bg-slate-200 text-white dark:text-slate-900 shadow-sm'
+                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
                 }`}
                 title={option.description}
               >
                 <p className="text-sm font-semibold">{option.label}</p>
-                <p className={`mt-1 text-[11px] leading-5 ${isSelected ? 'text-slate-200' : 'text-slate-500'}`}>
+                <p className={`mt-1 text-[11px] leading-5 ${
+                  isSelected
+                    ? 'text-slate-200 dark:text-slate-600'
+                    : 'text-slate-500 dark:text-slate-400'
+                }`}>
                   {option.description}
                 </p>
               </button>

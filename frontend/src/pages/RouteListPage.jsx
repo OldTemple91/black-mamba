@@ -272,11 +272,12 @@ export default function RouteListPage() {
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(380px,480px)] lg:gap-6">
 
       {selectedRoute && (
-        <div className="mb-4 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+        <div className="mb-4 rounded-2xl border border-slate-200 dark:border-slate-700
+                        bg-white dark:bg-slate-800/70 px-4 py-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Selected Route</p>
-              <h3 className="mt-1 text-base font-semibold text-slate-800">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Selected Route</p>
+              <h3 className="mt-1 text-base font-semibold text-slate-800 dark:text-slate-100">
                 {selectedRoute.totalMinutes}분 경로 분석
               </h3>
             </div>
@@ -287,7 +288,10 @@ export default function RouteListPage() {
 
           <div className="mt-3 flex flex-wrap gap-2">
             {selectedReasons.map(reason => (
-              <span key={reason} className="text-xs px-2 py-1 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+              <span key={reason} className="text-xs px-2 py-1 rounded-full
+                                            bg-sky-50 dark:bg-sky-900/40
+                                            text-sky-700 dark:text-sky-300
+                                            border border-sky-200 dark:border-sky-800/60">
                 {reason}
               </span>
             ))}
@@ -299,11 +303,12 @@ export default function RouteListPage() {
           </div>
 
           {showDebug && (
-            <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3">
-              <p className="text-[11px] font-semibold text-slate-600">엔진 진단 요약</p>
+            <div className="mt-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-600
+                            bg-slate-50 dark:bg-slate-900/50 px-3 py-3">
+              <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">엔진 진단 요약</p>
               <div className="mt-2 space-y-1">
                 {selectedDebugFacts.map(fact => (
-                  <p key={fact} className="text-xs text-slate-500">{fact}</p>
+                  <p key={fact} className="text-xs text-slate-500 dark:text-slate-400">{fact}</p>
                 ))}
               </div>
             </div>
@@ -311,14 +316,15 @@ export default function RouteListPage() {
         </div>
       )}
 
-      <div className="mb-4 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+      <div className="mb-4 rounded-2xl border border-slate-200 dark:border-slate-700
+                      bg-white dark:bg-slate-800/70 px-4 py-4 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Preference Compare</p>
-            <h3 className="mt-1 text-base font-semibold text-slate-800">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Preference Compare</p>
+            <h3 className="mt-1 text-base font-semibold text-slate-800 dark:text-slate-100">
               {recommendationPreference === 'TIME_PRIORITY' ? '시간 우선' : '신뢰도 우선'} 결과를 기준으로 비교
             </h3>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               반대 추천 성향 결과를 필요할 때만 조회합니다.
             </p>
           </div>
@@ -327,8 +333,8 @@ export default function RouteListPage() {
             disabled={comparisonLoading}
             className={`rounded-full px-4 py-2 text-sm font-medium transition ${
               comparisonLoading
-                ? 'bg-slate-200 text-slate-500'
-                : 'bg-slate-900 text-white hover:bg-slate-800'
+                ? 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                : 'bg-slate-900 dark:bg-slate-200 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100'
             }`}
           >
             {comparisonLoading ? '비교 불러오는 중...' : `${comparePreferenceLabel}와 비교`}
@@ -336,43 +342,44 @@ export default function RouteListPage() {
         </div>
 
         {comparisonError && (
-          <p className="mt-3 text-sm text-rose-600">{comparisonError}</p>
+          <p className="mt-3 text-sm text-rose-600 dark:text-rose-400">{comparisonError}</p>
         )}
 
         {comparisonSelectedRoute && comparisonSummary && (
-          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+          <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-700
+                          bg-slate-50 dark:bg-slate-900/50 px-4 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold text-slate-700">{comparePreferenceLabel} 대표 추천</p>
-                <p className="mt-1 text-sm text-slate-600">
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">{comparePreferenceLabel} 대표 추천</p>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
                   {comparisonSelectedRoute.type} · {comparisonSelectedRoute.totalMinutes}분
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <span className={`text-xs px-2 py-1 rounded-full border ${
                   comparisonSummary.minuteDelta < 0
-                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    ? 'border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
                     : comparisonSummary.minuteDelta > 0
-                      ? 'border-amber-200 bg-amber-50 text-amber-700'
-                      : 'border-slate-200 bg-white text-slate-600'
+                      ? 'border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                 }`}>
                   시간 {comparisonSummary.minuteDelta === 0 ? '동일' : `${Math.abs(comparisonSummary.minuteDelta)}분 ${comparisonSummary.minuteDelta < 0 ? '빠름' : '느림'}`}
                 </span>
                 <span className={`text-xs px-2 py-1 rounded-full border ${
                   comparisonSummary.walkDelta < 0
-                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    ? 'border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
                     : comparisonSummary.walkDelta > 0
-                      ? 'border-amber-200 bg-amber-50 text-amber-700'
-                      : 'border-slate-200 bg-white text-slate-600'
+                      ? 'border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                 }`}>
                   도보 {comparisonSummary.walkDelta === 0 ? '동일' : `${Math.abs(comparisonSummary.walkDelta)}m ${comparisonSummary.walkDelta < 0 ? '적음' : '많음'}`}
                 </span>
                 <span className={`text-xs px-2 py-1 rounded-full border ${
                   comparisonSummary.transferDelta < 0
-                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    ? 'border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
                     : comparisonSummary.transferDelta > 0
-                      ? 'border-amber-200 bg-amber-50 text-amber-700'
-                      : 'border-slate-200 bg-white text-slate-600'
+                      ? 'border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                 }`}>
                   환승 {comparisonSummary.transferDelta === 0 ? '동일' : `${Math.abs(comparisonSummary.transferDelta)}회 ${comparisonSummary.transferDelta < 0 ? '적음' : '많음'}`}
                 </span>
@@ -380,15 +387,17 @@ export default function RouteListPage() {
             </div>
 
             <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">현재 추천 성향</p>
-                <p className="mt-2 text-sm font-semibold text-slate-800">{recommendationPreference === 'TIME_PRIORITY' ? '시간 우선' : '신뢰도 우선'}</p>
-                <p className="mt-1 text-sm text-slate-600">{selectedRoute.type} · {selectedRoute.totalMinutes}분</p>
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700
+                              bg-white dark:bg-slate-800 px-3 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">현재 추천 성향</p>
+                <p className="mt-2 text-sm font-semibold text-slate-800 dark:text-slate-100">{recommendationPreference === 'TIME_PRIORITY' ? '시간 우선' : '신뢰도 우선'}</p>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{selectedRoute.type} · {selectedRoute.totalMinutes}분</p>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">비교 성향</p>
-                <p className="mt-2 text-sm font-semibold text-slate-800">{comparePreferenceLabel}</p>
-                <p className="mt-1 text-sm text-slate-600">{comparisonSelectedRoute.type} · {comparisonSelectedRoute.totalMinutes}분</p>
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700
+                              bg-white dark:bg-slate-800 px-3 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">비교 성향</p>
+                <p className="mt-2 text-sm font-semibold text-slate-800 dark:text-slate-100">{comparePreferenceLabel}</p>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{comparisonSelectedRoute.type} · {comparisonSelectedRoute.totalMinutes}분</p>
               </div>
             </div>
           </div>

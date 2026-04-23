@@ -208,13 +208,15 @@ export default function MainPage() {
                 </div>
                 {activeSuggestField === 'origin' && suggestions.length > 0 && (
                   <ul className="absolute z-20 left-0 right-0 mt-1.5 overflow-hidden
-                                 rounded-2xl border border-slate-200 bg-white shadow-xl">
+                                 rounded-2xl border border-slate-200 dark:border-slate-700
+                                 bg-white dark:bg-slate-800 shadow-xl">
                     {suggestions.map((item, idx) => (
                       <li
                         key={idx}
                         onMouseDown={() => selectSuggestion(item, 'origin')}
-                        className="cursor-pointer border-b border-slate-100 px-3 py-2 text-sm text-slate-700
-                                   last:border-b-0 hover:bg-blue-50"
+                        className="cursor-pointer border-b border-slate-100 dark:border-slate-700 px-3 py-2
+                                   text-sm text-slate-700 dark:text-slate-200
+                                   last:border-b-0 hover:bg-blue-50 dark:hover:bg-slate-700"
                       >
                         📍 {item.name}
                       </li>
