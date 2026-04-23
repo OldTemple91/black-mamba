@@ -1,0 +1,1655 @@
+{
+  "date": "2026-04-23",
+  "results": [
+    {
+      "label": "서초 아파트 → 성수 카페거리",
+      "origin_type": "apartment",
+      "destination_type": "cafe_street",
+      "origin": {
+        "lat": 37.485,
+        "lng": 127.032
+      },
+      "destination": {
+        "lat": 37.542,
+        "lng": 127.0554
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 10335,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 28,
+          "transit_only_minutes": 36,
+          "time_saved_vs_transit_only": 8,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 2362,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 28,
+          "transit_only_minutes": 36,
+          "time_saved_vs_transit_only": 8,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 2438,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 36,
+          "transit_only_minutes": 36,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 4
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 1277,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 36,
+          "transit_only_minutes": 36,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 4
+        }
+      ]
+    },
+    {
+      "label": "방배 아파트 → 성수 카페거리",
+      "origin_type": "apartment",
+      "destination_type": "cafe_street",
+      "origin": {
+        "lat": 37.4815,
+        "lng": 126.994
+      },
+      "destination": {
+        "lat": 37.542,
+        "lng": 127.0554
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3884,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 29,
+          "transit_only_minutes": 37,
+          "time_saved_vs_transit_only": 8,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 2093,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 29,
+          "transit_only_minutes": 37,
+          "time_saved_vs_transit_only": 8,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 2629,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 37,
+          "transit_only_minutes": 37,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 4
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 1461,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 37,
+          "transit_only_minutes": 37,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 4
+        }
+      ]
+    },
+    {
+      "label": "반포자이 아파트 → 연남동",
+      "origin_type": "apartment",
+      "destination_type": "commercial",
+      "origin": {
+        "lat": 37.5066,
+        "lng": 126.998
+      },
+      "destination": {
+        "lat": 37.5615,
+        "lng": 126.9225
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3241,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 34,
+          "transit_only_minutes": 35,
+          "time_saved_vs_transit_only": 1,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 2054,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 34,
+          "transit_only_minutes": 35,
+          "time_saved_vs_transit_only": 1,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 1908,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 35,
+          "transit_only_minutes": 35,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 4
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 1474,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 35,
+          "transit_only_minutes": 35,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 4
+        }
+      ]
+    },
+    {
+      "label": "반포자이 아파트 → 성수 카페거리",
+      "origin_type": "apartment",
+      "destination_type": "cafe_street",
+      "origin": {
+        "lat": 37.5066,
+        "lng": 126.998
+      },
+      "destination": {
+        "lat": 37.542,
+        "lng": 127.0554
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3237,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 28,
+          "transit_only_minutes": 30,
+          "time_saved_vs_transit_only": 2,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 1899,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 28,
+          "transit_only_minutes": null,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 1943,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 30,
+          "transit_only_minutes": 30,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 3
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 1522,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 30,
+          "transit_only_minutes": 30,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 3
+        }
+      ]
+    },
+    {
+      "label": "대치동 아파트 → 성수 카페",
+      "origin_type": "apartment",
+      "destination_type": "cafe_street",
+      "origin": {
+        "lat": 37.4995,
+        "lng": 127.063
+      },
+      "destination": {
+        "lat": 37.542,
+        "lng": 127.0554
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3502,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 25,
+          "transit_only_minutes": null,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 1847,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 25,
+          "transit_only_minutes": null,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 2638,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 30,
+          "transit_only_minutes": 30,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 1
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 1710,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 30,
+          "transit_only_minutes": 30,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 1
+        }
+      ]
+    },
+    {
+      "label": "서초 아파트 → 망원동 카페",
+      "origin_type": "apartment",
+      "destination_type": "cafe_street",
+      "origin": {
+        "lat": 37.485,
+        "lng": 127.032
+      },
+      "destination": {
+        "lat": 37.5564,
+        "lng": 126.902
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3928,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 50,
+          "transit_only_minutes": 55,
+          "time_saved_vs_transit_only": 5,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 2297,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 50,
+          "transit_only_minutes": 55,
+          "time_saved_vs_transit_only": 5,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 2264,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 55,
+          "transit_only_minutes": 55,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 4
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 1639,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 55,
+          "transit_only_minutes": 55,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 4
+        }
+      ]
+    },
+    {
+      "label": "서초 아파트 → 합정 카페",
+      "origin_type": "apartment",
+      "destination_type": "cafe_street",
+      "origin": {
+        "lat": 37.485,
+        "lng": 127.032
+      },
+      "destination": {
+        "lat": 37.5496,
+        "lng": 126.912
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3507,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 30,
+          "transit_only_minutes": 30,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 1579,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 30,
+          "transit_only_minutes": 30,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 2205,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 30,
+          "transit_only_minutes": 30,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 2
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 1422,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 30,
+          "transit_only_minutes": 30,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 2
+        }
+      ]
+    },
+    {
+      "label": "개포동 아파트 → 연남동",
+      "origin_type": "apartment",
+      "destination_type": "commercial",
+      "origin": {
+        "lat": 37.488,
+        "lng": 127.07
+      },
+      "destination": {
+        "lat": 37.5615,
+        "lng": 126.9225
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3205,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 47,
+          "transit_only_minutes": 47,
+          "time_saved_vs_transit_only": 0,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 1942,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 47,
+          "transit_only_minutes": 47,
+          "time_saved_vs_transit_only": 0,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 1899,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 47,
+          "transit_only_minutes": 47,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 2
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 2027,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 47,
+          "transit_only_minutes": 47,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 2
+        }
+      ]
+    },
+    {
+      "label": "반포한강공원 → 홍대 상권",
+      "origin_type": "park",
+      "destination_type": "commercial",
+      "origin": {
+        "lat": 37.514,
+        "lng": 126.9985
+      },
+      "destination": {
+        "lat": 37.5559,
+        "lng": 126.9221
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3188,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 34,
+          "transit_only_minutes": null,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 2288,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 36,
+          "transit_only_minutes": null,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 2392,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 42,
+          "transit_only_minutes": 42,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 1768,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 42,
+          "transit_only_minutes": 42,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        }
+      ]
+    },
+    {
+      "label": "올림픽공원 남문 → 성수 카페거리",
+      "origin_type": "park",
+      "destination_type": "cafe_street",
+      "origin": {
+        "lat": 37.5164,
+        "lng": 127.1267
+      },
+      "destination": {
+        "lat": 37.542,
+        "lng": 127.0554
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 4008,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 26,
+          "transit_only_minutes": 26,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 1778,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 29,
+          "transit_only_minutes": 26,
+          "time_saved_vs_transit_only": -3,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 2098,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 26,
+          "transit_only_minutes": 26,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 4
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 2178,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 26,
+          "transit_only_minutes": 26,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        }
+      ]
+    },
+    {
+      "label": "올림픽공원 → 연남동",
+      "origin_type": "park",
+      "destination_type": "commercial",
+      "origin": {
+        "lat": 37.5164,
+        "lng": 127.1267
+      },
+      "destination": {
+        "lat": 37.5615,
+        "lng": 126.9225
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3196,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 51,
+          "transit_only_minutes": 52,
+          "time_saved_vs_transit_only": 1,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 2148,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 51,
+          "transit_only_minutes": null,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 1598,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 52,
+          "transit_only_minutes": 52,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 3
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 2282,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 52,
+          "transit_only_minutes": 52,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        }
+      ]
+    },
+    {
+      "label": "용산가족공원 → 연남동",
+      "origin_type": "park",
+      "destination_type": "commercial",
+      "origin": {
+        "lat": 37.5252,
+        "lng": 126.9866
+      },
+      "destination": {
+        "lat": 37.5615,
+        "lng": 126.9225
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3815,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 36,
+          "transit_only_minutes": null,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 2079,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 37,
+          "transit_only_minutes": null,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 3529,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 44,
+          "transit_only_minutes": 44,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 3278,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 44,
+          "transit_only_minutes": 44,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        }
+      ]
+    },
+    {
+      "label": "서울숲 → 연남동",
+      "origin_type": "park",
+      "destination_type": "commercial",
+      "origin": {
+        "lat": 37.5442,
+        "lng": 127.0377
+      },
+      "destination": {
+        "lat": 37.5615,
+        "lng": 126.9225
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3336,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 44,
+          "transit_only_minutes": 45,
+          "time_saved_vs_transit_only": 1,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 1916,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 44,
+          "transit_only_minutes": 45,
+          "time_saved_vs_transit_only": 1,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 2805,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 45,
+          "transit_only_minutes": 45,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 2962,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 45,
+          "transit_only_minutes": 45,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        }
+      ]
+    },
+    {
+      "label": "양재 시민의 숲 → 테헤란로",
+      "origin_type": "park",
+      "destination_type": "office",
+      "origin": {
+        "lat": 37.4706,
+        "lng": 127.0375
+      },
+      "destination": {
+        "lat": 37.505,
+        "lng": 127.05
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3555,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 9,
+          "transit_only_minutes": 9,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 4
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 1712,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 9,
+          "transit_only_minutes": 9,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 4
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 2032,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 9,
+          "transit_only_minutes": 9,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 1
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 1441,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 9,
+          "transit_only_minutes": 9,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 1
+        }
+      ]
+    },
+    {
+      "label": "올림픽공원 → 홍대 상권",
+      "origin_type": "park",
+      "destination_type": "commercial",
+      "origin": {
+        "lat": 37.5164,
+        "lng": 127.1267
+      },
+      "destination": {
+        "lat": 37.5559,
+        "lng": 126.9221
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3361,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 47,
+          "transit_only_minutes": 47,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 2224,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 49,
+          "transit_only_minutes": 47,
+          "time_saved_vs_transit_only": -2,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 2178,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 47,
+          "transit_only_minutes": 47,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 3
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 2126,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 47,
+          "transit_only_minutes": 47,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        }
+      ]
+    },
+    {
+      "label": "테헤란로 오피스 → 성수 카페거리",
+      "origin_type": "office",
+      "destination_type": "cafe_street",
+      "origin": {
+        "lat": 37.505,
+        "lng": 127.05
+      },
+      "destination": {
+        "lat": 37.542,
+        "lng": 127.0554
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3653,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 24,
+          "transit_only_minutes": 24,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 2277,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 24,
+          "transit_only_minutes": 24,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 2148,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 24,
+          "transit_only_minutes": 24,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 3
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 1731,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 24,
+          "transit_only_minutes": 24,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 3
+        }
+      ]
+    },
+    {
+      "label": "테헤란로 오피스 → 연남동",
+      "origin_type": "office",
+      "destination_type": "commercial",
+      "origin": {
+        "lat": 37.505,
+        "lng": 127.05
+      },
+      "destination": {
+        "lat": 37.5615,
+        "lng": 126.9225
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3880,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 50,
+          "transit_only_minutes": 50,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 2379,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 50,
+          "transit_only_minutes": 50,
+          "time_saved_vs_transit_only": 0,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 2849,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 50,
+          "transit_only_minutes": 50,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 4
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 1456,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 50,
+          "transit_only_minutes": 50,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 4
+        }
+      ]
+    },
+    {
+      "label": "판교 오피스 → 강남 테헤란로",
+      "origin_type": "office",
+      "destination_type": "office",
+      "origin": {
+        "lat": 37.3947,
+        "lng": 127.1112
+      },
+      "destination": {
+        "lat": 37.505,
+        "lng": 127.05
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3835,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 17,
+          "transit_only_minutes": 17,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 1763,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 17,
+          "transit_only_minutes": 17,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 2080,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 17,
+          "transit_only_minutes": 17,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 1
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 1868,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 17,
+          "transit_only_minutes": 17,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 1
+        }
+      ]
+    },
+    {
+      "label": "판교 오피스 → 한남",
+      "origin_type": "office",
+      "destination_type": "commercial",
+      "origin": {
+        "lat": 37.3947,
+        "lng": 127.1112
+      },
+      "destination": {
+        "lat": 37.5318,
+        "lng": 127.01
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3460,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 28,
+          "transit_only_minutes": 34,
+          "time_saved_vs_transit_only": 6,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 2127,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 28,
+          "transit_only_minutes": 34,
+          "time_saved_vs_transit_only": 6,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 1864,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 34,
+          "transit_only_minutes": 34,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 1
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 1830,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 34,
+          "transit_only_minutes": 34,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 1
+        }
+      ]
+    },
+    {
+      "label": "여의도 IFC → 성수 카페거리",
+      "origin_type": "office",
+      "destination_type": "cafe_street",
+      "origin": {
+        "lat": 37.5253,
+        "lng": 126.926
+      },
+      "destination": {
+        "lat": 37.542,
+        "lng": 127.0554
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 4059,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 41,
+          "transit_only_minutes": 41,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 2359,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 45,
+          "transit_only_minutes": 41,
+          "time_saved_vs_transit_only": -4,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 2588,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 41,
+          "transit_only_minutes": 41,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 4
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 2891,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 41,
+          "transit_only_minutes": 41,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        }
+      ]
+    },
+    {
+      "label": "상암 DMC → 연남동",
+      "origin_type": "office",
+      "destination_type": "commercial",
+      "origin": {
+        "lat": 37.5797,
+        "lng": 126.8907
+      },
+      "destination": {
+        "lat": 37.5615,
+        "lng": 126.9225
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3802,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 20,
+          "transit_only_minutes": null,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 1985,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 20,
+          "transit_only_minutes": null,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 2287,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 28,
+          "transit_only_minutes": 28,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 2
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 2952,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 28,
+          "transit_only_minutes": 28,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        }
+      ]
+    },
+    {
+      "label": "연세대 신촌 → 성수 카페거리",
+      "origin_type": "university",
+      "destination_type": "cafe_street",
+      "origin": {
+        "lat": 37.5658,
+        "lng": 126.9386
+      },
+      "destination": {
+        "lat": 37.542,
+        "lng": 127.0554
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 4223,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 46,
+          "transit_only_minutes": 47,
+          "time_saved_vs_transit_only": 1,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 2044,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 47,
+          "transit_only_minutes": 47,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 2634,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 47,
+          "transit_only_minutes": 47,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 3289,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 47,
+          "transit_only_minutes": 47,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        }
+      ]
+    },
+    {
+      "label": "서울대 관악 → 강남 테헤란로",
+      "origin_type": "university",
+      "destination_type": "office",
+      "origin": {
+        "lat": 37.4596,
+        "lng": 126.952
+      },
+      "destination": {
+        "lat": 37.505,
+        "lng": 127.05
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3573,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 36,
+          "transit_only_minutes": 36,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 2130,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 36,
+          "transit_only_minutes": 36,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 1892,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 36,
+          "transit_only_minutes": 36,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 1
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 1808,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 36,
+          "transit_only_minutes": 36,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 1
+        }
+      ]
+    },
+    {
+      "label": "한양대 → 합정 카페",
+      "origin_type": "university",
+      "destination_type": "cafe_street",
+      "origin": {
+        "lat": 37.5579,
+        "lng": 127.0453
+      },
+      "destination": {
+        "lat": 37.5496,
+        "lng": 126.912
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3461,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 34,
+          "transit_only_minutes": 34,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 1970,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 34,
+          "transit_only_minutes": 34,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 1937,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 34,
+          "transit_only_minutes": 34,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 3
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 2538,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 34,
+          "transit_only_minutes": 34,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        }
+      ]
+    },
+    {
+      "label": "이화여대 → 성수 카페거리",
+      "origin_type": "university",
+      "destination_type": "cafe_street",
+      "origin": {
+        "lat": 37.562,
+        "lng": 126.9469
+      },
+      "destination": {
+        "lat": 37.542,
+        "lng": 127.0554
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 4131,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 37,
+          "transit_only_minutes": 37,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 2078,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 37,
+          "transit_only_minutes": 37,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 1914,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 37,
+          "transit_only_minutes": 37,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 3
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 3015,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 37,
+          "transit_only_minutes": 37,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        }
+      ]
+    },
+    {
+      "label": "세브란스병원 → 합정 카페",
+      "origin_type": "hospital",
+      "destination_type": "cafe_street",
+      "origin": {
+        "lat": 37.562,
+        "lng": 126.941
+      },
+      "destination": {
+        "lat": 37.5496,
+        "lng": 126.912
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 4043,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 19,
+          "transit_only_minutes": 19,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 2052,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 19,
+          "transit_only_minutes": 19,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 2256,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 19,
+          "transit_only_minutes": 19,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 2
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 2207,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 19,
+          "transit_only_minutes": 19,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        }
+      ]
+    },
+    {
+      "label": "서울아산병원 → 성수 카페거리",
+      "origin_type": "hospital",
+      "destination_type": "cafe_street",
+      "origin": {
+        "lat": 37.5261,
+        "lng": 127.1086
+      },
+      "destination": {
+        "lat": 37.542,
+        "lng": 127.0554
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3148,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 22,
+          "transit_only_minutes": 23,
+          "time_saved_vs_transit_only": 1,
+          "total_routes": 4
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 2101,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 22,
+          "transit_only_minutes": 23,
+          "time_saved_vs_transit_only": 1,
+          "total_routes": 4
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 2363,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 23,
+          "transit_only_minutes": 23,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 2
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 2103,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 23,
+          "transit_only_minutes": 23,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        }
+      ]
+    },
+    {
+      "label": "삼성서울병원 → 망원동",
+      "origin_type": "hospital",
+      "destination_type": "cafe_street",
+      "origin": {
+        "lat": 37.4875,
+        "lng": 127.0852
+      },
+      "destination": {
+        "lat": 37.5564,
+        "lng": 126.902
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3203,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 66,
+          "transit_only_minutes": 69,
+          "time_saved_vs_transit_only": 3,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 2270,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 66,
+          "transit_only_minutes": null,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 2212,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 69,
+          "transit_only_minutes": 69,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 4
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 1698,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 69,
+          "transit_only_minutes": 69,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 4
+        }
+      ]
+    },
+    {
+      "label": "이촌동 주택가 → 성수 카페거리",
+      "origin_type": "apartment",
+      "destination_type": "cafe_street",
+      "origin": {
+        "lat": 37.5215,
+        "lng": 126.9683
+      },
+      "destination": {
+        "lat": 37.542,
+        "lng": 127.0554
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3159,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 26,
+          "transit_only_minutes": 29,
+          "time_saved_vs_transit_only": 3,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 1932,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 26,
+          "transit_only_minutes": 29,
+          "time_saved_vs_transit_only": 3,
+          "total_routes": 5
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 2168,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 29,
+          "transit_only_minutes": 29,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 4
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 2956,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 29,
+          "transit_only_minutes": 29,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        }
+      ]
+    },
+    {
+      "label": "이촌동 주택가 → 연남동",
+      "origin_type": "apartment",
+      "destination_type": "commercial",
+      "origin": {
+        "lat": 37.5215,
+        "lng": 126.9683
+      },
+      "destination": {
+        "lat": 37.5615,
+        "lng": 126.9225
+      },
+      "scenarios": [
+        {
+          "scenario": "SPECIFIC + EBIKE + TIME",
+          "ok": true,
+          "elapsed_ms": 3342,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 28,
+          "transit_only_minutes": 32,
+          "time_saved_vs_transit_only": 4,
+          "total_routes": 4
+        },
+        {
+          "scenario": "SPECIFIC + EBIKE + REL",
+          "ok": true,
+          "elapsed_ms": 2154,
+          "recommended_type": "TRANSIT_WITH_BIKE",
+          "recommended_minutes": 28,
+          "transit_only_minutes": 32,
+          "time_saved_vs_transit_only": 4,
+          "total_routes": 4
+        },
+        {
+          "scenario": "SPECIFIC + DDAREUNGI + TIME",
+          "ok": true,
+          "elapsed_ms": 1994,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 32,
+          "transit_only_minutes": 32,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 2
+        },
+        {
+          "scenario": "OPTIMAL + TIME",
+          "ok": true,
+          "elapsed_ms": 3170,
+          "recommended_type": "TRANSIT_ONLY",
+          "recommended_minutes": 32,
+          "transit_only_minutes": 32,
+          "time_saved_vs_transit_only": null,
+          "total_routes": 5
+        }
+      ]
+    }
+  ]
+}

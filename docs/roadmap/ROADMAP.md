@@ -831,7 +831,7 @@ Claude에게:
 
 ### 다음 진행 예정 (우선순위 순)
 - [ ] **M-1** Alerting + Discord 웹훅 (관측성 스택 마무리)
-- [ ] **A-5** 현실 시나리오 벤치마크 (역 편향 제거) — MaaS 복합 경로 가치를 실측으로 증명
+- [x] **A-5 현실 시나리오 벤치마크** — OD 30쌍 자동 배치, Mixed 채택률 43% / 평균 3.4분 / 최대 8분 — [개선 기록](../improvements/2026-04-23-A5-real-user-benchmark.md)
 - [ ] **A-2** 도착 시간 신뢰도 구간
 - [ ] **A-4** 날씨 인식 경로
 - [ ] **RAG-3** POI Semantic Search (pgvector + 임베딩) — 선택
