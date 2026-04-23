@@ -69,78 +69,94 @@ export default function RouteCard({
   return (
     <div
       onClick={onClick}
-      className={`p-4 rounded-xl border cursor-pointer transition
-        ${selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+      className={`group relative cursor-pointer rounded-2xl border p-4 transition-all animate-fade-in-up
+        ${selected
+          ? 'border-blue-500 bg-blue-50/70 shadow-lg shadow-blue-500/10 ring-2 ring-blue-300/40'
+          : route.recommended
+            ? 'border-transparent bg-white shadow-md shadow-indigo-500/5 recommended-ring'
+            : 'border-slate-200 bg-white/90 hover:border-slate-300 hover:shadow-sm'}`}
     >
-      {/* 헤더 */}
-      <div className="flex justify-between items-start">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2 flex-wrap">
+      {/* ──────── 헤더: 배지 + 경로 타입 + 시간/비용 ──────── */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             {route.recommended && (
-              <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full">
+              <span className="inline-flex items-center gap-1 rounded-full
+                               bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500
+                               px-2.5 py-0.5 text-[11px] font-semibold text-white shadow-sm shadow-indigo-500/40">
                 ⭐ 추천
               </span>
             )}
-            <span className="text-xs text-gray-400">{routeLabel}</span>
+            <span className="text-[11px] font-medium tracking-wide text-slate-500">
+              {routeLabel}
+            </span>
             {risks.map(risk => (
-              <span key={risk.label} className={`text-[11px] px-2 py-0.5 rounded-full ${risk.className}`}>
+              <span key={risk.label} className={`rounded-full px-2 py-0.5 text-[11px] ${risk.className}`}>
                 {risk.label}
               </span>
             ))}
           </div>
           {/* 이동수단 체인 */}
-          <span className="text-sm text-gray-600">
+          <p className="truncate text-[13px] text-slate-600">
             {route.legs.map(summarizeLeg).join(' → ')}
-          </span>
+          </p>
         </div>
-        <div className="text-right">
-          <span className="text-xl font-bold text-gray-800">{route.totalMinutes}분</span>
+        <div className="shrink-0 text-right">
+          <div className="flex items-baseline gap-0.5">
+            <span className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
+              {route.totalMinutes}
+            </span>
+            <span className="text-xs font-medium text-slate-500">분</span>
+          </div>
           {route.totalCostWon > 0 && (
-            <>
-              <p className="text-xs text-gray-400">{route.totalCostWon.toLocaleString()}원</p>
-              {costBreakdown.length > 0 && (
-                <p className="mt-1 text-[11px] text-gray-400 max-w-[180px] text-right">
-                  {costBreakdown.map(item => `${item.label} ${item.amountWon.toLocaleString()}원`).join(' + ')}
-                </p>
-              )}
-            </>
+            <p className="text-[11px] font-medium text-slate-500 tabular-nums">
+              {route.totalCostWon.toLocaleString()}원
+            </p>
+          )}
+          {costBreakdown.length > 0 && (
+            <p className="mt-0.5 max-w-[160px] text-right text-[10px] text-slate-400">
+              {costBreakdown.map(item => `${item.label} ${item.amountWon.toLocaleString()}`).join(' · ')}
+            </p>
           )}
         </div>
       </div>
 
-      {/* 절약 시간 */}
-      {route.comparison?.savedMinutes > 0 && (
-        <p className="text-xs text-green-600 mt-1">
-          🔥 대중교통만 이용시보다 {route.comparison.savedMinutes}분 빠름
-        </p>
-      )}
-
-      {/* C-2: 경로 자체의 탄소 배출량 (독립 배지) */}
-      {route.carbon && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span
-            className={`text-[11px] font-semibold px-2 py-1 rounded-full border ${
-              route.carbon.eco
-                ? 'border-green-300 bg-green-50 text-green-700'
-                : 'border-slate-200 bg-slate-50 text-slate-600'
-            }`}
-            title={`평균 탄소 강도 ${route.carbon.gramsPerKm.toFixed(1)} g/km`}
-          >
-            🌱 {route.carbon.grams >= 1000
-              ? `${(route.carbon.grams / 1000).toFixed(1)}kg`
-              : `${Math.round(route.carbon.grams)}g`} CO₂
-          </span>
-          {route.carbon.eco && (
-            <span className="text-[11px] font-semibold px-2 py-1 rounded-full border border-green-400 bg-green-100 text-green-800">
-              🌿 친환경 경로
+      {/* ──────── 절약 시간 & Carbon 배지 — 하나의 메타 라인에 ──────── */}
+      {(route.comparison?.savedMinutes > 0 || route.carbon) && (
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          {route.comparison?.savedMinutes > 0 && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700">
+              🔥 {route.comparison.savedMinutes}분 단축
             </span>
           )}
-          {route.carbon.savedVsCarGrams > 100 && (
-            <span className="text-[11px] text-emerald-600">
-              자가용 대비 −{route.carbon.savedVsCarGrams >= 1000
-                ? `${(route.carbon.savedVsCarGrams / 1000).toFixed(1)}kg`
-                : `${Math.round(route.carbon.savedVsCarGrams)}g`} 감축
-            </span>
+          {route.carbon && (
+            <>
+              <span
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
+                  route.carbon.eco
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                    : 'border-slate-200 bg-slate-50 text-slate-600'
+                }`}
+                title={`평균 탄소 강도 ${route.carbon.gramsPerKm.toFixed(1)} g/km`}
+              >
+                🌱 {route.carbon.grams >= 1000
+                  ? `${(route.carbon.grams / 1000).toFixed(1)}kg`
+                  : `${Math.round(route.carbon.grams)}g`} CO₂
+              </span>
+              {route.carbon.eco && (
+                <span className="rounded-full border border-emerald-400 bg-emerald-100 px-2 py-0.5
+                                 text-[11px] font-semibold text-emerald-800">
+                  🌿 친환경
+                </span>
+              )}
+              {route.carbon.savedVsCarGrams > 100 && (
+                <span className="text-[11px] font-medium text-emerald-600">
+                  자가용 −{route.carbon.savedVsCarGrams >= 1000
+                    ? `${(route.carbon.savedVsCarGrams / 1000).toFixed(1)}kg`
+                    : `${Math.round(route.carbon.savedVsCarGrams)}g`}
+                </span>
+              )}
+            </>
           )}
         </div>
       )}

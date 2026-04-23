@@ -32,13 +32,13 @@ async function captureScenario(weatherKey, weatherLabel, outputName) {
   await page.goto(FRONTEND, { waitUntil: 'networkidle', timeout: 30000 });
   await page.waitForTimeout(2000);
 
-  const originInput = page.getByPlaceholder('출발지를 입력하세요');
+  const originInput = page.getByPlaceholder(/출발지/);
   await originInput.click();
   await originInput.fill(ORIGIN);
   await page.mouse.click(10, 10);
   await page.waitForTimeout(200);
 
-  const destInput = page.getByPlaceholder('목적지를 입력하세요');
+  const destInput = page.getByPlaceholder(/목적지/);
   await destInput.click();
   await destInput.fill(DESTINATION);
   await page.mouse.click(10, 10);

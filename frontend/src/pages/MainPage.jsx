@@ -15,25 +15,31 @@ async function fetchSuggestions(query) {
   }
 }
 
+const WEATHER_OPTIONS = [
+  { key: '',     label: '기본',  emoji: '☁️', hint: '날씨 영향 반영 안 함' },
+  { key: 'RAIN', label: '비',    emoji: '🌧',  hint: '공유 자전거·장거리 도보 감점' },
+  { key: 'SNOW', label: '눈',    emoji: '❄️', hint: '공유 모빌리티 강한 감점' },
+  { key: 'HEAT', label: '폭염',  emoji: '☀️', hint: '장거리 도보 감점' },
+  { key: 'COLD', label: '혹한',  emoji: '🥶', hint: '장거리 도보 감점' },
+]
+
 export default function MainPage() {
   const [origin, setOrigin]           = useState('')
   const [destination, setDestination] = useState('')
-  const [originCoord, setOriginCoord]     = useState(null)  // { lat, lng } or null
+  const [originCoord, setOriginCoord]     = useState(null)
   const [destCoord, setDestCoord]         = useState(null)
   const [mobility, setMobility]       = useState([])
   const [searchMode, setSearchMode]   = useState('OPTIMAL')
   const [recommendationPreference, setRecommendationPreference] = useState('RELIABILITY')
-  const [weather, setWeather]         = useState('')  // A-4: CLEAR/RAIN/SNOW/HEAT/COLD/'' (기본)
-  const [mapMode, setMapMode]         = useState(null)  // 'origin' | 'destination' | null
+  const [weather, setWeather]         = useState('')
+  const [mapMode, setMapMode]         = useState(null)
 
-  // 자동완성
   const [suggestions, setSuggestions]         = useState([])
-  const [activeSuggestField, setActiveSuggestField] = useState(null)  // 'origin' | 'destination' | null
+  const [activeSuggestField, setActiveSuggestField] = useState(null)
 
   const navigate   = useNavigate()
   const debounceRef = useRef(null)
 
-  // 입력 변경 시 좌표 초기화 + 연관검색어 디바운스
   const handleOriginChange = (e) => {
     const val = e.target.value
     setOrigin(val)
@@ -63,7 +69,6 @@ export default function MainPage() {
     }, 300)
   }
 
-  // 연관검색어 항목 선택
   const selectSuggestion = (item, field) => {
     if (field === 'origin') {
       setOrigin(item.name)
@@ -76,7 +81,6 @@ export default function MainPage() {
     setActiveSuggestField(null)
   }
 
-  // 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
     const handler = () => {
       setSuggestions([])
@@ -86,7 +90,6 @@ export default function MainPage() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  // 지도 클릭 핸들러
   const handleMapClick = useCallback(({ lat, lng }) => {
     const coord = `${lat.toFixed(6)},${lng.toFixed(6)}`
     if (mapMode === 'origin') {
@@ -105,15 +108,20 @@ export default function MainPage() {
     setSuggestions([])
   }
 
+  const swapLocations = () => {
+    setOrigin(destination)
+    setDestination(origin)
+    setOriginCoord(destCoord)
+    setDestCoord(originCoord)
+  }
+
   const handleSearch = () => {
-    // 좌표가 이미 있으면 "lat,lng" 형식으로, 없으면 입력 텍스트 그대로 전달
     const originParam = originCoord
       ? `${originCoord.lat.toFixed(6)},${originCoord.lng.toFixed(6)}`
       : origin
     const destParam = destCoord
       ? `${destCoord.lat.toFixed(6)},${destCoord.lng.toFixed(6)}`
       : destination
-
     const weatherParam = weather ? `&weather=${weather}` : ''
     navigate(
       `/routes?origin=${encodeURIComponent(originParam)}&dest=${encodeURIComponent(destParam)}` +
@@ -121,137 +129,241 @@ export default function MainPage() {
     )
   }
 
+  const canSearch = !!origin && !!destination
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-lg mx-auto p-4">
-        <h1 className="text-2xl font-bold text-gray-800 mb-4">
-          🐍 Black Mamba
-        </h1>
-        <div className="bg-white rounded-xl shadow p-4 space-y-3">
+    <div className="min-h-screen">
+      {/* ────────────────────────────────────────────────────────────
+          데스크톱: 좌 검색 패널 sticky / 우 지도 full-height (lg+)
+          모바일: stacked vertical
+          ──────────────────────────────────────────────────────────── */}
+      <div className="mx-auto max-w-7xl px-4 py-6 lg:py-10
+                      lg:grid lg:grid-cols-[minmax(440px,520px)_1fr] lg:gap-8">
 
-          {/* 출발지 */}
-          <div className="relative" onMouseDown={e => e.stopPropagation()}>
-            <div className="flex gap-2">
-              <input
-                value={origin}
-                onChange={handleOriginChange}
-                onFocus={() => { setActiveSuggestField('origin'); triggerSuggest(origin, 'origin') }}
-                placeholder="출발지를 입력하세요"
-                className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
-              <button
-                onClick={() => toggleMapMode('origin')}
-                title="지도에서 출발지 선택"
-                className={`px-3 py-2 rounded-lg border text-sm transition ${
-                  mapMode === 'origin'
-                    ? 'bg-blue-500 text-white border-blue-500'
-                    : 'bg-white text-gray-500 border-gray-300 hover:border-blue-400'
-                }`}
-              >
-                📍
-              </button>
+        {/* ──────── 좌측: Hero + 검색 패널 ──────── */}
+        <div className="lg:sticky lg:top-10 lg:h-fit space-y-6">
+          {/* Hero */}
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl
+                              bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500
+                              shadow-lg shadow-indigo-500/30">
+                <span className="text-2xl">🐍</span>
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Black Mamba</h1>
+                <p className="text-[11px] text-slate-500 tracking-wider uppercase">MaaS Routing Engine</p>
+              </div>
             </div>
-            {activeSuggestField === 'origin' && suggestions.length > 0 && (
-              <ul className="absolute z-10 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                {suggestions.map((item, idx) => (
-                  <li
-                    key={idx}
-                    onMouseDown={() => selectSuggestion(item, 'origin')}
-                    className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 cursor-pointer border-b last:border-b-0"
-                  >
-                    📍 {item.name}
-                  </li>
-                ))}
-              </ul>
-            )}
+            <p className="mt-4 text-[15px] text-slate-600 leading-relaxed">
+              대중교통 + 공공자전거 + 개인 이동수단을 결합해
+              <br />
+              <span className="font-semibold text-slate-800">
+                "자가용 대체 가능한 경로"
+              </span>
+              를 설명 가능하게 추천합니다.
+            </p>
           </div>
 
-          {/* 목적지 */}
-          <div className="relative" onMouseDown={e => e.stopPropagation()}>
-            <div className="flex gap-2">
-              <input
-                value={destination}
-                onChange={handleDestChange}
-                onFocus={() => { setActiveSuggestField('destination'); triggerSuggest(destination, 'destination') }}
-                placeholder="목적지를 입력하세요"
-                className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
-              <button
-                onClick={() => toggleMapMode('destination')}
-                title="지도에서 목적지 선택"
-                className={`px-3 py-2 rounded-lg border text-sm transition ${
-                  mapMode === 'destination'
-                    ? 'bg-blue-500 text-white border-blue-500'
-                    : 'bg-white text-gray-500 border-gray-300 hover:border-blue-400'
-                }`}
-              >
-                📍
-              </button>
-            </div>
-            {activeSuggestField === 'destination' && suggestions.length > 0 && (
-              <ul className="absolute z-10 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                {suggestions.map((item, idx) => (
-                  <li
-                    key={idx}
-                    onMouseDown={() => selectSuggestion(item, 'destination')}
-                    className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 cursor-pointer border-b last:border-b-0"
+          {/* ──────── 검색 패널 (Glass) ──────── */}
+          <div className="glass-panel rounded-3xl p-5 shadow-xl shadow-slate-200/50">
+            {/* 출발/목적지 입력 — 세로 스택 + 중간 swap 버튼 */}
+            <div className="relative space-y-2" onMouseDown={e => e.stopPropagation()}>
+              {/* 출발지 */}
+              <div className="relative">
+                <div className="flex items-center gap-2 rounded-2xl border border-slate-200
+                                bg-white/80 px-3 py-2.5 transition
+                                focus-within:border-blue-400 focus-within:shadow-md focus-within:shadow-blue-500/10">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center
+                                   rounded-full bg-blue-100 text-sm">🟢</span>
+                  <input
+                    value={origin}
+                    onChange={handleOriginChange}
+                    onFocus={() => { setActiveSuggestField('origin'); triggerSuggest(origin, 'origin') }}
+                    placeholder="출발지 · 주소 · 좌표"
+                    className="flex-1 bg-transparent text-[14px] text-slate-800
+                               placeholder-slate-400 focus:outline-none"
+                  />
+                  <button
+                    onClick={() => toggleMapMode('origin')}
+                    title="지도에서 출발지 선택"
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full
+                                text-[13px] transition ${
+                      mapMode === 'origin'
+                        ? 'bg-blue-500 text-white shadow'
+                        : 'text-slate-400 hover:bg-slate-100'
+                    }`}
                   >
-                    📍 {item.name}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+                    📍
+                  </button>
+                </div>
+                {activeSuggestField === 'origin' && suggestions.length > 0 && (
+                  <ul className="absolute z-20 left-0 right-0 mt-1.5 overflow-hidden
+                                 rounded-2xl border border-slate-200 bg-white shadow-xl">
+                    {suggestions.map((item, idx) => (
+                      <li
+                        key={idx}
+                        onMouseDown={() => selectSuggestion(item, 'origin')}
+                        className="cursor-pointer border-b border-slate-100 px-3 py-2 text-sm text-slate-700
+                                   last:border-b-0 hover:bg-blue-50"
+                      >
+                        📍 {item.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
 
-          <MobilitySelector
-            selected={mobility}
-            onChange={setMobility}
-            searchMode={searchMode}
-            onSearchModeChange={setSearchMode}
-            recommendationPreference={recommendationPreference}
-            onRecommendationPreferenceChange={setRecommendationPreference}
-          />
-
-          {/* A-4: 날씨 힌트 — 공유 모빌리티/장거리 도보에 페널티 반영 */}
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-gray-600 text-xs whitespace-nowrap">☁️ 날씨</span>
-            <div className="flex flex-wrap gap-1">
-              {[
-                { key: '',     label: '기본',  emoji: '—' },
-                { key: 'RAIN', label: '비',    emoji: '🌧' },
-                { key: 'SNOW', label: '눈',    emoji: '❄️' },
-                { key: 'HEAT', label: '폭염',  emoji: '☀️' },
-                { key: 'COLD', label: '혹한',  emoji: '🥶' },
-              ].map(opt => (
+              {/* Swap 버튼 (중앙) */}
+              <div className="flex justify-center -my-1">
                 <button
-                  key={opt.key}
-                  onClick={() => setWeather(opt.key)}
-                  type="button"
-                  className={`text-xs px-2 py-1 rounded-full border transition ${
-                    weather === opt.key
-                      ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold'
-                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-400'
-                  }`}
-                  title={opt.key === '' ? '날씨 영향 반영 안 함' : `${opt.label} 시 공유 모빌리티 및 장거리 도보 페널티 적용`}
+                  onClick={swapLocations}
+                  disabled={!origin && !destination}
+                  title="출발/도착 교체"
+                  className="flex h-7 w-7 items-center justify-center rounded-full
+                             border border-slate-200 bg-white text-slate-500 shadow-sm
+                             transition hover:rotate-180 hover:text-blue-500 disabled:opacity-30"
                 >
-                  {opt.emoji} {opt.label}
+                  ⇅
                 </button>
-              ))}
+              </div>
+
+              {/* 목적지 */}
+              <div className="relative">
+                <div className="flex items-center gap-2 rounded-2xl border border-slate-200
+                                bg-white/80 px-3 py-2.5 transition
+                                focus-within:border-blue-400 focus-within:shadow-md focus-within:shadow-blue-500/10">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center
+                                   rounded-full bg-rose-100 text-sm">🔴</span>
+                  <input
+                    value={destination}
+                    onChange={handleDestChange}
+                    onFocus={() => { setActiveSuggestField('destination'); triggerSuggest(destination, 'destination') }}
+                    placeholder="목적지 · 주소 · 좌표"
+                    className="flex-1 bg-transparent text-[14px] text-slate-800
+                               placeholder-slate-400 focus:outline-none"
+                  />
+                  <button
+                    onClick={() => toggleMapMode('destination')}
+                    title="지도에서 목적지 선택"
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full
+                                text-[13px] transition ${
+                      mapMode === 'destination'
+                        ? 'bg-rose-500 text-white shadow'
+                        : 'text-slate-400 hover:bg-slate-100'
+                    }`}
+                  >
+                    📍
+                  </button>
+                </div>
+                {activeSuggestField === 'destination' && suggestions.length > 0 && (
+                  <ul className="absolute z-20 left-0 right-0 mt-1.5 overflow-hidden
+                                 rounded-2xl border border-slate-200 bg-white shadow-xl">
+                    {suggestions.map((item, idx) => (
+                      <li
+                        key={idx}
+                        onMouseDown={() => selectSuggestion(item, 'destination')}
+                        className="cursor-pointer border-b border-slate-100 px-3 py-2 text-sm text-slate-700
+                                   last:border-b-0 hover:bg-blue-50"
+                      >
+                        📍 {item.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
+
+            {/* MobilitySelector */}
+            <div className="mt-4">
+              <MobilitySelector
+                selected={mobility}
+                onChange={setMobility}
+                searchMode={searchMode}
+                onSearchModeChange={setSearchMode}
+                recommendationPreference={recommendationPreference}
+                onRecommendationPreferenceChange={setRecommendationPreference}
+              />
+            </div>
+
+            {/* 날씨 옵션 */}
+            <div className="mt-4 rounded-2xl bg-slate-50/70 p-3">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                ☁️ 날씨 (선택)
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {WEATHER_OPTIONS.map(opt => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => setWeather(opt.key)}
+                    title={opt.hint}
+                    className={`flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                      weather === opt.key
+                        ? 'border-blue-500 bg-blue-500 text-white shadow-sm shadow-blue-500/30'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>{opt.emoji}</span>
+                    <span>{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+              {weather && (
+                <p className="mt-2 text-[11px] text-slate-500">
+                  ✨ {WEATHER_OPTIONS.find(o => o.key === weather)?.hint}
+                </p>
+              )}
+            </div>
+
+            {/* 검색 버튼 */}
+            <button
+              onClick={handleSearch}
+              disabled={!canSearch}
+              className={`mt-5 w-full rounded-2xl py-3 text-sm font-semibold text-white transition
+                          ${canSearch
+                            ? 'bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 hover:brightness-110 active:scale-[0.99] animate-gentle-pulse'
+                            : 'bg-slate-300 cursor-not-allowed'}`}
+            >
+              {canSearch ? '🚀 경로 탐색' : '출발지 / 목적지를 입력하세요'}
+            </button>
           </div>
 
-          <button
-            onClick={handleSearch}
-            disabled={!origin && !destination}
-            className="w-full bg-blue-500 text-white py-2 rounded-lg font-medium hover:bg-blue-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            경로 탐색
-          </button>
+          {/* 하단 요약 통계 */}
+          <div className="grid grid-cols-3 gap-2 text-center">
+            {[
+              { label: '관측 축',       value: '4',   suffix: '축' },
+              { label: '자체 알고리즘', value: '8',   suffix: '종' },
+              { label: '개선 기록',     value: '18',  suffix: '건' },
+            ].map(s => (
+              <div key={s.label}
+                   className="rounded-2xl border border-slate-200 bg-white/70 px-3 py-2">
+                <div className="text-[11px] uppercase tracking-wider text-slate-500">{s.label}</div>
+                <div className="mt-0.5 text-xl font-bold text-slate-800">
+                  {s.value}<span className="ml-0.5 text-xs font-normal text-slate-400">{s.suffix}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* 지도 */}
-        <div className="mt-4">
-          <NaverMap onMapClick={handleMapClick} mapMode={mapMode} />
+        {/* ──────── 우측: 지도 (데스크톱 sticky) ──────── */}
+        <div className="mt-6 lg:mt-0">
+          <div className="map-container overflow-hidden rounded-3xl border border-slate-200 bg-white/70
+                          lg:sticky lg:top-10 lg:h-[calc(100vh-5rem)]">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white/80 px-4 py-2.5
+                            backdrop-blur">
+              <p className="text-xs font-semibold text-slate-600">
+                {mapMode === 'origin'  ? '🟢 지도에서 출발지를 클릭하세요' :
+                 mapMode === 'destination' ? '🔴 지도에서 목적지를 클릭하세요' :
+                 '🗺 서울 지하철 + 버스 노선'}
+              </p>
+              <p className="text-[10px] text-slate-400">Naver Maps</p>
+            </div>
+            <div className="h-[400px] lg:h-full">
+              <NaverMap onMapClick={handleMapClick} mapMode={mapMode} />
+            </div>
+          </div>
         </div>
       </div>
     </div>

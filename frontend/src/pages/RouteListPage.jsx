@@ -171,27 +171,52 @@ export default function RouteListPage() {
   )
 
   return (
-    <div className="max-w-lg mx-auto p-4">
-      {/* 헤더 */}
-      <div className="flex items-center gap-2 mb-4">
-        <button onClick={() => navigate('/')} className="text-gray-400 hover:text-gray-600">
-          ← 
-        </button>
-        <div className="flex-1">
-          <h2 className="text-lg font-bold text-gray-800">경로 결과</h2>
-          <p className="text-xs text-gray-500">{originName} → {destName}</p>
+    <div className="min-h-screen">
+      <div className="mx-auto max-w-7xl px-4 py-6 lg:py-8">
+
+      {/* ──────── Sticky 상단: OD + 디버그 토글 ──────── */}
+      <div className="sticky top-0 z-10 -mx-4 mb-5 border-b border-slate-200/60
+                      bg-slate-50/80 px-4 py-3 backdrop-blur-md">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/')}
+            title="메인으로"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200
+                       bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-700"
+          >
+            ←
+          </button>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              <span>🗺 Route Result</span>
+              {weather && (
+                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                  {weather === 'RAIN' ? '🌧 비' : weather === 'SNOW' ? '❄️ 눈' :
+                   weather === 'HEAT' ? '☀️ 폭염' : weather === 'COLD' ? '🥶 혹한' : weather}
+                </span>
+              )}
+            </div>
+            <p className="mt-0.5 truncate text-sm font-semibold text-slate-800">
+              <span className="text-blue-600">{originName}</span>
+              <span className="mx-2 text-slate-400">→</span>
+              <span className="text-rose-600">{destName}</span>
+            </p>
+          </div>
+          <button
+            onClick={() => setShowDebug(v => !v)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+              showDebug
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'
+            }`}
+          >
+            {showDebug ? '🔧 디버그 ON' : '🔧 디버그'}
+          </button>
         </div>
-        <button
-          onClick={() => setShowDebug(v => !v)}
-          className={`text-xs px-3 py-1.5 rounded-full border transition ${
-            showDebug
-              ? 'bg-slate-900 text-white border-slate-900'
-              : 'bg-white text-slate-600 border-slate-300'
-          }`}
-        >
-          {showDebug ? '디버그 ON' : '디버그'}
-        </button>
       </div>
+
+      {/* ──────── 데스크톱: 카드 좌측 + 지도 우측 sticky ──────── */}
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(380px,480px)] lg:gap-6">
 
       {selectedRoute && (
         <div className="mb-4 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
@@ -318,9 +343,14 @@ export default function RouteListPage() {
       </div>
 
       {/* 경로 카드 목록 */}
-      <div className="space-y-3 mb-4">
+      <div className="space-y-3 lg:col-start-1 lg:row-start-1">
         {routes.length === 0
-          ? <p className="text-center text-gray-400 py-8">검색된 경로가 없습니다.</p>
+          ? (
+            <div className="rounded-3xl border border-dashed border-slate-300 bg-white/60 py-12 text-center">
+              <p className="text-4xl">🕳</p>
+              <p className="mt-3 text-sm text-slate-500">검색된 경로가 없습니다.</p>
+            </div>
+          )
           : routes.map(route => (
             <RouteCard
               key={route.routeId}
@@ -337,8 +367,27 @@ export default function RouteListPage() {
         }
       </div>
 
-      {/* 지도 */}
-      <NaverMap selectedRoute={selectedRoute} />
+      {/* ──────── 우측 sticky 지도 (데스크톱) / 하단 일반 (모바일) ──────── */}
+      <div className="mt-5 lg:mt-0 lg:col-start-2 lg:row-start-1">
+        <div className="map-container overflow-hidden rounded-3xl border border-slate-200 bg-white/70
+                        lg:sticky lg:top-24 lg:h-[calc(100vh-7rem)]">
+          <div className="flex items-center justify-between border-b border-slate-100 bg-white/80
+                          px-4 py-2.5 backdrop-blur">
+            <p className="text-xs font-semibold text-slate-600">
+              🗺 {selectedRoute ? `선택된 경로 · ${selectedRoute.totalMinutes}분` : '경로 미리보기'}
+            </p>
+            {selectedRoute?.recommended && (
+              <span className="text-[10px] font-semibold text-blue-600">⭐ 추천</span>
+            )}
+          </div>
+          <div className="h-[400px] lg:h-full">
+            <NaverMap selectedRoute={selectedRoute} />
+          </div>
+        </div>
+      </div>
+
+      </div>{/* end grid */}
+      </div>{/* end container */}
     </div>
   )
 }

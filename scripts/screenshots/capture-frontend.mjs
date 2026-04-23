@@ -54,7 +54,7 @@ console.log('[2/2] 경로 결과 시나리오');
 
 // 출발지 좌표 입력 (프론트 MainPage 가 "lat,lng" 문자열 그대로 지원)
 console.log(`  출발지 입력: "${ORIGIN}" (서초 아파트)`);
-const originInput = page.getByPlaceholder('출발지를 입력하세요');
+const originInput = page.getByPlaceholder(/출발지/);
 await originInput.click();
 await originInput.fill(ORIGIN);
 // 좌표 입력 후 자동완성이 뜨면 닫기 위해 외부 클릭 (드롭다운 닫힘)
@@ -63,7 +63,7 @@ await page.waitForTimeout(300);
 
 // 목적지 좌표 입력
 console.log(`  목적지 입력: "${DESTINATION}" (성수 카페거리)`);
-const destInput = page.getByPlaceholder('목적지를 입력하세요');
+const destInput = page.getByPlaceholder(/목적지/);
 await destInput.click();
 await destInput.fill(DESTINATION);
 await page.mouse.click(10, 10);
