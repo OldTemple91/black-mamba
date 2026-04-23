@@ -167,28 +167,33 @@ export default function RouteCard({
 
       {/* F-1: 자가용 대비 비교 */}
       {route.carComparison && (
-        <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-          <div className="flex items-center gap-2 text-[11px] font-semibold text-emerald-700">
+        <div className="mt-3 rounded-lg border border-emerald-200 dark:border-emerald-800/60
+                        bg-emerald-50 dark:bg-emerald-900/30 px-3 py-2">
+          <div className="flex items-center gap-2 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
             <span>🚗</span>
             <span>자가용 대비</span>
           </div>
           <div className="mt-1.5 flex flex-wrap gap-3 text-xs">
-            <span className={route.carComparison.timeDiffMinutes >= 0 ? 'text-slate-600' : 'text-emerald-700 font-semibold'}>
+            <span className={route.carComparison.timeDiffMinutes >= 0
+                ? 'text-slate-600 dark:text-slate-400'
+                : 'text-emerald-700 dark:text-emerald-300 font-semibold'}>
               {route.carComparison.timeDiffMinutes >= 0 ? '+' : ''}
               {route.carComparison.timeDiffMinutes}분
             </span>
-            <span className={route.carComparison.costSavedWon > 0 ? 'text-emerald-700 font-semibold' : 'text-slate-600'}>
+            <span className={route.carComparison.costSavedWon > 0
+                ? 'text-emerald-700 dark:text-emerald-300 font-semibold'
+                : 'text-slate-600 dark:text-slate-400'}>
               {route.carComparison.costSavedWon > 0 ? '-' : '+'}
               {Math.abs(route.carComparison.costSavedWon).toLocaleString()}원
             </span>
-            <span className="text-emerald-700 font-semibold">
+            <span className="text-emerald-700 dark:text-emerald-300 font-semibold">
               -{route.carComparison.co2ReducedGrams >= 1000
                   ? `${(route.carComparison.co2ReducedGrams / 1000).toFixed(1)}kg`
                   : `${Math.round(route.carComparison.co2ReducedGrams)}g`}
               {' CO₂'}
             </span>
           </div>
-          <p className="mt-1.5 text-[11px] text-emerald-800">
+          <p className="mt-1.5 text-[11px] text-emerald-800 dark:text-emerald-200/90">
             {route.carComparison.narrative}
           </p>
         </div>
@@ -196,23 +201,27 @@ export default function RouteCard({
 
       <div className="mt-3 flex flex-wrap gap-2">
         {reasons.map(reason => (
-          <span key={reason} className="text-xs px-2 py-1 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+          <span key={reason} className="text-xs px-2 py-1 rounded-full
+                                        bg-sky-50 dark:bg-sky-900/40
+                                        text-sky-700 dark:text-sky-300
+                                        border border-sky-200 dark:border-sky-800/60">
             {reason}
           </span>
         ))}
       </div>
 
       {hubs.length > 0 && (
-        <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2">
-          <p className="text-[11px] font-semibold text-violet-700">경로 허브</p>
+        <div className="mt-3 rounded-lg border border-violet-200 dark:border-violet-800/60
+                        bg-violet-50 dark:bg-violet-900/30 px-3 py-2">
+          <p className="text-[11px] font-semibold text-violet-700 dark:text-violet-300">경로 허브</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {hubs.map(hub => (
               <span
                 key={`${hub.label}-${hub.detail}`}
                 className={`text-[11px] px-2 py-1 rounded-full border ${
                   hub.tone === 'candidate'
-                    ? 'border-amber-200 bg-amber-50 text-amber-700'
-                    : 'border-violet-200 bg-white text-violet-700'
+                    ? 'border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                    : 'border-violet-200 dark:border-violet-800/60 bg-white dark:bg-slate-800 text-violet-700 dark:text-violet-300'
                 }`}
               >
                 {hub.label} · {hub.detail}
@@ -230,18 +239,19 @@ export default function RouteCard({
       )}
 
       {diagnostics.length > 0 && (
-        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-          <p className="text-[11px] font-semibold text-amber-700">혼합 경로 진단</p>
+        <div className="mt-3 rounded-lg border border-amber-200 dark:border-amber-800/60
+                        bg-amber-50 dark:bg-amber-900/30 px-3 py-2">
+          <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">혼합 경로 진단</p>
           <div className="mt-2 space-y-1">
             {diagnostics.map(item => (
               <p
                 key={item.message}
                 className={`text-xs ${
                   item.tone === 'risk'
-                    ? 'text-rose-700'
+                    ? 'text-rose-700 dark:text-rose-400'
                     : item.tone === 'caution'
-                      ? 'text-amber-800'
-                      : 'text-slate-600'
+                      ? 'text-amber-800 dark:text-amber-200'
+                      : 'text-slate-600 dark:text-slate-400'
                 }`}
               >
                 {item.message}
@@ -252,18 +262,19 @@ export default function RouteCard({
       )}
 
       {fallbackDiagnostics.length > 0 && (
-        <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-          <p className="text-[11px] font-semibold text-slate-700">Fallback / 추정 정보</p>
+        <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-700
+                        bg-slate-50 dark:bg-slate-900/50 px-3 py-2">
+          <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Fallback / 추정 정보</p>
           <div className="mt-2 space-y-1">
             {fallbackDiagnostics.map(item => (
               <p
                 key={item.message}
                 className={`text-xs ${
                   item.tone === 'risk'
-                    ? 'text-rose-700'
+                    ? 'text-rose-700 dark:text-rose-400'
                     : item.tone === 'caution'
-                      ? 'text-amber-800'
-                      : 'text-slate-600'
+                      ? 'text-amber-800 dark:text-amber-200'
+                      : 'text-slate-600 dark:text-slate-400'
                 }`}
               >
                 {item.message}
@@ -275,23 +286,25 @@ export default function RouteCard({
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         {comparisonBars.map(bar => (
-          <div key={bar.key} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
-            <div className="flex items-center justify-between text-[11px] text-slate-500">
+          <div key={bar.key} className="rounded-lg bg-slate-50 dark:bg-slate-900/50
+                                        border border-slate-200 dark:border-slate-700 px-3 py-2">
+            <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
               <span>{bar.label}</span>
               <span>{bar.value.toLocaleString()}{bar.suffix}</span>
             </div>
-            <div className="mt-2 h-1.5 rounded-full bg-white overflow-hidden">
+            <div className="mt-2 h-1.5 rounded-full bg-white dark:bg-slate-800 overflow-hidden">
               <div className={`h-full rounded-full ${bar.color}`} style={{ width: `${bar.percent}%` }} />
             </div>
           </div>
         ))}
       </div>
 
-      <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-        <p className="text-[11px] font-semibold text-slate-600">핵심 환승 포인트</p>
+      <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-700
+                      bg-slate-50 dark:bg-slate-900/50 px-3 py-2">
+        <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">핵심 환승 포인트</p>
         <div className="mt-1 space-y-1">
           {transfers.map(step => (
-            <p key={step} className="text-xs text-slate-600">{step}</p>
+            <p key={step} className="text-xs text-slate-600 dark:text-slate-400">{step}</p>
           ))}
         </div>
       </div>
@@ -299,14 +312,14 @@ export default function RouteCard({
       {/* 상세 토글 */}
       <button
         onClick={e => { e.stopPropagation(); setExpanded(v => !v) }}
-        className="text-xs text-blue-500 mt-2 hover:underline"
+        className="text-xs text-blue-500 dark:text-blue-400 mt-2 hover:underline"
       >
         {expanded ? '접기 ▲' : '상세 보기 ▼'}
       </button>
 
       {/* 상세 — 타임라인 스타일 */}
       {expanded && (
-        <div className="mt-3 border-t pt-3">
+        <div className="mt-3 border-t border-slate-200 dark:border-slate-700 pt-3">
           {route.legs.map((leg, i) => (
             <LegItem
               key={i}
@@ -318,11 +331,12 @@ export default function RouteCard({
           ))}
 
           {showDebug && (
-            <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-3">
-              <p className="text-[11px] font-semibold text-slate-600">엔진 디버그</p>
+            <div className="mt-3 rounded-lg border border-dashed border-slate-300 dark:border-slate-600
+                            bg-white dark:bg-slate-900 px-3 py-3">
+              <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">엔진 디버그</p>
               <div className="mt-2 space-y-1">
                 {debugFacts.map(fact => (
-                  <p key={fact} className="text-xs text-slate-500">{fact}</p>
+                  <p key={fact} className="text-xs text-slate-500 dark:text-slate-400">{fact}</p>
                 ))}
               </div>
             </div>

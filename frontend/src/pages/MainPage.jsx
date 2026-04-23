@@ -144,12 +144,12 @@ export default function MainPage() {
         {/* ──────── 좌측: Hero + 검색 패널 ──────── */}
         <div className="lg:sticky lg:top-10 lg:h-fit space-y-6">
           {/* Hero */}
-          <div>
+          <div className="animate-hero-in">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl
                                 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500
-                                shadow-lg shadow-indigo-500/30">
+                                shadow-lg shadow-indigo-500/30 animate-float-y">
                   <span className="text-2xl">🐍</span>
                 </div>
                 <div>
@@ -175,7 +175,7 @@ export default function MainPage() {
 
           {/* ──────── 검색 패널 (Glass) ──────── */}
           <div className="glass-panel rounded-3xl p-5 shadow-xl shadow-slate-200/50
-                          dark:shadow-slate-950/40">
+                          dark:shadow-slate-950/40 animate-hero-in animate-hero-in-delay-1">
             {/* 출발/목적지 입력 — 세로 스택 + 중간 swap 버튼 */}
             <div className="relative space-y-2" onMouseDown={e => e.stopPropagation()}>
               {/* 출발지 */}
@@ -339,7 +339,7 @@ export default function MainPage() {
           </div>
 
           {/* 하단 요약 통계 */}
-          <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="grid grid-cols-3 gap-2 text-center animate-hero-in animate-hero-in-delay-2">
             {[
               { label: '관측 축',       value: '4',   suffix: '축' },
               { label: '자체 알고리즘', value: '8',   suffix: '종' },
@@ -363,7 +363,7 @@ export default function MainPage() {
         </div>
 
         {/* ──────── 우측: 지도 (데스크톱 sticky) ──────── */}
-        <div className="mt-6 lg:mt-0">
+        <div className="mt-6 lg:mt-0 animate-hero-in animate-hero-in-delay-3">
           <div className="map-container overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-700
                           bg-white/70 dark:bg-slate-800/50
                           lg:sticky lg:top-10 lg:h-[calc(100vh-5rem)]">

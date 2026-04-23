@@ -54,3 +54,40 @@
     0 1px 2px rgba(0, 0, 0, 0.05),
     0 8px 24px -8px rgba(0, 0, 0, 0.08);
 }
+
+/* Hero 로고 부드러운 floating */
+@keyframes floatY {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
+.animate-float-y {
+  animation: floatY 3.2s ease-in-out infinite;
+}
+
+/* Hero 패널 등장 — stagger 없이 CSS delay 로 */
+@keyframes heroIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-hero-in {
+  animation: heroIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-hero-in-delay-1 { animation-delay: 0.08s; }
+.animate-hero-in-delay-2 { animation-delay: 0.16s; }
+.animate-hero-in-delay-3 { animation-delay: 0.24s; }
+
+/*
+ * Reduced Motion 설정 사용자 대응.
+ * WCAG 2.3.3 / MDN 권장. prefers-reduced-motion: reduce 이면
+ * 모든 애니메이션을 비활성화 (또는 매우 빠르게).
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

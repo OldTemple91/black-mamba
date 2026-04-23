@@ -82,11 +82,26 @@ geohash, preference 등) 확인 가능.
   - 사용자 보유 이동수단을 전제로 한 상한선 실험
   - 동일 비용으로 `12~20분` 단축되는 stronger case까지 확인
 
-## Screenshots
+## 🖥 Screenshots
 
-### Main Search
+### 🌗 Light / Dark — 테마 토글로 즉시 전환
 
-![Main Search UI](output/playwright/main-page.png)
+| 라이트 | 다크 |
+|:--:|:--:|
+| ![Main Light](output/playwright/main-page.png) | ![Main Dark](output/playwright/main-page-dark.png) |
+| ![Routes Light](output/playwright/routes-page.png) | ![Routes Dark](output/playwright/routes-page-dark.png) |
+
+> 우상단 🌙 / ☀️ 토글 버튼 · localStorage + `prefers-color-scheme` 우선순위 · 0.3s 부드러운 전환
+> Tailwind v4 `@custom-variant dark (&:where(.dark, .dark *))` 전략.
+
+### 🎨 Citymapper 스타일 Route Timeline Bar
+
+각 경로의 구간 비율을 **서울 지하철 15개 노선 공식 색상**으로 수평 막대 분할.
+
+```
+[🚶 2' | 🚇 2호선 20' ━━━━━━━━━━━━ | 🚲 6' ]
+                                     총 28분 · 3개 구간
+```
 
 ### Route Recommendation — 현실 시나리오: 역이 아닌 위치 간 이동
 
