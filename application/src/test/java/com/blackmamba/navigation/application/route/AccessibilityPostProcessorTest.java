@@ -49,7 +49,7 @@ class AccessibilityPostProcessorTest {
                 "rt_walk", RouteType.TRANSIT_ONLY, 40, 1_000,
                 new RouteCostBreakdown(List.of(new CostComponent("대중교통", 1_000)), 1_000),
                 List.of(), null, 0, false,
-                List.of(walk, transit), null, null, null
+                List.of(walk, transit), null, null, null, null
         );
 
         // 4.5 → 3.0 km/h = 1.5배 → 10분 → 15분
@@ -95,7 +95,7 @@ class AccessibilityPostProcessorTest {
                 "rt_test_" + to, RouteType.TRANSIT_ONLY, minutes, cost,
                 new RouteCostBreakdown(List.of(new CostComponent("대중교통", cost)), cost),
                 List.of(), null, 0.5, false,
-                List.of(transit), null, null, null
+                List.of(transit), null, null, null, null
         );
     }
 }

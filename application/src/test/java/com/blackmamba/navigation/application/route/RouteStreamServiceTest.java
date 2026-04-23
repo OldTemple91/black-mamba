@@ -84,6 +84,6 @@ class RouteStreamServiceTest {
                 List.of(new CostComponent("대중교통", 1650)), 1650);
         return new Route(id, type, minutes, 1650,
                 breakdown, List.of(), null, 0.8, recommended,
-                List.of(), new Comparison(minutes, 0), null, null);
+                List.of(), new Comparison(minutes, 0), null, null, null);
     }
 }

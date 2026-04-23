@@ -48,15 +48,19 @@ public class CarReferenceCalculator {
     private static final int TOLL_PER_KM = 100;
     private static final double TOLL_THRESHOLD_KM = 30.0;
 
-    // CO₂ 배출 (g/km) — 환경부 '2023 국가 온실가스 인벤토리' 승용 휘발유 평균
-    private static final double CO2_GRAM_PER_KM = 171.0;
-
     // 기타 상수
     private static final double DETOUR_FACTOR = 1.3;
     private static final double EARTH_RADIUS_METERS = 6_371_000;
 
+    private final CarbonFootprintCalculator carbonFootprintCalculator;
+
+    public CarReferenceCalculator(CarbonFootprintCalculator carbonFootprintCalculator) {
+        this.carbonFootprintCalculator = carbonFootprintCalculator;
+    }
+
     /**
      * 출발/도착 좌표로부터 자가용 기준값 계산.
+     * CO₂ 계수는 {@link CarbonFootprintCalculator#CAR_G_PER_KM} 에서 공유 (171 g/km).
      */
     public CarReference estimate(Location origin, Location destination) {
         double distKm = haversineKm(origin, destination) * DETOUR_FACTOR;
@@ -74,42 +78,25 @@ public class CarReferenceCalculator {
         if (toll > 0) breakdown.put("toll", toll);
 
         int totalCost = fuel + parking + toll;
-        double co2 = distKm * CO2_GRAM_PER_KM;
+        double co2 = carbonFootprintCalculator.forCarDistance(distKm);
 
         return new CarReference(minutes, totalCost, co2, breakdown);
     }
 
     /**
      * 주어진 Route가 자가용 대비 얼마나 나은지 비교.
-     * <p>narrative는 한국어 템플릿으로 생성한다.
+     * Route 의 CO₂ 는 {@link CarbonFootprintCalculator} 로 이동수단별 정밀 계산.
      */
     public RouteComparison compareWithRoute(Route route, Location origin, Location destination) {
         CarReference car = estimate(origin, destination);
 
-        int timeDiff = route.totalMinutes() - car.estimatedMinutes();   // 양수 = 이 경로가 더 오래 걸림
-        int costSaved = car.estimatedCostWon() - route.totalCostWon();   // 양수 = 이 경로가 절약
-        double co2Reduced = car.estimatedCo2Grams() - routeCo2Grams(route); // 양수 = 이 경로가 덜 배출
+        int timeDiff = route.totalMinutes() - car.estimatedMinutes();
+        int costSaved = car.estimatedCostWon() - route.totalCostWon();
+        double co2Reduced = car.estimatedCo2Grams() - carbonFootprintCalculator.forRoute(route);
 
         String narrative = buildNarrative(timeDiff, costSaved, co2Reduced);
 
         return new RouteComparison(car, timeDiff, costSaved, co2Reduced, narrative);
-    }
-
-    /**
-     * 현재 구현은 대중교통/도보 구간은 자전거(0g) + 평균 대중교통(68 g/km 버스 기준) 단순화.
-     * 정확한 경로 배출량 계산은 CO2 측정 모듈 도입 후 개선.
-     */
-    private double routeCo2Grams(Route route) {
-        return route.legs().stream()
-                .mapToDouble(leg -> {
-                    double legKm = leg.distanceMeters() / 1_000.0;
-                    return switch (leg.type()) {
-                        case TRANSIT -> legKm * 68.0;  // 버스 평균
-                        case BIKE, WALK -> 0.0;
-                        case KICKBOARD -> legKm * 0.5;  // 전력 소모 극소
-                    };
-                })
-                .sum();
     }
 
     private int estimateMinutes(double distKm) {

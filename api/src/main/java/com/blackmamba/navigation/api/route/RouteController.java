@@ -5,6 +5,7 @@ import com.blackmamba.navigation.application.route.RouteNarrativeEnhancer;
 import com.blackmamba.navigation.application.route.RouteOptimizationService;
 import com.blackmamba.navigation.application.route.RecommendationPreference;
 import com.blackmamba.navigation.application.route.SearchMode;
+import com.blackmamba.navigation.application.route.WeatherContext;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.MobilityType;
 import com.blackmamba.navigation.domain.route.Route;
@@ -72,7 +73,8 @@ public class RouteController {
             @Parameter(description = "탐색 모드: OPTIMAL(전체 최적) / SPECIFIC(선택 수단)") @RequestParam(defaultValue = "SPECIFIC") SearchMode searchMode,
             @Parameter(description = "추천 기준: RELIABILITY(안정) / TIME_PRIORITY(시간)") @RequestParam(defaultValue = "RELIABILITY") RecommendationPreference recommendationPreference,
             @Parameter(description = "휠체어 접근성 (true면 엘리베이터 있는 역만 환승 후보)") @RequestParam(required = false) Boolean wheelchairAccessible,
-            @Parameter(description = "도보 속도 km/h (노인/유아 기본 3.0, 미지정 시 기본 4.5)", example = "3.0") @RequestParam(required = false) Double walkingSpeedKmh
+            @Parameter(description = "도보 속도 km/h (노인/유아 기본 3.0, 미지정 시 기본 4.5)", example = "3.0") @RequestParam(required = false) Double walkingSpeedKmh,
+            @Parameter(description = "날씨 힌트 (CLEAR/RAIN/SNOW/HEAT/COLD) — 공유 모빌리티 · 장거리 도보에 페널티 반영") @RequestParam(required = false) String weather
     ) {
         // 입력값 검증
         if (originLat < -90 || originLat > 90 || destLat < -90 || destLat > 90) {
@@ -116,11 +118,13 @@ public class RouteController {
         }
 
         AccessibilityContext accessibilityContext = AccessibilityContext.of(wheelchairAccessible, walkingSpeedKmh);
+        WeatherContext weatherContext = WeatherContext.of(
+                com.blackmamba.navigation.domain.weather.WeatherCondition.parse(weather));
 
         Timer.Sample sample = Timer.start(meterRegistry);
         try {
             List<Route> routes = routeOptimizationService
-                    .findRoutes(origin, destination, mobilityTypes, searchMode, recommendationPreference, accessibilityContext)
+                    .findRoutes(origin, destination, mobilityTypes, searchMode, recommendationPreference, accessibilityContext, weatherContext)
                     .block(ROUTE_SEARCH_TIMEOUT);
 
             // RAG-4: 추천 경로의 carComparison.narrative 를 LLM 설명으로 업그레이드

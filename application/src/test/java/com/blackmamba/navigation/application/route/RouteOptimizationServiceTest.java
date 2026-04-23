@@ -29,11 +29,15 @@ class RouteOptimizationServiceTest {
     @Mock MobilityAvailabilityPort mobilityAvailabilityPort;
     @Mock HubSelector hubSelector;
     @Mock RouteEvaluator routeEvaluator;
+    // C-2: CarbonFootprintCalculator는 순수 계산 컴포넌트 → 실제 인스턴스 주입
+    @org.mockito.Spy CarbonFootprintCalculator carbonFootprintCalculator = new CarbonFootprintCalculator();
     // F-1: CarReferenceCalculator는 순수 계산 컴포넌트 → 실제 인스턴스 주입
-    @org.mockito.Spy CarReferenceCalculator carReferenceCalculator = new CarReferenceCalculator();
+    @org.mockito.Spy CarReferenceCalculator carReferenceCalculator = new CarReferenceCalculator(carbonFootprintCalculator);
     // C-3: AccessibilityPostProcessor도 순수 후처리 → 실제 인스턴스
     @org.mockito.Spy AccessibilityPostProcessor accessibilityPostProcessor =
             new AccessibilityPostProcessor(new AccessibilityStationRegistry());
+    // A-4: WeatherAwareRouteAdjuster 도 순수 후처리 → 실제 인스턴스
+    @org.mockito.Spy WeatherAwareRouteAdjuster weatherAwareRouteAdjuster = new WeatherAwareRouteAdjuster();
     // RAG Phase 2: Recorder 는 비동기 fire-and-forget이라 mock 으로 주입 (호출 검증 불필요)
     @Mock RouteHistoryRecorder routeHistoryRecorder;
 

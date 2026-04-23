@@ -11,7 +11,8 @@ import static org.assertj.core.api.Assertions.within;
 
 class CarReferenceCalculatorTest {
 
-    private final CarReferenceCalculator calculator = new CarReferenceCalculator();
+    private final CarbonFootprintCalculator carbonCalc = new CarbonFootprintCalculator();
+    private final CarReferenceCalculator calculator = new CarReferenceCalculator(carbonCalc);
 
     @Test
     void 도심_단거리는_25kmh_속도로_계산된다() {
@@ -110,7 +111,7 @@ class CarReferenceCalculatorTest {
         return new Route(
                 "rt_test", RouteType.TRANSIT_ONLY, minutes, cost,
                 breakdown, List.of(), null, 0.5, false,
-                List.of(transit), null, null, null
+                List.of(transit), null, null, null, null
         );
     }
 }

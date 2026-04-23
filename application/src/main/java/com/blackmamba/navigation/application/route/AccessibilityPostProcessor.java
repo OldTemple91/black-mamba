@@ -109,7 +109,7 @@ public class AccessibilityPostProcessor {
                 route.routeId(), route.type(), newTotal, route.totalCostWon(),
                 route.costBreakdown(), route.selectedHubs(), route.evaluation(),
                 route.score(), route.recommended(), recomputedLegs,
-                route.comparison(), route.insights(), route.carComparison()
+                route.comparison(), route.insights(), route.carComparison(), route.carbon()
         );
     }
 }

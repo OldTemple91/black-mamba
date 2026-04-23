@@ -19,7 +19,8 @@ public record Route(
         List<Leg> legs,
         Comparison comparison,
         RouteInsights insights,
-        RouteComparison carComparison       // F-1: 자가용 대비 비교 (nullable)
+        RouteComparison carComparison,      // F-1: 자가용 대비 비교 (nullable)
+        CarbonSummary carbon                 // C-2: 경로별 탄소 배출량 (nullable = 미계산)
 ) {
     // compact constructor: 모든 생성 경로에서 불변 컬렉션 강제
     public Route {
@@ -33,32 +34,37 @@ public record Route(
         RouteCostBreakdown costBreakdown = RouteCostEstimator.estimate(normalizedLegs);
         return new Route(
                 UUID.randomUUID().toString(),
-                type, total, costBreakdown.totalWon(), costBreakdown, List.of(), null, 0.0, false, normalizedLegs, null, null, null
+                type, total, costBreakdown.totalWon(), costBreakdown, List.of(), null, 0.0, false, normalizedLegs, null, null, null, null
         );
     }
 
     public Route withComparison(Comparison comparison) {
-        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights, carComparison);
+        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights, carComparison, carbon);
     }
 
     public Route withScore(double score, boolean recommended) {
-        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights, carComparison);
+        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights, carComparison, carbon);
     }
 
     public Route withInsights(RouteInsights insights) {
-        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights, carComparison);
+        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights, carComparison, carbon);
     }
 
     public Route withEvaluation(RouteEvaluation evaluation) {
-        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights, carComparison);
+        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights, carComparison, carbon);
     }
 
     public Route withSelectedHubs(List<RouteHub> selectedHubs) {
-        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights, carComparison);
+        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights, carComparison, carbon);
     }
 
     public Route withCarComparison(RouteComparison carComparison) {
-        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights, carComparison);
+        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights, carComparison, carbon);
+    }
+
+    /** C-2: 탄소 요약 첨부. 기존 다른 필드는 유지. */
+    public Route withCarbon(CarbonSummary carbon) {
+        return new Route(routeId, type, totalMinutes, totalCostWon, costBreakdown, selectedHubs, evaluation, score, recommended, legs, comparison, insights, carComparison, carbon);
     }
 
     private static List<Leg> normalizeLegs(List<Leg> legs) {

@@ -91,6 +91,8 @@ YYYY-MM-DD-<카테고리>-<제목>.md
 | 13 | 2026-04-23 | A-6 | [장소 자동완성 POI+주소 2단계 폴백](./2026-04-23-A6-place-autocomplete-fallback.md) | `/api/places` 에 Geocoding 폴백 체인 추가 — 프론트 수정 0줄, 자동완성 UX 가 결과 페이지와 일관 |
 | 14 | 2026-04-23 | T-7 | [TAGO API 런타임 킬 스위치](./2026-04-23-T7-tago-kill-switch.md) | 서울 미제공 엔드포인트 외부 호출 스킵 — 응답 500ms → **<10ms**, 로그 노이즈 제거, 재개 시 env 한 줄로 복구 |
 | 15 | 2026-04-23 | M-1/M-2/M-3 | [관측성 4축 완성 (Alertmanager + SLO + 호스트 메트릭)](./2026-04-23-M1-M2-M3-alerts-slo.md) | 3축(Logs/Metrics/Traces) → **4축(+Alerts, +SLO)**. Alert 7 + Recording 9 룰 + Burn Rate 다중 윈도우 + cAdvisor/Node Exporter |
+| 16 | 2026-04-23 | C-2 | [경로별 탄소 배출량 (Carbon Footprint)](./2026-04-23-C2-carbon-footprint.md) | 이동수단별 정밀 계수 (지하철 41 / 버스 68 / 공유킥보드 22 / 전기자전거 10) + `Route.carbon` 응답 + Prometheus 히스토그램 2종 |
+| 17 | 2026-04-23 | A-4 | [날씨 인식 경로 (Weather-aware Routing)](./2026-04-23-A4-weather-aware-routing.md) | C-3 후처리 패턴 재사용. RAIN 에서 공유 모빌리티 × 0.85, SNOW × 0.70, 실측 0.422 → 0.330 정확 적용 |
 
 ---
 
