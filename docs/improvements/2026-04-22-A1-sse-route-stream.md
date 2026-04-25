@@ -295,7 +295,7 @@ navigation_route_stream_seconds_count = 2     (@Observed 자동)
 
 ---
 
-## 6. 발표 스토리
+## 6. 기록
 
 ### 30초 버전
 > "MaaS 의 본질은 '이동 중 가이던스' 입니다. 기존 1회성 경로 응답을 **Reactor Flux 기반 SSE**

@@ -12,7 +12,6 @@
   3. **이중 추천 축** — RELIABILITY(안정 우선) vs TIME_PRIORITY(시간 우선) 사용자 선호 반영
   4. **확장 가능한 도메인 설계** — MobilityType/HubType 추가 시 전략 코드 변경 불필요
 - **스택:** Java 21, Spring Boot 3.3, Gradle 멀티모듈, WebClient(Reactive), JUnit 5, Micrometer | React 18, Vite, TailwindCSS, 네이버 지도 SDK
-- **포지셔닝:** EV/자동차 제조사 모빌리티 서비스 백엔드 경력 포트폴리오
 
 ## 모듈 구조
 
@@ -148,7 +147,7 @@ docs/
 
 - **MobilityHub 모델:** 카셰어 존을 이동수단(Leg)이 아닌 환승 거점 가중치로 활용
   - TAGO 카셰어 API(존 위치) → CandidatePointSelector 허브 가중치
-  - 실시간 재고 연동은 사업자 파트너십 API(카셰어 사업자/카셰어 사업자) 필요
+  - 실시간 재고 연동은 카셰어 사업자 파트너십 API 필요
 - **날씨 연동:** 기상청 API → 우천 시 이동수단 경로 신뢰도 감소
 - **시간대 인식:** 출퇴근 러시아워 대중교통 지연/따릉이 재고 변동 반영
 

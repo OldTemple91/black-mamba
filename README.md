@@ -9,7 +9,7 @@
 
 대중교통 + 공공자전거 + 개인 이동수단 멀티모달 경로 엔진에,
 **Spring AI 기반 RAG 파이프라인 / Reactor 기반 SSE 실시간 스트림 / Resilience4j 장애 대응 / 4축 관측성(Logs↔Metrics↔Traces↔Alerts+SLO)** 을
-통합한 "설명 가능한 MaaS" 포트폴리오.
+통합한 "설명 가능한 MaaS" 라우팅 엔진.
 
 ### 🎬 20초 데모
 
@@ -625,7 +625,7 @@ open http://localhost:3200     # Tempo
 ### 3) Automotive-Oriented Extension
 
 - 카셰어 존을 이동수단(Leg)이 아닌 환승 거점 가중치(MobilityHub)로 활용
-- 편도 카셰어(카셰어 사업자 등) 연동 시 Car → Transit → PM 완전 통합 경로 지원
+- 편도 카셰어 서비스 연동 시 Car → Transit → PM 완전 통합 경로 지원
 - EV charging-aware routing
 - PBV / mobility hub 시나리오 확장
 

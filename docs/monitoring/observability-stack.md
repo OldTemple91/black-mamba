@@ -102,7 +102,7 @@
 - **OpenTelemetry Java Agent + OTLP/gRPC**: 메서드 단위 세분화 강하지만 초기 셋업 복잡
 - **Zipkin HTTP**: 서비스 간 호출 중심, 간단
 
-→ 포트폴리오 범위로는 **Micrometer Tracing + Zipkin 포맷**이 균형
+→ 프로젝트 범위로는 **Micrometer Tracing + Zipkin 포맷**이 균형
 
 ### @Observed 어노테이션
 
@@ -157,7 +157,7 @@ curl http://localhost:8081/actuator/prometheus | grep navigation_route
 
 ---
 
-## 발표 설명 포인트
+## 설명 포인트
 
 ### 1. 왜 Prometheus Pull 방식인가?
 대상 서버 부하 제어 + 가변 인프라 대응(Service Discovery). 블로그 문서 3장 참조.
@@ -166,7 +166,7 @@ curl http://localhost:8081/actuator/prometheus | grep navigation_route
 Promtail Pull은 stack trace 가독성 문제. loki4j는 비동기 배치로 애플리케이션 부하 최소화.
 
 ### 3. 왜 OpenTelemetry Java Agent가 아닌가?
-- Agent는 메서드 단위 세분화가 강하지만 포트폴리오 범위에서 과함
+- Agent는 메서드 단위 세분화가 강하지만 프로젝트 범위에서 과함
 - Spring Boot 3.3 표준인 Micrometer Tracing으로 충분
 - 나중에 OTel Agent로 전환 가능 (OTLP/gRPC exporter 대체)
 

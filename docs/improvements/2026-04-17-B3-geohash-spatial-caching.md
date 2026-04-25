@@ -188,7 +188,7 @@ curl 'http://localhost:9090/api/v1/query?query=sum(navigation_cache_total{cache=
 
 ---
 
-## 7. 발표 스토리텔링
+## 7. 사례 정리
 
 > "단순 좌표 기반 캐시는 ODsay 히트율이 46.9%에 머물렀습니다.
 > 분석해 보니 **GPS 오차 10m 수준**인데 좌표 `double` 기반 키는

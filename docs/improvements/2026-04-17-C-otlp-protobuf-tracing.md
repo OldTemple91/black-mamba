@@ -189,7 +189,7 @@ docker logs --since=1m black-mamba-app | grep -iE "Failed to export|Connection r
 
 ---
 
-## 7. 발표 스토리텔링
+## 7. 사례 정리
 
 > **"분산 추적 전송 프로토콜 고민하신 부분이 있나요?"**
 >

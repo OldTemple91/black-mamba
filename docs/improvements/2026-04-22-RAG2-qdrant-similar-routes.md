@@ -42,7 +42,7 @@
 | 후보 | 장점 | 단점 | 선택 여부 |
 |------|------|------|----------|
 | **Qdrant** | 경량(Rust, 단일 바이너리), gRPC, Spring AI starter 지원, 대시보드 내장 | 단일 노드 한정 | ✅ 채택 |
-| Milvus | 대규모(수십억) 지원, 분산 | 인프라 무거움 (etcd/pulsar/minio) | ❌ 포트폴리오 스케일에 과함 |
+| Milvus | 대규모(수십억) 지원, 분산 | 인프라 무거움 (etcd/pulsar/minio) | ❌ 프로젝트 스케일에 과함 |
 | pgvector | 기존 Postgres 스택 재활용 | 확장·필터 기능 상대적 약함 | 차후 POI용 (RAG-3) |
 
 **판단 기준:** 이력 20~수만 건 스케일 + Docker 1줄 + Spring AI 공식 지원.
@@ -350,7 +350,7 @@ After (RAG-4 도입 후):
 
 ---
 
-## 6. 발표 스토리
+## 6. 기록
 
 ### 30초 버전
 > "RAG Phase 2 에서 **Qdrant 벡터 DB 기반 Retrieval 레이어** 를 구축했습니다.

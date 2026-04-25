@@ -59,7 +59,7 @@ public ResponseEntity<Map<String, Object>> searchRoutes(...) {
   - 팀 Reactive 숙련도 낮음, 학습 곡선
   - 디버깅 어려움 (stacktrace가 Reactor operator들로 도배)
   - WebFlux용 Security/Validation 재학습 필요
-  - 현재 트래픽 규모(로컬, 포트폴리오)에서 이득 미미
+  - 현재 트래픽 규모(로컬, 프로젝트)에서 이득 미미
 - **채택 안 함**
 
 ### 대안 B: Spring MVC + RestTemplate

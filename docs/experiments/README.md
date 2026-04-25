@@ -146,4 +146,4 @@ mixed 자체가 생성되지 않는 케이스와 `reasonCode`를 보고 싶다�
   - `mangwon_personal_to_worldcup_park` -> `TRANSIT_WITH_KICKBOARD`, `14분` 단축, 비용 `+50원`
   - `mapo_personal_to_nanji_camp` -> `TRANSIT_WITH_KICKBOARD`, `10분` 단축, 비용 동일
 - 이는 개인 이동수단이 기본 `OPTIMAL`에서는 제외되어도, 사용자 보유를 전제로 한 별도 실험 축에서는 훨씬 큰 시간 단축 잠재력이 있음을 보여준다.
-- 따라서 포트폴리오에서는 `mixed가 실제로 이기는 사례를 확보했다` 수준으로 표현하고, 일반성을 주장하기보다 샘플 확장 계획을 함께 제시하는 것이 좋다.
+- 따라서 이 프로젝트에서는 `mixed가 실제로 이기는 사례를 확보했다` 수준으로 표현하고, 일반성을 주장하기보다 샘플 확장 계획을 함께 제시하는 것이 좋다.

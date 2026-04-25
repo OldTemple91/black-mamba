@@ -147,11 +147,11 @@ TAGO_ENABLED=true docker compose up -d --build app
 `city-code: 11` 하드코딩. 다른 도시로 확장 시 city-code 파라미터를 domain 레벨로 올리고 지역별 enabled 여부도 관리 필요.
 
 ### 4-3. 스위치 동작이 운영 이벤트에 노출되지 않음
-DEBUG 로그만 찍음. Kibana/Grafana 대시보드에 "현재 TAGO 활성 여부" 패널은 없음. Spring Boot Actuator `/actuator/env` 로는 노출되나 **별도 Info 엔드포인트 배지**로 공개하면 발표 시연에 더 명확.
+DEBUG 로그만 찍음. Kibana/Grafana 대시보드에 "현재 TAGO 활성 여부" 패널은 없음. Spring Boot Actuator `/actuator/env` 로는 노출되나 **별도 Info 엔드포인트 배지**로 공개하면 시연에 더 명확.
 
 ---
 
-## 5. 발표 스토리
+## 5. 기록
 
 > "알고리즘 문서화 준비 중 **주석은 '호출 안 함' 인데 실제로는 호출되는** 미묘한 버그를 발견했습니다.
 > TAGO API 가 서울 데이터를 제공하지 않아 100% 실패하는데도, `mobility=KICKBOARD_SHARED` 쿼리엔 여전히 외부 호출이 나가고 있었습니다.

@@ -187,7 +187,7 @@ Spring Boot 3.5는 Spring Framework 6.2 사용. 일부 내부 API 변경 있지�
 
 ---
 
-## 7. 발표 스토리텔링
+## 7. 사례 정리
 
 > **"최근 Spring Boot 버전 업그레이드 경험 있나요?"**
 >

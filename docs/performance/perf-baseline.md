@@ -98,7 +98,7 @@ k6가 로컬에 없으면 자동으로 Docker(`grafana/k6`)를 사용합니다.
 
 ---
 
-## 발표 설명 포인트
+## 설명 포인트
 
 ```
 "k6로 smoke/load/stress/spike/cache 5종 시나리오를 구성했습니다.

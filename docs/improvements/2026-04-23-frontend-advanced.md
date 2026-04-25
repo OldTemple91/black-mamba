@@ -1,7 +1,7 @@
 # 프론트엔드 고도화 — Timeline Bar + Dark Mode + Skeleton
 
 > 작업일: 2026-04-23
-> 담당 Phase: (로드맵 외) 포트폴리오 시각 완성도
+> 담당 Phase: (로드맵 외) 프로젝트 시각 완성도
 > 공수: 실측 약 2시간
 > 커밋: TBD
 
@@ -163,7 +163,7 @@ Hub summary / Generation diagnostics / Fallback diagnostics 에 `bg-violet-50` /
 
 ---
 
-## 5. 발표 스토리
+## 5. 기록
 
 > "Split layout 리뉴얼까지 하고 나서 '구조는 잡혔는데 아직 Citymapper 수준은 아니네' 라는 느낌이 들었습니다. 세 가지 더 얹었습니다.
 >
