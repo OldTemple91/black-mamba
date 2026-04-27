@@ -819,7 +819,7 @@ Claude에게:
 - [x] **B-3 Geohash 공간 인덱스 캐시** (ODsay 히트율 46.9% → 80.4%) — [개선 기록](../improvements/2026-04-17-B3-geohash-spatial-caching.md)
 - [x] **Zipkin/JSON → OTLP/Protobuf 트레이스 전송** (OpenTelemetry 표준 준수, Protobuf 페이로드) — [개선 기록](../improvements/2026-04-17-C-otlp-protobuf-tracing.md)
 - [x] **T-4 Phase 1: Spring Boot 3.5.13 + OTLP/gRPC + Gradle 8.14.3** — [개선 기록](../improvements/2026-04-20-T4-phase1-springboot-3.5-otlp-grpc.md)
-- [x] **T-1 ADR 6건 작성** (설계 결정 근거 문서화) — [docs/adr/](../adr/)
+- [x] **T-1 ADR 7건 작성** (설계 결정 근거 문서화 — ADR-001~007) — [docs/adr/](../adr/)
 - [x] **F-1 vs 자가용 비교 응답 (MaaS 정체성 전환)** — [개선 기록](../improvements/2026-04-20-F1-vs-car-comparison.md)
 - [x] **C-3 Accessibility 경로 (휠체어/노인 옵션)** — [개선 기록](../improvements/2026-04-20-C3-accessibility.md)
 - [x] **RAG-1 자연어 경로 검색 (Ollama + Spring AI)** — 자연어 진입점 — [개선 기록](../improvements/2026-04-20-RAG1-nlp-route-search.md)
@@ -849,7 +849,7 @@ Claude에게:
 > "자동차 회사의 미래는 차량 판매가 아니라 모빌리티 서비스입니다. 제 프로젝트는 서울의 대중교통/따릉이/개인 PM에서 시작해 **EV 충전 인프라까지 통합한 MaaS 라우팅 엔진**으로 확장됩니다. 향후 E-GMP 플랫폼 차량 데이터와 연동하면 남은 배터리 기반 실시간 경로 재탐색도 가능합니다."
 
 ### 스토리 2: 관측성 + 신뢰성
-> "운영 관점에서는 Prometheus/Loki/Tempo를 traceId 하나로 연결해 로그↔메트릭↔트레이스 **3축 관측성**을 구현했습니다. Exemplars로 p99 스파이크를 즉시 트레이스로 역추적하고, @Observed로 외부 API 호출별 병목을 Gantt 차트에서 시각화합니다."
+> "운영 관점에서는 Prometheus/Loki/Tempo를 traceId 하나로 연결하고 Alertmanager + SLO Burn Rate(Google SRE 다중 윈도우)를 더해 **4축 관측성**을 구성했습니다. Exemplars로 p99 스파이크를 즉시 트레이스로 역추적하고, @Observed로 외부 API 호출별 병목을 Gantt 차트에서 시각화합니다."
 
 ### 스토리 3: 확장 가능한 도메인 설계
 > "MobilityType enum 하나 추가하면 새로운 이동수단 지원이 확장됩니다. Hub 모델로 카셰어존 같은 메타 인프라도 추가할 수 있고, 지역 확장은 cityCode 차원 하나만 추가하면 되는 구조입니다. Clean Architecture로 외부 API를 언제든 교체 가능합니다."

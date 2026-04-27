@@ -11,7 +11,7 @@
   2. **신뢰도 기반 다차원 스코어링** — 시간뿐 아니라 따릉이 재고, 반납 확인, 도보 거리까지 반영
   3. **이중 추천 축** — RELIABILITY(안정 우선) vs TIME_PRIORITY(시간 우선) 사용자 선호 반영
   4. **확장 가능한 도메인 설계** — MobilityType/HubType 추가 시 전략 코드 변경 불필요
-- **스택:** Java 21, Spring Boot 3.3, Gradle 멀티모듈, WebClient(Reactive), JUnit 5, Micrometer | React 18, Vite, TailwindCSS, 네이버 지도 SDK
+- **스택:** Java 21 · Spring Boot 3.5.13 · Gradle 8.14 (멀티모듈) · Reactor/WebClient · JUnit 5 · Micrometer · Spring AI 1.0.2 (Ollama + Qdrant) · Resilience4j 2.2 · Prometheus/Grafana/Loki/Tempo/Alertmanager | React 19 · Vite 7 · TailwindCSS v4 · 네이버 지도 SDK
 
 ## 모듈 구조
 
@@ -34,7 +34,7 @@ enum MobilityType {
     DDAREUNGI,          // 공공 따릉이 (실 API, 15 km/h)
     PERSONAL_EBIKE,     // 개인 전기자전거 (API 불필요, 22 km/h)
     PERSONAL_KICKBOARD, // 개인 전동킥보드 (API 불필요, 20 km/h)
-    KICKBOARD_SHARED    // 공유 킥보드 (TAGO API — 서울 데이터 미제공, 호출 차단)
+    KICKBOARD_SHARED    // 공유 킥보드 (TAGO API — 서울 미제공, tago.enabled=false 로 호출 스킵)
 }
 
 // 경로 타입
@@ -88,7 +88,7 @@ record Hub(hubId, name, type, location, metadata)
 | 서울 공공데이터 따릉이 | 대여소 실시간 가용 | ✅ 정상 (snapshot 캐시, stale fallback) |
 | Tmap 보행자 경로 | 자전거/킥보드 이동거리·경로 | ✅ 정상 (quota backoff) |
 | 네이버 지오코딩/장소 검색 | 주소→좌표, 장소 자동완성 | ✅ 정상 |
-| TAGO GetPMListByProvider | 공유킥보드 위치 | ❌ 서울 데이터 미제공 (호출 차단) |
+| TAGO GetPMListByProvider | 공유킥보드 위치 | ⚠️ 서울 미제공, `TAGO_ENABLED` env 토글로 호출 스킵 (T-7) |
 
 환경변수: `ODSAY_API_KEY`, `DDAREUNGI_API_KEY`, `TAGO_API_KEY`, `TMAP_APP_KEY`, `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`
 

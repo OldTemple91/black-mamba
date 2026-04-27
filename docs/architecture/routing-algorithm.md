@@ -1,12 +1,12 @@
 # 자체 라우팅 알고리즘 카탈로그
 
 > Black Mamba 는 **도로 그래프 최단경로 문제를 푸는 엔진이 아니다.**
-> ODsay / Tmap 같은 외부 엔진이 그 층을 처리하고, 우리는 그 위에서
+> ODsay / Tmap 같은 외부 엔진이 그 층을 담당하고, 본 프로젝트는 그 위에서
 > **다중 이동수단을 재조합 · 평가 · 설명하는 Orchestration 층** 을 자체 설계했다.
 >
-> 이 문서는 그 Orchestration 층에 들어간 **7가지 자체 알고리즘 · 휴리스틱** 을 하나씩 풀어서 설명한다.
+> 이 문서는 그 Orchestration 층에 들어간 **8가지 자체 알고리즘 · 휴리스틱** 을 하나씩 풀어서 설명한다.
 
-**Last updated:** 2026-04-23
+**Last updated:** 2026-04-24
 
 ---
 
@@ -14,7 +14,7 @@
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│                   Orchestration Layer (우리 프로젝트)             │
+│                   Orchestration Layer (본 프로젝트)               │
 │                                                                  │
 │   ① Baseline-Guided Multimodal Recomposition   (탐색)            │
 │   ② Two-Phase Hub Selection                    (정류장 선별)     │
@@ -330,7 +330,7 @@ score = 1.0
 | Geohash precision | Cell 크기 |
 |-------------------|-----------|
 | 6 | 1.2km × 0.6km |
-| **7** | **153m × 153m** ← 우리 선택 |
+| **7** | **153m × 153m** ← 본 프로젝트 선택 |
 | 8 | 38m × 19m |
 
 서울 지하철 역 간격이 평균 700~1200m, 아파트 단지 한 블록이 ~150m.
@@ -432,11 +432,11 @@ Flux.interval 은 컨슈머 지연 시 `onBackpressureDrop` 필요할 수 있지
 
 ---
 
-## 9. Design Non-Goals (우리가 쓰지 않은 알고리즘)
+## 9. Design Non-Goals (본 프로젝트가 채택하지 않은 알고리즘)
 
 ### 9-1. A\*, Dijkstra, CH, ALT
 
-도로 그래프 최단경로는 **외부 엔진(ODsay/Tmap)이 이미 처리**. 우리가 OSM 그래프를 띄워 다시 풀 이유가 없다.
+도로 그래프 최단경로는 **외부 엔진(ODsay/Tmap)이 담당**. 자체 OSM 그래프를 띄워 다시 풀 이유가 없다.
 → **자체 OSM + OSRM 도입은 "외부 rate-limit 해방" 이 필요해질 때.** 현재는 ODsay 캐시 히트율 80%+ 로 관리 가능.
 
 ### 9-2. RAPTOR / Connection Scan (CSA)
