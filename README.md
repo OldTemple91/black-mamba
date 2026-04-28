@@ -516,4 +516,3 @@ npm run dev
 - **[Core 개선기록 14건](docs/improvements/README.md)** — 각 개선마다 배경 → 설계 → 구현 → 검증
 - **[ADR 7건](docs/adr/)** — WebClient on MVC, OTLP gRPC, Baseline-Guided Recomposition 등 핵심 의사결정
 - **[로드맵](docs/roadmap/ROADMAP.md)**
-- **[프로젝트 설명](docs/resume/)**
