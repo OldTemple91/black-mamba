@@ -72,4 +72,29 @@ class RouteTest {
         assertThat(route.costBreakdown().items())
                 .containsExactly(new CostComponent("따릉이", 2_000));
     }
+
+    @Test
+    void 같은_구성의_경로는_같은_routeId를_갖는다() {
+        Location a = new Location("A", 37.5, 127.0);
+        Location b = new Location("B", 37.6, 127.1);
+        Leg leg = new Leg(LegType.TRANSIT, "BUS", 20, 5000, a, b, null, null, null);
+
+        Route r1 = Route.of(List.of(leg), RouteType.TRANSIT_ONLY);
+        Route r2 = Route.of(List.of(leg), RouteType.TRANSIT_ONLY);
+
+        assertThat(r1.routeId()).isEqualTo(r2.routeId());
+    }
+
+    @Test
+    void 다른_구성의_경로는_다른_routeId를_갖는다() {
+        Location a = new Location("A", 37.5, 127.0);
+        Location b = new Location("B", 37.6, 127.1);
+        Leg leg20 = new Leg(LegType.TRANSIT, "BUS", 20, 5000, a, b, null, null, null);
+        Leg leg25 = new Leg(LegType.TRANSIT, "BUS", 25, 5000, a, b, null, null, null);
+
+        Route r1 = Route.of(List.of(leg20), RouteType.TRANSIT_ONLY);
+        Route r2 = Route.of(List.of(leg25), RouteType.TRANSIT_ONLY);
+
+        assertThat(r1.routeId()).isNotEqualTo(r2.routeId());
+    }
 }

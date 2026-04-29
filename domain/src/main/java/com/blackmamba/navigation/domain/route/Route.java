@@ -33,9 +33,36 @@ public record Route(
         int total = normalizedLegs.stream().mapToInt(Leg::durationMinutes).sum();
         RouteCostBreakdown costBreakdown = RouteCostEstimator.estimate(normalizedLegs);
         return new Route(
-                UUID.randomUUID().toString(),
+                deterministicRouteId(type, normalizedLegs, total),
                 type, total, costBreakdown.totalWon(), costBreakdown, List.of(), null, 0.0, false, normalizedLegs, null, null, null, null
         );
+    }
+
+    /**
+     * 경로 내용 기반의 결정론적 ID 생성.
+     * 같은 경로(type + leg 구성 + 총 시간)면 같은 UUID, 달라지면 다른 UUID.
+     *
+     * <p>SSE 변화 감지가 의미를 가지려면 ID가 내용에 결정되어야 한다.
+     * 무작위 UUID였다면 매 호출마다 다른 ID가 나와 "진짜 변화"와
+     * "ID만 다른 가짜 변화"를 구분할 수 없다.
+     */
+    private static String deterministicRouteId(RouteType type, List<Leg> legs, int totalMinutes) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(type == null ? "NULL" : type.name()).append('|');
+        sb.append(totalMinutes).append('|');
+        for (Leg leg : legs) {
+            sb.append(leg.type() == null ? "" : leg.type().name()).append(':');
+            sb.append(leg.mode() == null ? "" : leg.mode()).append(':');
+            sb.append(leg.durationMinutes()).append(':');
+            sb.append(leg.start() == null ? "" : safe(leg.start().name())).append('>');
+            sb.append(leg.end() == null ? "" : safe(leg.end().name())).append('|');
+        }
+        return UUID.nameUUIDFromBytes(sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                .toString();
+    }
+
+    private static String safe(String s) {
+        return s == null ? "" : s;
     }
 
     public Route withComparison(Comparison comparison) {
