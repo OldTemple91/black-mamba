@@ -15,3 +15,6 @@ package.json
 .playwright-cli/
 output/experiments/
 scripts/__pycache__/
+
+# Claude Code IDE 설정 (개인 환경)
+.claude/
