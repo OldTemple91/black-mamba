@@ -39,14 +39,14 @@ ERROR 로그의 **목록 뷰 가독성** 문제가 여러 번 발생했다.
     host=${HOSTNAME}
     level=%level
   </labels>
-  
+
   <!-- 목록에 표시되는 한 줄 -->
   <message>
     <pattern>
       %d{HH:mm:ss.SSS} | %-5level | traceId=%X{traceId:-} | %replace(%msg){'[\r\n]+','\\n'}%nopex
     </pattern>
   </message>
-  
+
   <!-- 펼쳐야 보이는 부가 필드 -->
   <structuredMetadata>
     traceId=%mdc{traceId:-}

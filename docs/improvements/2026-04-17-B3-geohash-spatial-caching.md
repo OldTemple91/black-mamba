@@ -14,7 +14,7 @@
 
 ```java
 // Before
-private record RouteKey(double originLat, double originLng, 
+private record RouteKey(double originLat, double originLng,
                         double destinationLat, double destinationLng) {}
 ```
 
@@ -115,7 +115,7 @@ public final class GeohashKeyGenerator {
 private final ConcurrentHashMap<RouteKey, CacheEntry<List<Leg>>> routeCache = ...;
 RouteKey key = new RouteKey(origin, destination);
 
-// After  
+// After
 private final ConcurrentHashMap<String, CacheEntry<List<Leg>>> routeCache = ...;
 String key = GeohashKeyGenerator.forRoute(origin, destination);
 ```
@@ -194,16 +194,16 @@ curl 'http://localhost:9090/api/v1/query?query=sum(navigation_cache_total{cache=
 > 분석해 보니 **GPS 오차 10m 수준**인데 좌표 `double` 기반 키는
 > 소수점 6자리까지 정확히 일치해야 해서, 사실상 '같은 요청'인데도
 > 다른 키로 취급되고 있었습니다.
-> 
+>
 > **Geohash precision 7 (150m 격자)** 로 전환해 문자열 prefix 매칭으로
 > 바꿨고, 히트율은 **80.4%** 까지 올랐습니다 (약 1.71배).
 > 이는 ODsay 외부 API 호출 수 **53% 감소**, rate limit 안에서 처리할 수 있는 요청 수 1.7배 증가로 이어졌습니다.
-> 
+>
 > **한계:** 격자 경계에 걸친 좌표는 여전히 다른 키가 되는 트레이드오프가 있습니다.
 > 이는 H3(육각형) 전환이나 인접 격자 탐색으로 해결 가능하지만,
 > 지금은 80% 히트율로 실용적으로 충분하다고 판단했습니다.
-> 
-> 정류소 검색용 `MobilityAvailabilityAdapter`는 10m 정밀도가 필요해 
+>
+> 정류소 검색용 `MobilityAvailabilityAdapter`는 10m 정밀도가 필요해
 > 일부러 기존 좌표 반올림 방식을 유지했습니다.
 > **캐시 전략은 데이터 특성에 맞춰 다르게 가야** 한다는 것이 핵심입니다."
 

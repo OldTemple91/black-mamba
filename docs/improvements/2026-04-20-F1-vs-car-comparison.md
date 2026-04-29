@@ -101,7 +101,7 @@ public class CarReferenceCalculator {
         double co2 = distKm * 171.0;
         // ...
     }
-    
+
     public RouteComparison compareWithRoute(Route route, Location origin, Location destination) {
         CarReference car = estimate(origin, destination);
         int timeDiff = route.totalMinutes() - car.estimatedMinutes();
@@ -171,7 +171,7 @@ return strategy.search(origin, destination)
 ## 6. 사이드 이펙트 & 한계
 
 ### ⚠️ Route 생성자 시그니처 변경
-`carComparison` 필드 추가로 모든 `new Route(...)` 호출이 깨짐. 
+`carComparison` 필드 추가로 모든 `new Route(...)` 호출이 깨짐.
 - 7곳 테스트 + Route 내부 메서드 5곳 수정
 - `withCarComparison(...)` helper 추가
 - Breaking change지만 domain 모듈이라 영향 범위 예측 가능

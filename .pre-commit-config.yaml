@@ -1,0 +1,52 @@
+# Pre-commit hooks 설정
+# 설치: pre-commit install
+# 수동 실행: pre-commit run --all-files
+#
+# 본 프로젝트의 핵심 목적: API 키·시크릿 노출 사전 차단
+
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+        name: Detect hardcoded secrets
+        description: Gitleaks 로 API 키·토큰·시크릿 패턴 탐지
+        # .gitleaks.toml 의 커스텀 룰 + 기본 룰 모두 적용
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      # 키 파일 commit 차단 (.pem, .key, .p12, .jks 등)
+      - id: detect-private-key
+      # 큰 파일 차단 (실수로 빌드 산출물 commit 방지)
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      # YAML / JSON 문법 검증
+      - id: check-yaml
+        # mermaid 다이어그램 등 멀티 도큐먼트 허용
+        args: ["--allow-multiple-documents"]
+      - id: check-json
+      # 머지 충돌 마커 (<<<<<<<) 잔재 차단
+      - id: check-merge-conflict
+      # 파일 끝 newline 정리 (외부 산출물·바이너리 제외)
+      - id: end-of-file-fixer
+        exclude: |
+          (?x)^(
+            frontend/public/.*|
+            frontend/src/assets/.*|
+            monitoring/grafana-dashboards/.*|
+            scripts/benchmark/results/.*|
+            output/.*|
+            docs/images/.*
+          )$
+      # 줄 끝 공백 제거 (동일 제외)
+      - id: trailing-whitespace
+        exclude: |
+          (?x)^(
+            frontend/public/.*|
+            frontend/src/assets/.*|
+            monitoring/grafana-dashboards/.*|
+            scripts/benchmark/results/.*|
+            output/.*|
+            docs/images/.*
+          )$

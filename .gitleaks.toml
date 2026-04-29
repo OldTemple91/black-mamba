@@ -1,0 +1,63 @@
+# Gitleaks 커스텀 설정
+# 본 프로젝트가 사용하는 외부 API 키 패턴 추가 탐지
+# 기본 룰셋 (extend.useDefault) 위에 프로젝트 특화 패턴을 더한다.
+
+[extend]
+useDefault = true
+
+# ────────────────────────────────────────────────────────────
+# 프로젝트 특화 룰
+# ────────────────────────────────────────────────────────────
+
+[[rules]]
+id = "odsay-api-key"
+description = "ODsay API Key (URL-safe base64-like, 40~50자)"
+regex = '''ODSAY_API_KEY[\s]*[:=][\s]*['"]?[A-Za-z0-9+/=_-]{30,}'''
+tags = ["key", "odsay"]
+
+[[rules]]
+id = "ddareungi-api-key"
+description = "서울 공공데이터 따릉이 API Key (hex, 30자)"
+regex = '''DDAREUNGI_API_KEY[\s]*[:=][\s]*['"]?[a-f0-9]{30,}'''
+tags = ["key", "ddareungi"]
+
+[[rules]]
+id = "tago-api-key"
+description = "TAGO API Key (hex, 64자)"
+regex = '''TAGO_API_KEY[\s]*[:=][\s]*['"]?[a-zA-Z0-9]{40,}'''
+tags = ["key", "tago"]
+
+[[rules]]
+id = "tmap-app-key"
+description = "TMAP App Key (URL-safe, 40자 이상)"
+regex = '''TMAP_APP_KEY[\s]*[:=][\s]*['"]?[A-Za-z0-9_-]{30,}'''
+tags = ["key", "tmap"]
+
+[[rules]]
+id = "naver-client-secret"
+description = "Naver Client Secret (40자)"
+regex = '''NAVER(?:_SEARCH)?_CLIENT_SECRET[\s]*[:=][\s]*['"]?[A-Za-z0-9]{30,}'''
+tags = ["secret", "naver"]
+
+# ────────────────────────────────────────────────────────────
+# Allowlist — 안전한 placeholder / 환경변수 참조는 제외
+# ────────────────────────────────────────────────────────────
+
+[allowlist]
+description = "환경변수 참조·placeholder·테스트값은 차단 대상에서 제외"
+regexes = [
+    '''\$\{[A-Z_]+(:-?[^}]*)?\}''',          # ${VAR} 또는 ${VAR:default}
+    '''your[-_]?[a-z_]+[-_]?key''',          # your-key, your_key 등 placeholder
+    '''YOUR_[A-Z_]+''',                       # YOUR_API_KEY 형 placeholder
+    '''test-[a-z-]+''',                       # test-naver-client-secret 등 테스트값
+    '''dummy-?[a-z-]+''',                     # dummy 값
+    '''REMOVED-[A-Z-]+''',                    # 본 프로젝트 history 정리용 마커
+    '''placeholder''',                         # placeholder 라는 단어 자체
+    '''발급받은키''',                          # 한국어 placeholder
+]
+paths = [
+    '''\.example$''',                         # .env.example 등 예시 파일
+    '''README\.md$''',                        # README 안의 환경변수 *이름* 언급
+    '''docs/''',                              # 문서 디렉토리 (예시값 허용)
+    '''\.gitleaks\.toml$''',                  # 본 설정 파일 자체
+]

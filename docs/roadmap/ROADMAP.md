@@ -1,7 +1,7 @@
 # Black Mamba — 향후 로드맵
 
-> 작성일: 2026-04-17  
-> 목적: MaaS 라우팅 엔진 프로젝트의 기능/비즈니스 확장 계획  
+> 작성일: 2026-04-17
+> 목적: MaaS 라우팅 엔진 프로젝트의 기능/비즈니스 확장 계획
 > 용법: 이 문서 보면서 Claude와 이어서 작업 (`claude chat` → "ROADMAP.md 보고 [항목 번호] 진행")
 
 ---
@@ -100,7 +100,7 @@ Week 2:
 
 ### A-2. 🔥🔥🔥🔥 도착 시간 신뢰도 구간 (Confidence Interval)
 
-**현재:** "35분 소요"  
+**현재:** "35분 소요"
 **개선:** "30~42분 (95% 신뢰구간)"
 
 #### 응답 예시
@@ -131,7 +131,7 @@ Week 2:
 
 ### A-3. 🔥🔥🔥 시간대별 트래픽 인식
 
-**현재:** 출발 시각 무관 동일 응답  
+**현재:** 출발 시각 무관 동일 응답
 **개선:** 러시아워 패턴 반영
 
 #### 시나리오
@@ -160,7 +160,7 @@ Week 2:
 
 ### A-4. 🔥🔥🔥 날씨 인식 경로
 
-**현재:** 날씨 상관없이 동일  
+**현재:** 날씨 상관없이 동일
 **개선:** 비/눈/폭염 시 이동수단 가중치 조정
 
 #### 스코어 조정
@@ -224,7 +224,7 @@ Week 2:
 
 #### 시나리오
 ```
-[따릉이 재고 변경] 
+[따릉이 재고 변경]
     ↓
 [Redis Stream 또는 Spring Event 발행]
     ↓
@@ -254,7 +254,7 @@ Week 2:
 
 ### B-2. 🔥🔥🔥 사용자 개인화 / 프로필
 
-**현재:** 모든 사용자 동일 점수  
+**현재:** 모든 사용자 동일 점수
 **개선:** 개인 선호 반영
 
 #### 프로필 구조
@@ -279,7 +279,7 @@ UserPreference {
 
 ### B-3. 🔥🔥🔥 Route Caching + Spatial Index (Geohash)
 
-**현재:** 동일 OD마다 외부 API 재호출  
+**현재:** 동일 OD마다 외부 API 재호출
 **개선:** Geohash 격자 단위 캐시
 
 #### 설계
@@ -420,7 +420,7 @@ ELECTRIC_WHEELCHAIR
 
 ### D-1. 🔥🔥🔥🔥 멀티 지역 확장
 
-**현재:** 서울만  
+**현재:** 서울만
 **개선:** 경기/인천까지
 
 #### 해야 할 것
@@ -526,11 +526,11 @@ groups:
         for: 5m
         annotations:
           summary: "경로 탐색 p95 > 3초"
-      
+
       - alert: HighErrorRate
         expr: sum(rate(navigation_route_duration_seconds_count{outcome="timeout"}[5m])) / sum(rate(navigation_route_duration_seconds_count[5m])) > 0.05
         for: 5m
-      
+
       - alert: DdareungiApiFailure
         expr: sum(rate(navigation_mobility_fallback_total{mobility="ddareungi",reason="error"}[5m])) > 0.2
         for: 5m
@@ -581,7 +581,7 @@ Current Burn Rate: ...
 
 ### M-4. 🔥 로그 레벨 정리 (빠른 개선)
 
-현재: `com.blackmamba.navigation` → DEBUG (Loki로 전부)  
+현재: `com.blackmamba.navigation` → DEBUG (Loki로 전부)
 개선: Docker 프로필에서 INFO만
 
 #### 파일
@@ -594,7 +594,7 @@ Current Burn Rate: ...
 
 ### M-5. 🔥 Grafana 보안
 
-현재: `GF_AUTH_ANONYMOUS_ORG_ROLE=Admin`  
+현재: `GF_AUTH_ANONYMOUS_ORG_ROLE=Admin`
 개선: Viewer로 (운영 용도) 또는 auth 추가
 
 #### 공수
@@ -661,15 +661,15 @@ Current Burn Rate: ...
 void 강남에서_홍대까지_경로_탐색시_3개_API_호출_후_신뢰도_기반_순위_반환() {
     // given: ODsay 모킹, 따릉이 모킹, Tmap 모킹
     wireMockServer.stubFor(get("/api/transit")...)
-    
+
     // when
     var response = mockMvc.perform(get("/api/routes?..."))
-    
+
     // then
     response.andExpect(status().isOk())
             .andExpect(jsonPath("$.routes").isArray())
             .andExpect(jsonPath("$.routes[0].evaluation.totalScore").isNumber())
-    
+
     // 외부 API 호출 횟수 검증
     wireMockServer.verify(1, getRequestedFor(urlMatching("/api/transit.*")))
 }
@@ -790,14 +790,14 @@ Claude에게:
 ### 체크리스트 양식으로 진행 원할 때
 
 ```
-"ROADMAP.md의 Option 1 순서대로 진행하자. 
+"ROADMAP.md의 Option 1 순서대로 진행하자.
  첫 단계부터 시작해줘"
 ```
 
 ### 새로 떠오른 아이디어 추가할 때
 
 ```
-"ROADMAP.md에 [새 아이디어] 추가해줘. 
+"ROADMAP.md에 [새 아이디어] 추가해줘.
  공수/임팩트 산정해서 우선순위 매트릭스에도 반영"
 ```
 

@@ -115,7 +115,7 @@ public class AccessibilityStationRegistry {
 ```java
 public List<Route> apply(List<Route> routes, AccessibilityContext ctx) {
     if (!ctx.hasAnyConstraint()) return routes;
-    
+
     List<Route> result = new ArrayList<>();
     for (Route route : routes) {
         if (ctx.wheelchairAccessible() && containsInaccessibleStation(route)) continue;
@@ -195,7 +195,7 @@ return strategy.search(origin, destination)
 >
 > "자동차 없이도 자유롭게 이동할 수 있게 만드는 것이지만, 그 범위에 **운전을 못 하는 사람들**까지 포함돼야 진짜 MaaS입니다. 노인, 장애인, 유모차 동반자 같은.
 >
-> 그래서 `wheelchairAccessible=true` 파라미터로 엘리베이터 없는 역이 포함된 경로를 제외하고, `walkingSpeedKmh=3.0`으로 노인 보행 속도를 반영한 시간 재계산을 지원합니다. 
+> 그래서 `wheelchairAccessible=true` 파라미터로 엘리베이터 없는 역이 포함된 경로를 제외하고, `walkingSpeedKmh=3.0`으로 노인 보행 속도를 반영한 시간 재계산을 지원합니다.
 >
 > 설계 원칙은 **기존 라우팅 파이프라인에 침투하지 않고 후처리 레이어로 분리**한 것입니다. Strategy 패턴은 성인 기준으로 계산만 하고, `AccessibilityPostProcessor`가 결과를 필터/조정합니다. 이렇게 하면 나중에 저상버스 옵션, 경사 회피 같은 접근성 조건 추가할 때 **라우팅 코드는 그대로 두고 Post-Processor만 확장**하면 됩니다.
 >

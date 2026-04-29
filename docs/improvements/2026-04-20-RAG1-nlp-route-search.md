@@ -48,7 +48,7 @@ After:  "강남에서 홍대까지 노인도 쉬운 경로" 자연어 한 줄
     ↓
 [LLM: Intent Parsing]  ← Ollama + 프롬프트 엔지니어링
     ↓
-RouteSearchIntent (record) 
+RouteSearchIntent (record)
     ↓
 [결정론적: Geocoding → Route Optimization]  ← 기존 엔진 그대로
     ↓
