@@ -54,7 +54,7 @@ services:
     image: prom/prometheus:v3.11.2
     container_name: black-mamba-prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/prometheus-rules:/etc/prometheus/rules:ro
@@ -72,10 +72,10 @@ services:
     image: grafana/grafana:12.4.3
     container_name: black-mamba-grafana
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set in .env}
       # M-5: 익명 접근은 Viewer 로 제한.
       # Admin 작업은 GF_SECURITY_ADMIN_USER / GF_SECURITY_ADMIN_PASSWORD 로만 가능.
       - GF_AUTH_ANONYMOUS_ENABLED=true
@@ -97,7 +97,7 @@ services:
     image: grafana/loki:3.7.1
     container_name: black-mamba-loki
     ports:
-      - "3100:3100"
+      - "127.0.0.1:3100:3100"
     volumes:
       - ./monitoring/loki.yml:/etc/loki/local-config.yaml:ro
       # M-6: 로그 데이터 영속화 (컴팩터가 7일 초과분 자동 삭제).
@@ -113,10 +113,10 @@ services:
     image: grafana/tempo:2.10.4
     container_name: black-mamba-tempo
     ports:
-      - "3200:3200"   # Tempo HTTP API
-      - "9411:9411"   # Zipkin receiver (Before 비교용으로 유지)
-      - "4317:4317"   # OTLP/gRPC receiver ← OTLP/gRPC 전환 대상
-      - "4318:4318"   # OTLP/HTTP receiver
+      - "127.0.0.1:3200:3200"   # Tempo HTTP API
+      - "127.0.0.1:9411:9411"   # Zipkin receiver (Before 비교용으로 유지)
+      - "127.0.0.1:4317:4317"   # OTLP/gRPC receiver ← OTLP/gRPC 전환 대상
+      - "127.0.0.1:4318:4318"   # OTLP/HTTP receiver
     command: [ "-config.file=/etc/tempo.yml" ]
     volumes:
       - ./monitoring/tempo.yml:/etc/tempo.yml:ro
@@ -132,7 +132,7 @@ services:
     image: prom/alertmanager:v0.28.1
     container_name: black-mamba-alertmanager
     ports:
-      - "9093:9093"
+      - "127.0.0.1:9093:9093"
     volumes:
       - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.template.yml:ro
       - alertmanager-data:/alertmanager
@@ -161,7 +161,7 @@ services:
     image: gcr.io/cadvisor/cadvisor:v0.55.1
     container_name: black-mamba-cadvisor
     ports:
-      - "8088:8080"
+      - "127.0.0.1:8088:8080"
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
@@ -180,7 +180,7 @@ services:
     image: prom/node-exporter:v1.9.1
     container_name: black-mamba-node-exporter
     ports:
-      - "9100:9100"
+      - "127.0.0.1:9100:9100"
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -202,8 +202,8 @@ services:
     image: qdrant/qdrant:v1.13.6
     container_name: black-mamba-qdrant
     ports:
-      - "6333:6333"   # REST API (대시보드: http://localhost:6333/dashboard)
-      - "6334:6334"   # gRPC API (Spring AI 가 gRPC 사용)
+      - "127.0.0.1:6333:6333"   # REST API (대시보드: http://localhost:6333/dashboard)
+      - "127.0.0.1:6334:6334"   # gRPC API (Spring AI 가 gRPC 사용)
     volumes:
       - qdrant-data:/qdrant/storage
     environment:
