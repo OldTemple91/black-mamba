@@ -33,7 +33,7 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
     private final Counter segmentCacheHitCounter;
     private final Counter segmentCacheMissCounter;
     private final ConcurrentHashMap<AvailabilityKey, CacheEntry<Optional<MobilityInfo>>> availabilityCache = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<SegmentAvailabilityKey, CacheEntry<Optional<MobilityInfo>>> segmentAvailabilityCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<SegmentAvailabilityKey, CacheEntry<MobilityInfo>> segmentAvailabilityCache = new ConcurrentHashMap<>();
     private final long availabilityCacheTtlMs;
     private final int searchRadiusMeters;
     private final boolean tagoEnabled;
@@ -129,7 +129,7 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
     }
 
     @Override
-    public Mono<Optional<MobilityInfo>> findSegmentMobility(double startLat, double startLng, double endLat, double endLng, MobilityType type) {
+    public Mono<MobilityInfo> findSegmentMobility(double startLat, double startLng, double endLat, double endLng, MobilityType type) {
         long now = System.currentTimeMillis();
         SegmentAvailabilityKey key = SegmentAvailabilityKey.of(startLat, startLng, endLat, endLng, type);
         return segmentAvailabilityCache.compute(key, (ignored, existing) -> {
@@ -142,16 +142,18 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
         }).value();
     }
 
-    private Mono<Optional<MobilityInfo>> loadSegmentMobility(double startLat, double startLng, double endLat, double endLng, MobilityType type) {
+    private Mono<MobilityInfo> loadSegmentMobility(double startLat, double startLng, double endLat, double endLng, MobilityType type) {
         Mono<Optional<MobilityInfo>> pickup = findNearbyMobility(startLat, startLng, type);
 
         if (type != MobilityType.DDAREUNGI) {
-            return pickup;
+            return pickup.flatMap(Mono::justOrEmpty);
         }
 
+        // pickup/dropoff 는 어느 쪽이 비었는지 진단(NO_PICKUP/NO_DROPOFF)에 쓰이므로 Optional 유지.
+        // 세그먼트 결과는 "둘 다 성립" 일 때만 의미가 있어 여기서 empty Mono 로 평탄화한다.
         Mono<Optional<MobilityInfo>> dropoff = findNearbyDropoff(endLat, endLng, type);
         return Mono.zip(pickup, dropoff)
-                .map(tuple -> tuple.getT1()
+                .flatMap(tuple -> Mono.justOrEmpty(tuple.getT1()
                         .flatMap(pickupInfo -> tuple.getT2()
                                 .map(dropoffInfo -> pickupInfo.withDropoffStation(
                                         dropoffInfo.stationId(),
@@ -159,7 +161,7 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                                         dropoffInfo.lat(),
                                         dropoffInfo.lng()
                                 ))
-                                .filter(info -> !info.hasSamePickupAndDropoffStation())));
+                                .filter(info -> !info.hasSamePickupAndDropoffStation()))));
     }
 
     @Override

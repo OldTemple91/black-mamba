@@ -78,7 +78,7 @@ class SpecificMobilityStrategyTest {
         when(mobilityTimePort.getMobilityRoute(any(), any(), any()))
                 .thenReturn(Mono.just(MobilityRouteResult.timeOnly(9)));
         when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
-                .thenReturn(Mono.just(Optional.of(
+                .thenReturn(Mono.justOrEmpty(Optional.of(
                         new MobilityInfo(MobilityType.KICKBOARD_SHARED, "씽씽",
                                 "DEV_001", 85, null, 37.52, 127.0, 0, 120))));
         when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of(hub(candidate)));
@@ -111,7 +111,7 @@ class SpecificMobilityStrategyTest {
                 .thenReturn(Mono.just(List.of(leg)));
         when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of());
         when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
-                .thenReturn(Mono.just(Optional.empty()));
+                .thenReturn(Mono.justOrEmpty(Optional.empty()));
         when(mobilityAvailabilityPort.findNearbyMobility(any(Double.class), any(Double.class), any()))
                 .thenReturn(Mono.just(Optional.empty()));
         when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
@@ -149,7 +149,7 @@ class SpecificMobilityStrategyTest {
         when(transitRoutePort.getTransitTimeMinutes(any(), any())).thenReturn(Mono.just(18));
         when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of(hub(candidate)));
         when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
-                .thenReturn(Mono.just(Optional.of(
+                .thenReturn(Mono.justOrEmpty(Optional.of(
                         new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
                                 null, 100, "142. 아현역 4번출구 앞", 37.52, 127.0, 5, 20)
                                 .withDropoffStation("S-142", "142. 아현역 4번출구 앞", 37.52, 127.0))

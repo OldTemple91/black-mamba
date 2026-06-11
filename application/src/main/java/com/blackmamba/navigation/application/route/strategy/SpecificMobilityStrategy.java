@@ -102,11 +102,11 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
         Location switchPoint = candidateHub.location();
         Mono<List<Leg>>           transitLegs  = transitRoutePort.getTransitRoute(origin, switchPoint);
         Mono<Integer>             transitTime  = transitRoutePort.getTransitTimeMinutes(origin, switchPoint);
-        Mono<java.util.Optional<MobilityInfo>> avail = mobilityInfoForSegment(switchPoint, destination, type);
+        Mono<MobilityInfo> avail = mobilityInfoForSegment(switchPoint, destination, type);
 
+        // avail 이 empty 면 zip 전체가 empty → 이 후보 스킵 (의도된 의미)
         return Mono.zip(transitLegs, transitTime, avail)
-                .filter(tuple -> tuple.getT3().isPresent())
-                .flatMap(tuple -> mobilitySegmentBuilder.build(switchPoint, destination, type, tuple.getT3().get())
+                .flatMap(tuple -> mobilitySegmentBuilder.build(switchPoint, destination, type, tuple.getT3())
                 .map(mobilityLegs -> {
                     RouteType routeType = isKickboardType(type)
                             ? RouteType.TRANSIT_WITH_KICKBOARD : RouteType.TRANSIT_WITH_BIKE;
@@ -153,15 +153,12 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
 
     /** ODsay 없이 출발지→목적지 직접 이동수단 경로 */
     private Mono<Route> buildDirectRoute(Location origin, Location destination, MobilityType type) {
-        Mono<java.util.Optional<MobilityInfo>> avail = mobilityInfoForSegment(origin, destination, type);
-
-        return avail
-                .filter(java.util.Optional::isPresent)
-                .flatMap(optionalInfo -> mobilitySegmentBuilder.build(origin, destination, type, optionalInfo.get())
+        return mobilityInfoForSegment(origin, destination, type)
+                .flatMap(info -> mobilitySegmentBuilder.build(origin, destination, type, info)
                         .map(legs -> Route.of(legs, RouteType.MOBILITY_ONLY)));
     }
 
-    private Mono<java.util.Optional<MobilityInfo>> mobilityInfoForSegment(Location start, Location end, MobilityType type) {
+    private Mono<MobilityInfo> mobilityInfoForSegment(Location start, Location end, MobilityType type) {
         return mobilityAvailabilityPort.findSegmentMobility(start.lat(), start.lng(), end.lat(), end.lng(), type);
     }
 

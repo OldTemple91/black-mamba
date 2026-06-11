@@ -59,7 +59,7 @@ class OptimalSearchStrategyTest {
         lenient().when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.empty()));
         lenient().when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
-                .thenReturn(Mono.just(Optional.empty()));
+                .thenReturn(Mono.justOrEmpty(Optional.empty()));
         lenient().when(mobilityAvailabilityPort.findNearestMobilityHint(anyDouble(), anyDouble(), any(), anyBoolean()))
                 .thenReturn(Mono.just(Optional.empty()));
         lenient().when(routeEvaluator.evaluate(any(Route.class), any(Route.class), anyInt(), anyBoolean(), eq(RecommendationPreference.RELIABILITY)))
@@ -92,7 +92,7 @@ class OptimalSearchStrategyTest {
         when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of());
         when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of());
         when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
-                .thenReturn(Mono.just(Optional.of(
+                .thenReturn(Mono.justOrEmpty(Optional.of(
                         new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
                                 null, 100, "서울역", 37.5547, 126.9706, 5, 0))));
         when(mobilityTimePort.getMobilityRoute(any(), any(), any()))
@@ -111,7 +111,7 @@ class OptimalSearchStrategyTest {
         when(mobilityTimePort.getMobilityRoute(any(), any(), any()))
                 .thenReturn(Mono.just(MobilityRouteResult.timeOnly(8)));
         when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
-                .thenReturn(Mono.just(Optional.of(
+                .thenReturn(Mono.justOrEmpty(Optional.of(
                         new MobilityInfo(MobilityType.KICKBOARD_SHARED, "씽씽",
                                 "K001", 80, null, 37.52, 127.0, 1, 100))));
 
@@ -128,7 +128,7 @@ class OptimalSearchStrategyTest {
         when(mobilityTimePort.getMobilityRoute(any(), any(), any()))
                 .thenReturn(Mono.just(MobilityRouteResult.timeOnly(8)));
         when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
-                .thenReturn(Mono.just(Optional.of(
+                .thenReturn(Mono.justOrEmpty(Optional.of(
                         new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
                                 null, 100, "정류소", 37.52, 127.0, 5, 100))));
 
@@ -144,13 +144,13 @@ class OptimalSearchStrategyTest {
         when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of(hub(candidate)));
         when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of(hub(candidate)));
         when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), eq(MobilityType.DDAREUNGI)))
-                .thenReturn(Mono.just(Optional.of(
+                .thenReturn(Mono.justOrEmpty(Optional.of(
                         new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
                                 null, 100, "142. 아현역 4번출구 앞", 37.52, 127.0, 5, 20)
                                 .withDropoffStation("S-142", "142. 아현역 4번출구 앞", 37.52, 127.0))
                         .filter(info -> !info.hasSamePickupAndDropoffStation())));
         when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), eq(MobilityType.PERSONAL_KICKBOARD)))
-                .thenReturn(Mono.just(Optional.empty()));
+                .thenReturn(Mono.justOrEmpty(Optional.empty()));
 
         List<Route> routes = strategy.search(origin, destination, List.of(), RecommendationPreference.RELIABILITY).block();
 

@@ -126,9 +126,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                             .flatMap(firstHub -> {
                                 Location transitStart = firstHub.location();
                                 return mobilityInfoForSegment(origin, transitStart, type)
-                                            .filter(Optional::isPresent)
-                                            .flatMap(avail -> {
-                                                MobilityInfo info = avail.get();
+                                            .flatMap(info -> {
                                                 Mono<List<Leg>> transitLegs = transitRoutePort.getTransitRoute(transitStart, destination);
                                                 Mono<Integer> transitTime = transitRoutePort.getTransitTimeMinutes(transitStart, destination);
                                                 return Mono.zip(
@@ -159,9 +157,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                 .flatMap(lastHub -> {
                     Location switchPoint = lastHub.location();
                     return mobilityInfoForSegment(switchPoint, destination, type)
-                                .filter(Optional::isPresent)
-                                .flatMap(avail -> {
-                                    MobilityInfo info = avail.get();
+                                .flatMap(info -> {
                                     Mono<List<Leg>> transitLegs = transitRoutePort.getTransitRoute(origin, switchPoint);
                                     Mono<Integer> transitTime = transitRoutePort.getTransitTimeMinutes(origin, switchPoint);
                                     return Mono.zip(
@@ -200,14 +196,14 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                                 Location transitStart = startHub.location();
                                 Location transitEnd   = endHub.location();
 
-                                Mono<Optional<MobilityInfo>> startInfo = mobilityInfoForSegment(origin, transitStart, type);
-                                Mono<Optional<MobilityInfo>> endInfo   = mobilityInfoForSegment(transitEnd, destination, type);
+                                Mono<MobilityInfo> startInfo = mobilityInfoForSegment(origin, transitStart, type);
+                                Mono<MobilityInfo> endInfo   = mobilityInfoForSegment(transitEnd, destination, type);
 
+                                // 어느 한쪽이 empty 면 zip 전체가 empty → 해당 패턴 후보 스킵 (의도된 의미)
                                 return Mono.zip(startInfo, endInfo)
-                                        .filter(tuple -> tuple.getT1().isPresent() && tuple.getT2().isPresent())
                                         .flatMapMany(tuple -> {
-                                            MobilityInfo startMobility = tuple.getT1().get();
-                                            MobilityInfo endMobility   = tuple.getT2().get();
+                                            MobilityInfo startMobility = tuple.getT1();
+                                            MobilityInfo endMobility   = tuple.getT2();
                                             Mono<List<Leg>> startSegment = mobilitySegmentBuilder.build(origin, transitStart, type, startMobility);
                                             Mono<List<Leg>>           tranLegs = transitRoutePort.getTransitRoute(transitStart, transitEnd);
                                             Mono<Integer>             tranTime = transitRoutePort.getTransitTimeMinutes(transitStart, transitEnd);
@@ -240,15 +236,12 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
         if (dist > config.maxRangeMeters()) return Flux.empty();
 
         return mobilityInfoForSegment(origin, destination, type)
-                .filter(Optional::isPresent)
-                .flatMapMany(avail -> {
-                    return mobilitySegmentBuilder.build(origin, destination, type, avail.get())
-                            .map(legs -> buildRoute(legs, RouteType.MOBILITY_ONLY, List.of()))
-                            .flux();
-                });
+                .flatMapMany(info -> mobilitySegmentBuilder.build(origin, destination, type, info)
+                        .map(legs -> buildRoute(legs, RouteType.MOBILITY_ONLY, List.of()))
+                        .flux());
     }
 
-    private Mono<Optional<MobilityInfo>> mobilityInfoForSegment(Location start, Location end, MobilityType type) {
+    private Mono<MobilityInfo> mobilityInfoForSegment(Location start, Location end, MobilityType type) {
         return mobilityAvailabilityPort.findSegmentMobility(start.lat(), start.lng(), end.lat(), end.lng(), type);
     }
 
