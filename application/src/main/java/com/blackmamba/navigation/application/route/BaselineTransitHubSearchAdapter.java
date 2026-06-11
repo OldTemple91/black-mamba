@@ -2,6 +2,7 @@ package com.blackmamba.navigation.application.route;
 
 import com.blackmamba.navigation.application.route.port.HubSearchPort;
 import com.blackmamba.navigation.domain.location.Location;
+import com.blackmamba.navigation.domain.location.GeoDistance;
 import com.blackmamba.navigation.domain.route.Leg;
 import org.springframework.stereotype.Component;
 
@@ -14,7 +15,6 @@ import java.util.List;
 @Component
 public class BaselineTransitHubSearchAdapter implements HubSearchPort {
 
-    private static final double EARTH_RADIUS_METERS = 6_371_000;
 
     private final CandidatePointSelector candidatePointSelector;
 
@@ -51,11 +51,6 @@ public class BaselineTransitHubSearchAdapter implements HubSearchPort {
     }
 
     private double distanceMeters(Location from, Location to) {
-        double dLat = Math.toRadians(to.lat() - from.lat());
-        double dLng = Math.toRadians(to.lng() - from.lng());
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(from.lat())) * Math.cos(Math.toRadians(to.lat()))
-                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-        return EARTH_RADIUS_METERS * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return GeoDistance.meters(from, to);
     }
 }

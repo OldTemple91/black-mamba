@@ -1,6 +1,7 @@
 package com.blackmamba.navigation.application.route;
 
 import com.blackmamba.navigation.domain.location.Location;
+import com.blackmamba.navigation.domain.location.GeoDistance;
 import com.blackmamba.navigation.domain.route.CarReference;
 import com.blackmamba.navigation.domain.route.Route;
 import com.blackmamba.navigation.domain.route.RouteComparison;
@@ -50,7 +51,6 @@ public class CarReferenceCalculator {
 
     // 기타 상수
     private static final double DETOUR_FACTOR = 1.3;
-    private static final double EARTH_RADIUS_METERS = 6_371_000;
 
     private final CarbonFootprintCalculator carbonFootprintCalculator;
 
@@ -142,11 +142,6 @@ public class CarReferenceCalculator {
     }
 
     private double haversineKm(Location a, Location b) {
-        double dLat = Math.toRadians(b.lat() - a.lat());
-        double dLng = Math.toRadians(b.lng() - a.lng());
-        double h = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(a.lat())) * Math.cos(Math.toRadians(b.lat()))
-                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-        return EARTH_RADIUS_METERS * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h)) / 1_000.0;
+        return GeoDistance.kilometers(a, b);
     }
 }

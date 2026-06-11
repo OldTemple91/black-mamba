@@ -4,6 +4,7 @@ import com.blackmamba.navigation.application.route.*;
 import com.blackmamba.navigation.application.route.port.*;
 import com.blackmamba.navigation.domain.hub.Hub;
 import com.blackmamba.navigation.domain.location.Location;
+import com.blackmamba.navigation.domain.location.GeoDistance;
 import com.blackmamba.navigation.domain.route.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,7 +29,6 @@ import java.util.Optional;
 public class OptimalSearchStrategy implements RouteSearchStrategy {
 
     private static final Logger log = LoggerFactory.getLogger(OptimalSearchStrategy.class);
-    private static final double EARTH_RADIUS_METERS = 6_371_000;
     private static final int MAX_CANDIDATE_HUBS = 5;
     private static final int MAX_HINT_PRIORITY_DISTANCE_METERS = 1_100;
     // KICKBOARD_SHARED 제외: TAGO API 서울 데이터 미제공 (B-1)
@@ -645,21 +645,11 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     }
 
     private double haversineMeters(double lat1, double lng1, double lat2, double lng2) {
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLng = Math.toRadians(lng2 - lng1);
-        double a = Math.sin(dLat/2)*Math.sin(dLat/2)
-                + Math.cos(Math.toRadians(lat1))*Math.cos(Math.toRadians(lat2))
-                * Math.sin(dLng/2)*Math.sin(dLng/2);
-        return EARTH_RADIUS_METERS * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return GeoDistance.meters(lat1, lng1, lat2, lng2);
     }
 
     private static int haversineTransitMinutes(Location a, Location b) {
-        double dLat = Math.toRadians(b.lat() - a.lat());
-        double dLng = Math.toRadians(b.lng() - a.lng());
-        double h = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(a.lat())) * Math.cos(Math.toRadians(b.lat()))
-                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-        double distKm = 6371.0 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+        double distKm = GeoDistance.kilometers(a, b);
         return Math.max((int) Math.ceil(distKm * 1.4 / 25.0 * 60), 5);
     }
 }

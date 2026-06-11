@@ -4,6 +4,7 @@ import com.blackmamba.navigation.application.route.port.HubSearchPort;
 import com.blackmamba.navigation.domain.hub.Hub;
 import com.blackmamba.navigation.domain.hub.HubType;
 import com.blackmamba.navigation.domain.location.Location;
+import com.blackmamba.navigation.domain.location.GeoDistance;
 import com.blackmamba.navigation.domain.route.Leg;
 import com.blackmamba.navigation.domain.route.LegType;
 import org.springframework.stereotype.Component;
@@ -145,12 +146,7 @@ public class HubSelector {
 
     private double distanceMeters(Location a, Location b) {
         if (a == null || b == null) return 0;
-        double dLat = Math.toRadians(b.lat() - a.lat());
-        double dLng = Math.toRadians(b.lng() - a.lng());
-        double x = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(a.lat())) * Math.cos(Math.toRadians(b.lat()))
-                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-        return 6_371_000 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+        return GeoDistance.meters(a, b);
     }
 
     private String hubId(Location location) {

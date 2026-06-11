@@ -5,6 +5,7 @@ import com.blackmamba.navigation.application.route.strategy.OptimalSearchStrateg
 import com.blackmamba.navigation.application.route.strategy.SpecificMobilityStrategy;
 import com.blackmamba.navigation.application.route.strategy.RouteSearchStrategy;
 import com.blackmamba.navigation.domain.location.Location;
+import com.blackmamba.navigation.domain.location.GeoDistance;
 import com.blackmamba.navigation.domain.route.*;
 import io.micrometer.observation.annotation.Observed;
 import org.springframework.stereotype.Service;
@@ -134,11 +135,6 @@ public class RouteOptimizationService {
     }
 
     private static double haversineKm(Location a, Location b) {
-        double dLat = Math.toRadians(b.lat() - a.lat());
-        double dLng = Math.toRadians(b.lng() - a.lng());
-        double h = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(a.lat())) * Math.cos(Math.toRadians(b.lat()))
-                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-        return 6_371.0 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+        return GeoDistance.kilometers(a, b);
     }
 }
