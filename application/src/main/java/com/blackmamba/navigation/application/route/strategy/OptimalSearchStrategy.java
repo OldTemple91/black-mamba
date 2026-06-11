@@ -30,7 +30,6 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
 
     private static final Logger log = LoggerFactory.getLogger(OptimalSearchStrategy.class);
     private static final int MAX_CANDIDATE_HUBS = 5;
-    private static final int MAX_HINT_PRIORITY_DISTANCE_METERS = 1_100;
     // KICKBOARD_SHARED 제외: TAGO API 서울 데이터 미제공 (B-1)
     // PERSONAL_EBIKE/PERSONAL_KICKBOARD 제외: 사용자 보유 전제, SPECIFIC 모드에서만 사용
     private static final List<MobilityType> ALL_TYPES =
@@ -42,6 +41,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     private final HubSelector hubSelector;
     private final RouteEvaluator routeEvaluator;
     private final MobilitySegmentBuilder mobilitySegmentBuilder;
+    private final LastMileHubPrioritizer hubPrioritizer;
 
     public OptimalSearchStrategy(TransitRoutePort transitRoutePort,
                                   MobilityTimePort mobilityTimePort,
@@ -54,6 +54,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
         this.hubSelector = hubSelector;
         this.routeEvaluator = routeEvaluator;
         this.mobilitySegmentBuilder = new MobilitySegmentBuilder(mobilityTimePort);
+        this.hubPrioritizer = new LastMileHubPrioritizer(hubSelector, mobilityAvailabilityPort);
     }
 
     /** OPTIMAL 모드는 이동수단을 자동 선택하므로 {@code mobilityTypes} 파라미터를 무시한다. */
@@ -152,7 +153,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     // 패턴 C: 대중교통으로 환승점까지 → 이동수단으로 목적지
     private Flux<Route> patternC(Location origin, Location destination,
                                   List<Leg> baseLegs, MobilityType type, MobilityConfig config) {
-        return prioritizedLastMileHubs(baseLegs, destination, type, config)
+        return hubPrioritizer.prioritize(baseLegs, destination, type, config)
                 .flatMapMany(lastMile -> Flux.fromIterable(lastMile)
                 .flatMap(lastHub -> {
                     Location switchPoint = lastHub.location();
@@ -187,7 +188,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                         return Flux.empty();
                     }
                     List<Hub> firstMile = hubSelector.selectFirstMileHubs(origin, baseLegs, config);
-                    return prioritizedLastMileHubs(baseLegs, destination, type, config)
+                    return hubPrioritizer.prioritize(baseLegs, destination, type, config)
                             .flatMapMany(lastMile -> {
                                 if (firstMile.isEmpty() || lastMile.isEmpty()) return Flux.empty();
 
@@ -253,84 +254,6 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                 .map(Optional::isPresent);
     }
 
-    private Mono<List<Hub>> prioritizedLastMileHubs(List<Leg> baseLegs,
-                                                    Location destination,
-                                                    MobilityType type,
-                                                    MobilityConfig config) {
-        List<Hub> rawHubs = hubSelector.selectLastMileHubs(baseLegs, destination, config);
-        if (rawHubs.isEmpty()) {
-            return Mono.just(List.of());
-        }
-        if (type != MobilityType.DDAREUNGI) {
-            return Mono.just(rawHubs.stream().limit(MAX_CANDIDATE_HUBS).toList());
-        }
-
-        return Flux.fromIterable(rawHubs)
-                .flatMap(hub -> mobilityAvailabilityPort.findNearestMobilityHint(
-                                hub.location().lat(),
-                                hub.location().lng(),
-                                type,
-                                false
-                        )
-                        .map(optionalHint -> hubWithPickupHint(hub, optionalHint)))
-                .collectList()
-                .map(this::preferPickupAccessibleHubs)
-                .flatMapMany(Flux::fromIterable)
-                .sort(Comparator
-                        .comparing((Hub hub) -> hasReasonablePickupHint(hub) ? 0 : 1)
-                        .thenComparingInt(this::pickupHintDistanceOrMax)
-                        .thenComparingInt(this::selectionRankOrMax))
-                .take(MAX_CANDIDATE_HUBS)
-                .collectList();
-    }
-
-    private Hub hubWithPickupHint(Hub hub, Optional<MobilitySearchHint> optionalHint) {
-        Map<String, String> metadata = new LinkedHashMap<>(hub.metadata());
-        optionalHint.ifPresent(hint -> {
-            metadata.put("pickupHintDistanceMeters", String.valueOf(hint.distanceMeters()));
-            metadata.put("pickupHintStationId", hint.stationId());
-            metadata.put("pickupHintStationName", hint.stationName());
-            metadata.put("pickupHintAvailableCount", String.valueOf(hint.availableCount()));
-        });
-        return new Hub(hub.hubId(), hub.name(), hub.type(), hub.location(), hub.radiusMeters(), metadata);
-    }
-
-    private boolean hasReasonablePickupHint(Hub hub) {
-        String raw = hub.metadata().get("pickupHintDistanceMeters");
-        if (raw == null) return false;
-        try {
-            return Integer.parseInt(raw) <= MAX_HINT_PRIORITY_DISTANCE_METERS;
-        } catch (NumberFormatException ignored) {
-            return false;
-        }
-    }
-
-    private int pickupHintDistanceOrMax(Hub hub) {
-        String raw = hub.metadata().get("pickupHintDistanceMeters");
-        if (raw == null) return Integer.MAX_VALUE;
-        try {
-            return Integer.parseInt(raw);
-        } catch (NumberFormatException ignored) {
-            return Integer.MAX_VALUE;
-        }
-    }
-
-    private int selectionRankOrMax(Hub hub) {
-        String raw = hub.metadata().get("selectionRank");
-        if (raw == null) return Integer.MAX_VALUE;
-        try {
-            return Integer.parseInt(raw);
-        } catch (NumberFormatException ignored) {
-            return Integer.MAX_VALUE;
-        }
-    }
-
-    private List<Hub> preferPickupAccessibleHubs(List<Hub> hubs) {
-        List<Hub> filtered = hubs.stream()
-                .filter(this::hasReasonablePickupHint)
-                .toList();
-        return filtered.isEmpty() ? hubs : filtered;
-    }
 
     // ── 헬퍼 ──────────────────────────────────────────────────────────────────
 

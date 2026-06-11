@@ -22,13 +22,13 @@ import java.util.stream.Collectors;
 public class SpecificMobilityStrategy implements RouteSearchStrategy {
 
     private static final int MAX_CANDIDATE_HUBS = 5;
-    private static final int MAX_HINT_PRIORITY_DISTANCE_METERS = 1_100;
     private final TransitRoutePort transitRoutePort;
     private final MobilityTimePort mobilityTimePort;
     private final MobilityAvailabilityPort mobilityAvailabilityPort;
     private final HubSelector hubSelector;
     private final RouteEvaluator routeEvaluator;
     private final MobilitySegmentBuilder mobilitySegmentBuilder;
+    private final LastMileHubPrioritizer hubPrioritizer;
 
     public SpecificMobilityStrategy(TransitRoutePort transitRoutePort,
                                      MobilityTimePort mobilityTimePort,
@@ -41,6 +41,7 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
         this.hubSelector = hubSelector;
         this.routeEvaluator = routeEvaluator;
         this.mobilitySegmentBuilder = new MobilitySegmentBuilder(mobilityTimePort);
+        this.hubPrioritizer = new LastMileHubPrioritizer(hubSelector, mobilityAvailabilityPort);
     }
 
     @Override
@@ -85,7 +86,7 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                 .flatMap(type -> {
                     MobilityConfig config = isKickboardType(type)
                             ? personalAwareConfig(type) : MobilityConfig.bike();
-                    return prioritizedLastMileHubs(baseLegs, destination, type, config)
+                    return hubPrioritizer.prioritize(baseLegs, destination, type, config)
                             .flatMapMany(candidateHubs -> {
                                 if (candidateHubs.isEmpty()) {
                                     return buildDirectRoute(origin, destination, type).flux();
@@ -162,84 +163,6 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
         return mobilityAvailabilityPort.findSegmentMobility(start.lat(), start.lng(), end.lat(), end.lng(), type);
     }
 
-    private Mono<List<Hub>> prioritizedLastMileHubs(List<Leg> baseLegs,
-                                                    Location destination,
-                                                    MobilityType type,
-                                                    MobilityConfig config) {
-        List<Hub> rawHubs = hubSelector.selectLastMileHubs(baseLegs, destination, config);
-        if (rawHubs.isEmpty()) {
-            return Mono.just(List.of());
-        }
-        if (type != MobilityType.DDAREUNGI) {
-            return Mono.just(rawHubs.stream().limit(MAX_CANDIDATE_HUBS).toList());
-        }
-
-        return Flux.fromIterable(rawHubs)
-                .flatMap(hub -> mobilityAvailabilityPort.findNearestMobilityHint(
-                                hub.location().lat(),
-                                hub.location().lng(),
-                                type,
-                                false
-                        )
-                        .map(optionalHint -> hubWithPickupHint(hub, optionalHint)))
-                .collectList()
-                .map(this::preferPickupAccessibleHubs)
-                .flatMapMany(Flux::fromIterable)
-                .sort(Comparator
-                        .comparing((Hub hub) -> hasReasonablePickupHint(hub) ? 0 : 1)
-                        .thenComparingInt(this::pickupHintDistanceOrMax)
-                        .thenComparingInt(this::selectionRankOrMax))
-                .take(MAX_CANDIDATE_HUBS)
-                .collectList();
-    }
-
-    private Hub hubWithPickupHint(Hub hub, Optional<MobilitySearchHint> optionalHint) {
-        java.util.Map<String, String> metadata = new java.util.LinkedHashMap<>(hub.metadata());
-        optionalHint.ifPresent(hint -> {
-            metadata.put("pickupHintDistanceMeters", String.valueOf(hint.distanceMeters()));
-            metadata.put("pickupHintStationId", hint.stationId());
-            metadata.put("pickupHintStationName", hint.stationName());
-            metadata.put("pickupHintAvailableCount", String.valueOf(hint.availableCount()));
-        });
-        return new Hub(hub.hubId(), hub.name(), hub.type(), hub.location(), hub.radiusMeters(), metadata);
-    }
-
-    private boolean hasReasonablePickupHint(Hub hub) {
-        String raw = hub.metadata().get("pickupHintDistanceMeters");
-        if (raw == null) return false;
-        try {
-            return Integer.parseInt(raw) <= MAX_HINT_PRIORITY_DISTANCE_METERS;
-        } catch (NumberFormatException ignored) {
-            return false;
-        }
-    }
-
-    private int pickupHintDistanceOrMax(Hub hub) {
-        String raw = hub.metadata().get("pickupHintDistanceMeters");
-        if (raw == null) return Integer.MAX_VALUE;
-        try {
-            return Integer.parseInt(raw);
-        } catch (NumberFormatException ignored) {
-            return Integer.MAX_VALUE;
-        }
-    }
-
-    private int selectionRankOrMax(Hub hub) {
-        String raw = hub.metadata().get("selectionRank");
-        if (raw == null) return Integer.MAX_VALUE;
-        try {
-            return Integer.parseInt(raw);
-        } catch (NumberFormatException ignored) {
-            return Integer.MAX_VALUE;
-        }
-    }
-
-    private List<Hub> preferPickupAccessibleHubs(List<Hub> hubs) {
-        List<Hub> filtered = hubs.stream()
-                .filter(this::hasReasonablePickupHint)
-                .toList();
-        return filtered.isEmpty() ? hubs : filtered;
-    }
 
     private static boolean isKickboardType(MobilityType type) {
         return type == MobilityType.KICKBOARD_SHARED || type == MobilityType.PERSONAL_KICKBOARD;
