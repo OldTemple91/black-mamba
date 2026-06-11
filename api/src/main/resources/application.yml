@@ -16,6 +16,13 @@ spring:
   # (기본값은 NONE — Reactor 스레드가 Micrometer Observation 컨텍스트 못 받음)
   reactor:
     context-propagation: auto
+  # Java 21 Virtual Thread — Tomcat 워커 가상화 (ADR-008)
+  # Controller 의 .block() 이 platform thread 가 아닌 가상 스레드를 점유
+  # → 외부 API 대기(평균 2초) 동안 동시 처리량이 워커 수(200)에 묶이지 않음.
+  # Reactor(외부 API 합성·SSE)는 유지 — 적재적소 분리.
+  threads:
+    virtual:
+      enabled: true
 
 odsay:
   api-key: ${ODSAY_API_KEY}

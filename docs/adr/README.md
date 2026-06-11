@@ -24,6 +24,7 @@
 | [005](./005-reactor-context-propagation-traceid.md) | Reactor Context Propagation 활성화 | Accepted | 2026-04-17 |
 | [006](./006-otlp-grpc-over-http.md) | OTLP/gRPC over OTLP/HTTP (표준 전송) | Accepted | 2026-04-20 |
 | [007](./007-baseline-guided-recomposition.md) | **Baseline-Guided Multimodal Recomposition** (A\*/Dijkstra 대신) | Accepted | 2026-04-23 |
+| [008](./008-virtual-threads-with-reactor.md) | Virtual Thread + Reactor 적재적소 분리 | Accepted | 2026-06-11 |
 
 ---
 
