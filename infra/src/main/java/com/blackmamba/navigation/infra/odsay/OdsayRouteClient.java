@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
@@ -288,6 +289,19 @@ public class OdsayRouteClient {
                 + Math.cos(Math.toRadians(a.lat())) * Math.cos(Math.toRadians(b.lat()))
                 * Math.sin(dLng / 2) * Math.sin(dLng / 2);
         return 6_371_000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+    }
+
+
+    /**
+     * 만료 캐시 엔트리 주기 청소.
+     * <p>
+     * 조회 시 만료 검사만으로는 "재조회가 없는 키" 가 영구 잔류해 힙을 잠식한다
+     * — OD 쌍 키는 조합 수가 많아 장기 운영 시 OOM 위험.
+     */
+    @Scheduled(fixedDelayString = "${navigation.cache.purge-interval-ms:300000}")
+    void purgeExpiredCacheEntries() {
+        long now = System.currentTimeMillis();
+        routeCache.entrySet().removeIf(e -> e.getValue().isExpired(now));
     }
 
     private record CacheEntry<T>(Mono<T> value, long expiresAtMs) {

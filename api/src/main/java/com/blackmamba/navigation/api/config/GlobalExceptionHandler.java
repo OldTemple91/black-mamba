@@ -55,11 +55,13 @@ public class GlobalExceptionHandler {
         // e를 인자로 넘겨야 SLF4J가 stackTrace를 event.throwable에 저장 → structuredMetadata 의 %xException 에서 사용
         // line 자체에는 예외 타입 + 메시지만 출력 (스택트레이스는 분리)
         log.error("[전역 예외] {}: {}", e.getClass().getSimpleName(), e.getMessage(), e);
+        // 응답에는 예외 메시지를 싣지 않는다 — 내부 경로·외부 API 상세 등 민감 정보 노출 가능.
+        // 상세 원인은 위 ERROR 로그(traceId 포함)로만 추적.
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of(
                         "code", "INTERNAL_SERVER_ERROR",
-                        "message", e.getMessage() != null ? e.getMessage() : "서버 내부 오류",
+                        "message", "서버 내부 오류가 발생했습니다.",
                         "timestamp", Instant.now().toString()
                 ));
     }

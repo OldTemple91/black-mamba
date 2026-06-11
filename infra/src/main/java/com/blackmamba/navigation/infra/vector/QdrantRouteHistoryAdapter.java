@@ -189,11 +189,20 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
         FilterExpressionBuilder b = new FilterExpressionBuilder();
         List<Op> parts = new ArrayList<>();
 
-        if (request.hasOriginGeohash()) {
-            parts.add(b.eq(META_ORIGIN_GEOHASH, request.originGeohash()));
+        // 명시적 geohash 문자열 우선, 없으면 Location 좌표를 어댑터가 geohash 로 변환
+        // (geohash 인코딩은 infra 의 관심사 — save 경로와 동일한 변환기 사용)
+        String originGeohash = request.hasOriginGeohash()
+                ? request.originGeohash()
+                : (request.hasOriginLocation() ? GeohashKeyGenerator.of(request.origin()) : null);
+        String destGeohash = request.hasDestinationGeohash()
+                ? request.destinationGeohash()
+                : (request.hasDestinationLocation() ? GeohashKeyGenerator.of(request.destination()) : null);
+
+        if (originGeohash != null) {
+            parts.add(b.eq(META_ORIGIN_GEOHASH, originGeohash));
         }
-        if (request.hasDestinationGeohash()) {
-            parts.add(b.eq(META_DEST_GEOHASH, request.destinationGeohash()));
+        if (destGeohash != null) {
+            parts.add(b.eq(META_DEST_GEOHASH, destGeohash));
         }
         if (request.hasMobilityFilter()) {
             // OR of has_XXX flags

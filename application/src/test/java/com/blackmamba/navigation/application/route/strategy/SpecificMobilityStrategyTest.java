@@ -52,10 +52,10 @@ class SpecificMobilityStrategyTest {
                 .thenReturn(Mono.just(Optional.empty()));
 
         SpecificMobilityStrategy strategy = new SpecificMobilityStrategy(
-                List.of(), transitRoutePort, mobilityTimePort,
-                mobilityAvailabilityPort, hubSelector, routeEvaluator, RecommendationPreference.RELIABILITY);
+                transitRoutePort, mobilityTimePort,
+                mobilityAvailabilityPort, hubSelector, routeEvaluator);
 
-        List<Route> routes = strategy.search(origin, dest).block();
+        List<Route> routes = strategy.search(origin, dest, List.of(), RecommendationPreference.RELIABILITY).block();
 
         assertThat(routes).hasSize(1);
         assertThat(routes.get(0).type()).isEqualTo(RouteType.TRANSIT_ONLY);
@@ -92,10 +92,10 @@ class SpecificMobilityStrategyTest {
                 .thenReturn(Mono.just(Optional.empty()));
 
         SpecificMobilityStrategy strategy = new SpecificMobilityStrategy(
-                List.of(MobilityType.KICKBOARD_SHARED), transitRoutePort, mobilityTimePort,
-                mobilityAvailabilityPort, hubSelector, routeEvaluator, RecommendationPreference.RELIABILITY);
+                transitRoutePort, mobilityTimePort,
+                mobilityAvailabilityPort, hubSelector, routeEvaluator);
 
-        List<Route> routes = strategy.search(origin, dest).block();
+        List<Route> routes = strategy.search(origin, dest, List.of(MobilityType.KICKBOARD_SHARED), RecommendationPreference.RELIABILITY).block();
 
         assertThat(routes.get(0).recommended()).isTrue();
         assertThat(routes.get(0).totalMinutes()).isEqualTo(27);
@@ -126,10 +126,10 @@ class SpecificMobilityStrategyTest {
                 .thenReturn(Mono.just(Optional.empty()));
 
         SpecificMobilityStrategy strategy = new SpecificMobilityStrategy(
-                List.of(MobilityType.DDAREUNGI), transitRoutePort, mobilityTimePort,
-                mobilityAvailabilityPort, hubSelector, routeEvaluator, RecommendationPreference.RELIABILITY);
+                transitRoutePort, mobilityTimePort,
+                mobilityAvailabilityPort, hubSelector, routeEvaluator);
 
-        List<Route> routes = strategy.search(origin, dest).block();
+        List<Route> routes = strategy.search(origin, dest, List.of(MobilityType.DDAREUNGI), RecommendationPreference.RELIABILITY).block();
 
         assertThat(routes).hasSize(1);
         assertThat(routes.getFirst().type()).isEqualTo(RouteType.TRANSIT_ONLY);
@@ -172,10 +172,10 @@ class SpecificMobilityStrategyTest {
                 .thenReturn(Mono.just(Optional.empty()));
 
         SpecificMobilityStrategy strategy = new SpecificMobilityStrategy(
-                List.of(MobilityType.DDAREUNGI), transitRoutePort, mobilityTimePort,
-                mobilityAvailabilityPort, hubSelector, routeEvaluator, RecommendationPreference.RELIABILITY);
+                transitRoutePort, mobilityTimePort,
+                mobilityAvailabilityPort, hubSelector, routeEvaluator);
 
-        List<Route> routes = strategy.search(origin, dest).block();
+        List<Route> routes = strategy.search(origin, dest, List.of(MobilityType.DDAREUNGI), RecommendationPreference.RELIABILITY).block();
 
         assertThat(routes).hasSize(1);
         assertThat(routes.getFirst().type()).isEqualTo(RouteType.TRANSIT_ONLY);

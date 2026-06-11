@@ -22,34 +22,30 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
 
     private static final int MAX_CANDIDATE_HUBS = 5;
     private static final int MAX_HINT_PRIORITY_DISTANCE_METERS = 1_100;
-    private final List<MobilityType> mobilityTypes;
     private final TransitRoutePort transitRoutePort;
     private final MobilityTimePort mobilityTimePort;
     private final MobilityAvailabilityPort mobilityAvailabilityPort;
     private final HubSelector hubSelector;
     private final RouteEvaluator routeEvaluator;
-    private final RecommendationPreference recommendationPreference;
     private final MobilitySegmentBuilder mobilitySegmentBuilder;
 
-    public SpecificMobilityStrategy(List<MobilityType> mobilityTypes,
-                                     TransitRoutePort transitRoutePort,
+    public SpecificMobilityStrategy(TransitRoutePort transitRoutePort,
                                      MobilityTimePort mobilityTimePort,
                                      MobilityAvailabilityPort mobilityAvailabilityPort,
                                      HubSelector hubSelector,
-                                     RouteEvaluator routeEvaluator,
-                                     RecommendationPreference recommendationPreference) {
-        this.mobilityTypes = mobilityTypes;
+                                     RouteEvaluator routeEvaluator) {
         this.transitRoutePort = transitRoutePort;
         this.mobilityTimePort = mobilityTimePort;
         this.mobilityAvailabilityPort = mobilityAvailabilityPort;
         this.hubSelector = hubSelector;
         this.routeEvaluator = routeEvaluator;
-        this.recommendationPreference = recommendationPreference;
         this.mobilitySegmentBuilder = new MobilitySegmentBuilder(mobilityTimePort);
     }
 
     @Override
-    public Mono<List<Route>> search(Location origin, Location destination) {
+    public Mono<List<Route>> search(Location origin, Location destination,
+                                    List<MobilityType> mobilityTypes,
+                                    RecommendationPreference preference) {
         return transitRoutePort.getTransitRoute(origin, destination)
                 .flatMap(baseLegs -> {
                     // ODsay 결과가 없으면 haversine 추정값으로 기준 경로 생성
@@ -68,21 +64,22 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                     Route baseRoute = Route.of(routeLegs, RouteType.TRANSIT_ONLY);
 
                     if (mobilityTypes.isEmpty()) {
-                        return Mono.just(List.of(routeEvaluator.evaluate(baseRoute, true, recommendationPreference)));
+                        return Mono.just(List.of(routeEvaluator.evaluate(baseRoute, true, preference)));
                     }
-                    return generateCombinedRoutes(baseLegs, origin, destination)
+                    return generateCombinedRoutes(baseLegs, origin, destination, mobilityTypes)
                             .collectList()
                             .flatMap(combined -> {
                                 if (combined.isEmpty()) {
-                                    return buildNoMixedDiagnostics(baseLegs, origin, destination)
-                                            .map(diagnostics -> rank(withDiagnostics(baseRoute, diagnostics), combined, baseTime));
+                                    return buildNoMixedDiagnostics(baseLegs, origin, destination, mobilityTypes)
+                                            .map(diagnostics -> rank(withDiagnostics(baseRoute, diagnostics), combined, baseTime, preference));
                                 }
-                                return Mono.just(rank(baseRoute, combined, baseTime));
+                                return Mono.just(rank(baseRoute, combined, baseTime, preference));
                             });
                 });
     }
 
-    private Flux<Route> generateCombinedRoutes(List<Leg> baseLegs, Location origin, Location destination) {
+    private Flux<Route> generateCombinedRoutes(List<Leg> baseLegs, Location origin, Location destination,
+                                               List<MobilityType> mobilityTypes) {
         return Flux.fromIterable(mobilityTypes)
                 .flatMap(type -> {
                     MobilityConfig config = isKickboardType(type)
@@ -259,11 +256,12 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
         };
     }
 
-    private List<Route> rank(Route base, List<Route> combined, int baseMinutes) {
+    private List<Route> rank(Route base, List<Route> combined, int baseMinutes,
+                             RecommendationPreference preference) {
         List<Route> all = new ArrayList<>(combined);
         all.add(base);
         List<Route> scored = all.stream()
-                .map(r -> routeEvaluator.evaluate(r, base, baseMinutes, false, recommendationPreference))
+                .map(r -> routeEvaluator.evaluate(r, base, baseMinutes, false, preference))
                 .sorted(Comparator.comparingDouble(Route::score).reversed())
                 .limit(5)
                 .toList();
@@ -274,7 +272,7 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
 
         List<Route> result = new ArrayList<>(scored);
         Route top = result.getFirst();
-        result.set(0, routeEvaluator.evaluate(top, base, baseMinutes, true, recommendationPreference));
+        result.set(0, routeEvaluator.evaluate(top, base, baseMinutes, true, preference));
         return result;
     }
 
@@ -282,7 +280,8 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
         return route.withInsights(new RouteInsights(List.of(), List.of(), diagnostics, List.of()));
     }
 
-    private Mono<List<GenerationDiagnostic>> buildNoMixedDiagnostics(List<Leg> baseLegs, Location origin, Location destination) {
+    private Mono<List<GenerationDiagnostic>> buildNoMixedDiagnostics(List<Leg> baseLegs, Location origin, Location destination,
+                                                                     List<MobilityType> mobilityTypes) {
         return Flux.fromIterable(mobilityTypes)
                 .flatMap(type -> diagnosticsForType(baseLegs, origin, destination, type))
                 .distinct()

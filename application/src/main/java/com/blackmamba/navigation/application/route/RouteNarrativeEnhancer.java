@@ -98,6 +98,9 @@ public class RouteNarrativeEnhancer {
 
             // Augmented + Generation: LLM 호출 (boundedElastic 으로 블로킹 격리)
             String originalNarrative = route.carComparison() == null ? null : route.carComparison().narrative();
+            // 타임아웃은 .timeout() 한 곳에서만 관리.
+            // blockOptional(LLM_TIMEOUT) 로 이중 설정하면 바깥 타임아웃이 먼저 만료될 때
+            // 내부 Mono 가 취소되지 않은 채 boundedElastic 스레드를 계속 점유한다 (스레드 누수).
             String llmNarrative = Mono.fromCallable(() ->
                             narrativeGenerator.generate(
                                     route, origin, destination, preference, similar, originalNarrative))
@@ -107,7 +110,7 @@ public class RouteNarrativeEnhancer {
                         log.warn("[RAG4] LLM 타임아웃/실패 → 원본 narrative 유지. err={}", e.getMessage());
                         return Mono.just("");
                     })
-                    .blockOptional(LLM_TIMEOUT)
+                    .blockOptional()   // Spring MVC 동기 컨텍스트 전용 — 스트림(Flux) 경로에서 호출 금지
                     .orElse("");
 
             if (llmNarrative == null || llmNarrative.isBlank()) {
@@ -135,9 +138,11 @@ public class RouteNarrativeEnhancer {
                     "TIME_PRIORITY".equalsIgnoreCase(preference) ? "빠른 시간" : "안정적"
             );
 
-            RagSearchRequest request = new RagSearchRequest(
+            // 공간 필터: 같은 OD 격자의 이력만 — 타지역 사례가 narrative 근거로 오염되는 것 방지.
+            // geohash 변환은 infra 어댑터 책임 (application 은 좌표만 전달).
+            RagSearchRequest request = RagSearchRequest.nearLocations(
                     query, SIMILAR_TOP_K, SIMILAR_MIN_SCORE,
-                    null, null, List.of()
+                    origin, destination, List.of()
             );
             List<ScoredRouteHistoryEntry> results = routeHistoryPort.search(request);
             log.debug("[RAG4] similar history hit: {} 건", results.size());

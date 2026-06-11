@@ -44,7 +44,7 @@ class OptimalSearchStrategyTest {
     void setUp() {
         strategy = new OptimalSearchStrategy(
                 transitRoutePort, mobilityTimePort,
-                mobilityAvailabilityPort, hubSelector, routeEvaluator, RecommendationPreference.RELIABILITY);
+                mobilityAvailabilityPort, hubSelector, routeEvaluator);
         baseLeg = new Leg(LegType.TRANSIT, "BUS", 40, 10000, origin, destination, null, null, null);
         when(transitRoutePort.getTransitRoute(any(), any()))
                 .thenReturn(Mono.just(List.of(baseLeg)));
@@ -80,7 +80,7 @@ class OptimalSearchStrategyTest {
         when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.empty()));
 
-        List<Route> routes = strategy.search(origin, destination).block();
+        List<Route> routes = strategy.search(origin, destination, List.of(), RecommendationPreference.RELIABILITY).block();
 
         assertThat(routes).isNotEmpty();
         assertThat(routes.stream().anyMatch(r -> r.type() == RouteType.TRANSIT_ONLY)).isTrue();
@@ -98,7 +98,7 @@ class OptimalSearchStrategyTest {
         when(mobilityTimePort.getMobilityRoute(any(), any(), any()))
                 .thenReturn(Mono.just(MobilityRouteResult.timeOnly(30)));
 
-        List<Route> routes = strategy.search(origin, destination).block();
+        List<Route> routes = strategy.search(origin, destination, List.of(), RecommendationPreference.RELIABILITY).block();
 
         assertThat(routes.stream().anyMatch(r -> r.type() == RouteType.MOBILITY_ONLY)).isTrue();
     }
@@ -115,7 +115,7 @@ class OptimalSearchStrategyTest {
                         new MobilityInfo(MobilityType.KICKBOARD_SHARED, "씽씽",
                                 "K001", 80, null, 37.52, 127.0, 1, 100))));
 
-        List<Route> routes = strategy.search(origin, destination).block();
+        List<Route> routes = strategy.search(origin, destination, List.of(), RecommendationPreference.RELIABILITY).block();
 
         assertThat(routes.stream().anyMatch(Route::recommended)).isTrue();
         assertThat(routes.stream().filter(Route::recommended)).hasSize(1);
@@ -132,7 +132,7 @@ class OptimalSearchStrategyTest {
                         new MobilityInfo(MobilityType.DDAREUNGI, "따릉이",
                                 null, 100, "정류소", 37.52, 127.0, 5, 100))));
 
-        List<Route> routes = strategy.search(origin, destination).block();
+        List<Route> routes = strategy.search(origin, destination, List.of(), RecommendationPreference.RELIABILITY).block();
 
         assertThat(routes).isNotEmpty();
         assertThat(routes.getFirst().type()).isEqualTo(RouteType.TRANSIT_ONLY);
@@ -152,7 +152,7 @@ class OptimalSearchStrategyTest {
         when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), eq(MobilityType.PERSONAL_KICKBOARD)))
                 .thenReturn(Mono.just(Optional.empty()));
 
-        List<Route> routes = strategy.search(origin, destination).block();
+        List<Route> routes = strategy.search(origin, destination, List.of(), RecommendationPreference.RELIABILITY).block();
 
         assertThat(routes).hasSize(1);
         assertThat(routes.getFirst().type()).isEqualTo(RouteType.TRANSIT_ONLY);
@@ -168,7 +168,7 @@ class OptimalSearchStrategyTest {
         when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.empty()));
 
-        List<Route> routes = strategy.search(origin, destination).block();
+        List<Route> routes = strategy.search(origin, destination, List.of(), RecommendationPreference.RELIABILITY).block();
 
         assertThat(routes).isNotEmpty();
         assertThat(routes.get(0).totalMinutes()).isGreaterThan(0);
@@ -183,7 +183,7 @@ class OptimalSearchStrategyTest {
         when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any()))
                 .thenReturn(Mono.just(Optional.empty()));
 
-        List<Route> routes = strategy.search(origin, destination).block();
+        List<Route> routes = strategy.search(origin, destination, List.of(), RecommendationPreference.RELIABILITY).block();
 
         assertThat(routes).hasSize(1);
         assertThat(routes.getFirst().type()).isEqualTo(RouteType.TRANSIT_ONLY);

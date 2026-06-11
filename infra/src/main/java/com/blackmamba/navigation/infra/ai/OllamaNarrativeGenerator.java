@@ -65,12 +65,13 @@ public class OllamaNarrativeGenerator implements NarrativeGenerator {
         this.successCounter = Counter.builder("navigation.rag.narrative.generated")
                 .description("LLM narrative 생성 성공 건수")
                 .register(meterRegistry);
+        // 같은 metric 이름은 description 도 동일해야 함 (불일치 시 Micrometer 경고) — reason 태그로만 구분
         this.fallbackCounter = Counter.builder("navigation.rag.narrative.fallback")
                 .description("LLM narrative 폴백(원본 유지) 건수")
                 .tag("reason", "error_or_short")
                 .register(meterRegistry);
         this.hallucinationCounter = Counter.builder("navigation.rag.narrative.fallback")
-                .description("할루시네이션 감지로 인한 폴백 건수")
+                .description("LLM narrative 폴백(원본 유지) 건수")
                 .tag("reason", "hallucination")
                 .register(meterRegistry);
     }
@@ -140,30 +141,36 @@ public class OllamaNarrativeGenerator implements NarrativeGenerator {
         int expectedMinutes = route.totalMinutes();
         int expectedCost = route.totalCostWon();
 
-        // 1) 분 검증
-        Matcher mm = MINUTES_PATTERN.matcher(narrative);
-        while (mm.find()) {
-            try {
-                int minutes = Integer.parseInt(mm.group(1));
-                if (Math.abs(minutes - expectedMinutes) > ALLOWED_MINUTES_DELTA) {
-                    log.warn("[RAG4] 할루시네이션 감지 (분): 출력 {}분 vs 실제 {}분 → 폴백",
-                            minutes, expectedMinutes);
-                    return "";
-                }
-            } catch (NumberFormatException ignored) {}
+        // 1) 분 검증 — 실측 0분(비정상 데이터) 이면 비교 기준이 없으므로 스킵
+        if (expectedMinutes > 0) {
+            Matcher mm = MINUTES_PATTERN.matcher(narrative);
+            while (mm.find()) {
+                try {
+                    int minutes = Integer.parseInt(mm.group(1));
+                    if (Math.abs(minutes - expectedMinutes) > ALLOWED_MINUTES_DELTA) {
+                        log.warn("[RAG4] 할루시네이션 감지 (분): 출력 {}분 vs 실제 {}분 → 폴백",
+                                minutes, expectedMinutes);
+                        return "";
+                    }
+                } catch (NumberFormatException ignored) {}
+            }
         }
 
-        // 2) 비용(원) 검증
-        Matcher wm = WON_PATTERN.matcher(narrative);
-        while (wm.find()) {
-            try {
-                int won = Integer.parseInt(wm.group(1).replace(",", ""));
-                if (Math.abs(won - expectedCost) > ALLOWED_COST_DELTA) {
-                    log.warn("[RAG4] 할루시네이션 감지 (원): 출력 {}원 vs 실제 {}원 → 폴백",
-                            won, expectedCost);
-                    return "";
-                }
-            } catch (NumberFormatException ignored) {}
+        // 2) 비용(원) 검증 — 0원 경로(따릉이 단독 등)에서는 스킵.
+        //    스킵 없이는 LLM 이 어떤 금액(예: 자가용 절약액)을 언급해도 |won - 0| > 1000
+        //    으로 정상 응답을 할루시네이션으로 오판한다 (false positive).
+        if (expectedCost > 0) {
+            Matcher wm = WON_PATTERN.matcher(narrative);
+            while (wm.find()) {
+                try {
+                    int won = Integer.parseInt(wm.group(1).replace(",", ""));
+                    if (Math.abs(won - expectedCost) > ALLOWED_COST_DELTA) {
+                        log.warn("[RAG4] 할루시네이션 감지 (원): 출력 {}원 vs 실제 {}원 → 폴백",
+                                won, expectedCost);
+                        return "";
+                    }
+                } catch (NumberFormatException ignored) {}
+            }
         }
 
         return narrative;

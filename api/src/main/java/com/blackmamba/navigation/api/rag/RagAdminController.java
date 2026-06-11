@@ -3,6 +3,7 @@ package com.blackmamba.navigation.api.rag;
 import com.blackmamba.navigation.application.route.RouteHistorySeeder;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -11,15 +12,16 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 /**
- * RAG 벡터 DB 관리 엔드포인트 (데모/운영 지원).
+ * RAG 벡터 DB 관리 엔드포인트 (데모/시드용).
  * <p>
- * 운영에서는 접근 제한(스프링 시큐리티/VPN 등) 을 붙이는 것이 맞다.
- * 포트폴리오 단계에서는 open endpoint 로 두되, 경로를 {@code /api/rag/admin/*} 으로 분리해
- * "관리자용" 임을 명시한다.
+ * {@code @Profile("!prod")} — 운영 프로파일에서는 빈 자체가 등록되지 않아
+ * 인증 없는 시드 엔드포인트가 외부에 노출되지 않는다.
+ * 로컬/도커 데모 흐름(README 의 curl seed)은 그대로 동작.
  */
-@Tag(name = "RAG 관리", description = "벡터 DB 시드 / 관리용 엔드포인트")
+@Tag(name = "RAG 관리", description = "벡터 DB 시드 / 관리용 엔드포인트 (비운영 전용)")
 @RestController
 @RequestMapping("/api/rag/admin")
+@Profile("!prod")
 public class RagAdminController {
 
     private final RouteHistorySeeder routeHistorySeeder;

@@ -1,5 +1,6 @@
 package com.blackmamba.navigation.application.route.port;
 
+import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.MobilityType;
 
 import java.util.List;
@@ -13,10 +14,19 @@ import java.util.List;
  * <h3>검색 축 구성</h3>
  * <ul>
  *   <li><b>의미 유사도(벡터):</b> {@code query} 를 bge-m3 로 임베딩해 코사인 유사도</li>
- *   <li><b>공간 필터(payload):</b> {@code originGeohash}, {@code destinationGeohash}</li>
+ *   <li><b>공간 필터(payload):</b> {@code originGeohash}, {@code destinationGeohash}
+ *       — 또는 {@code origin}/{@code destination} 좌표 (어댑터가 geohash 변환)</li>
  *   <li><b>이동수단 필터(payload):</b> {@code mobilityFilter}</li>
  *   <li><b>품질 임계값:</b> {@code similarityThreshold} 미만은 제외</li>
  * </ul>
+ *
+ * <h3>공간 필터의 두 입력 경로</h3>
+ * <ul>
+ *   <li><b>geohash 문자열</b> — API 가 geohash 를 직접 받는 경우 ({@link #byGeohash})</li>
+ *   <li><b>Location 좌표</b> — application 레이어가 좌표만 가진 경우 ({@link #nearLocations}).
+ *       geohash 변환은 infra 어댑터의 책임 (application 은 geohash 라이브러리를 모름)</li>
+ * </ul>
+ * 같은 축에 둘 다 주어지면 명시적 geohash 문자열이 우선한다.
  *
  * <h3>불변 원칙</h3>
  * record + compact constructor 로 null/음수 입력 방어.
@@ -27,6 +37,8 @@ import java.util.List;
  * @param similarityThreshold 0.0~1.0 (0.0 = 필터 없음)
  * @param originGeohash       출발지 geohash7 필터 (null/빈 문자열 = 필터 없음)
  * @param destinationGeohash  도착지 geohash7 필터
+ * @param origin              출발지 좌표 (geohash 미지정 시 어댑터가 변환, null 허용)
+ * @param destination         도착지 좌표
  * @param mobilityFilter      포함되어야 할 이동수단 (OR 조건, 빈 리스트 = 필터 없음)
  */
 public record RagSearchRequest(
@@ -35,6 +47,8 @@ public record RagSearchRequest(
         double similarityThreshold,
         String originGeohash,
         String destinationGeohash,
+        Location origin,
+        Location destination,
         List<MobilityType> mobilityFilter
 ) {
     public RagSearchRequest {
@@ -50,7 +64,23 @@ public record RagSearchRequest(
 
     /** 기본값 빌더: threshold 0, 필터 없음. */
     public static RagSearchRequest of(String query, int topK) {
-        return new RagSearchRequest(query, topK, 0.0, null, null, List.of());
+        return new RagSearchRequest(query, topK, 0.0, null, null, null, null, List.of());
+    }
+
+    /** geohash 문자열 기반 공간 필터 (API 경로 — 사용자가 geohash 를 직접 지정). */
+    public static RagSearchRequest byGeohash(String query, int topK, double similarityThreshold,
+                                             String originGeohash, String destinationGeohash,
+                                             List<MobilityType> mobilityFilter) {
+        return new RagSearchRequest(query, topK, similarityThreshold,
+                originGeohash, destinationGeohash, null, null, mobilityFilter);
+    }
+
+    /** 좌표 기반 공간 필터 (application 경로 — geohash 변환은 infra 어댑터 책임). */
+    public static RagSearchRequest nearLocations(String query, int topK, double similarityThreshold,
+                                                 Location origin, Location destination,
+                                                 List<MobilityType> mobilityFilter) {
+        return new RagSearchRequest(query, topK, similarityThreshold,
+                null, null, origin, destination, mobilityFilter);
     }
 
     public boolean hasOriginGeohash() {
@@ -61,11 +91,21 @@ public record RagSearchRequest(
         return destinationGeohash != null && !destinationGeohash.isBlank();
     }
 
+    public boolean hasOriginLocation() {
+        return origin != null;
+    }
+
+    public boolean hasDestinationLocation() {
+        return destination != null;
+    }
+
     public boolean hasMobilityFilter() {
         return !mobilityFilter.isEmpty();
     }
 
     public boolean hasAnyPayloadFilter() {
-        return hasOriginGeohash() || hasDestinationGeohash() || hasMobilityFilter();
+        return hasOriginGeohash() || hasDestinationGeohash()
+                || hasOriginLocation() || hasDestinationLocation()
+                || hasMobilityFilter();
     }
 }

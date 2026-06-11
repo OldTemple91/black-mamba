@@ -154,6 +154,11 @@ public class RouteScoreCalculator {
             double weakHubDetourPenalty,
             int accessWalkPenaltyThresholdMeters
     ) {
+        /**
+         * 의도적 재사용: 배터리 부족과 대여 가용 부족은 "그 수단을 못 탈 수 있다" 는
+         * 동일한 실패 모드이므로 같은 페널티를 적용한다.
+         * 별도 튜닝이 필요해지면 독립 필드로 분리할 것.
+         */
         private double lowBatteryPenalty() {
             return lowAvailabilityPenalty;
         }

@@ -21,9 +21,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import reactor.core.publisher.Mono;
+
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 자연어 경로 검색 엔드포인트 (RAG Phase 1).
@@ -41,6 +44,9 @@ public class NaturalLanguageRouteController {
 
     private static final Logger log = LoggerFactory.getLogger(NaturalLanguageRouteController.class);
     private static final Duration ROUTE_SEARCH_TIMEOUT = Duration.ofSeconds(45);
+    private static final Duration GEOCODE_TIMEOUT = Duration.ofSeconds(5);
+    /** LLM 프롬프트에 들어가는 입력 — 과도한 길이로 인한 자원 고갈/인젝션 방어 */
+    private static final int MAX_QUERY_LENGTH = 200;
 
     private final NlpRouteIntentParser intentParser;
     private final NaverGeocodingClient geocodingClient;
@@ -78,6 +84,19 @@ public class NaturalLanguageRouteController {
             @Parameter(description = "자연어 경로 요청", example = "강남에서 홍대까지 환승 적은 경로")
             @RequestParam("q") String query
     ) {
+        // Step 0: 입력 검증 — LLM 프롬프트로 들어가는 입력이므로 길이 상한 필수
+        if (query == null || query.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "code", "QUERY_REQUIRED",
+                    "message", "쿼리 파라미터 'q' 가 비어 있습니다."
+            ));
+        }
+        if (query.length() > MAX_QUERY_LENGTH) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "code", "QUERY_TOO_LONG",
+                    "message", "쿼리는 " + MAX_QUERY_LENGTH + "자 이하여야 합니다."
+            ));
+        }
         log.info("[NLP] 자연어 요청 수신: \"{}\"", query);
 
         // Step 1: LLM 의도 파싱
@@ -93,9 +112,14 @@ public class NaturalLanguageRouteController {
             ));
         }
 
-        // Step 2: 장소명 → 좌표 (Geocoding)
-        Location origin = geocode(intent.origin());
-        Location destination = geocode(intent.destination());
+        // Step 2: 장소명 → 좌표 (Geocoding) — origin/destination 병렬 (직렬 시 최악 2배 지연)
+        var resolved = Mono.zip(
+                        resolveLocation(intent.origin()).map(Optional::of).defaultIfEmpty(Optional.empty()),
+                        resolveLocation(intent.destination()).map(Optional::of).defaultIfEmpty(Optional.empty()))
+                .block(GEOCODE_TIMEOUT.multipliedBy(2));
+
+        Location origin = resolved == null ? null : resolved.getT1().orElse(null);
+        Location destination = resolved == null ? null : resolved.getT2().orElse(null);
 
         if (origin == null || destination == null) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -106,13 +130,10 @@ public class NaturalLanguageRouteController {
         }
 
         // Step 3: 기존 경로 탐색 엔진 호출
-        List<MobilityType> mobilityTypes = (intent.mobility() == null) ? List.of() :
-                intent.mobility().stream()
-                        .filter(m -> m != null && !m.isBlank())
-                        .map(MobilityType::valueOf)
-                        .toList();
+        // LLM 출력은 스펙 밖 값을 낼 수 있으므로 valueOf 실패를 500 으로 흘리지 않는다.
+        List<MobilityType> mobilityTypes = parseMobilityTypes(intent.mobility());
         SearchMode mode = mobilityTypes.isEmpty() ? SearchMode.OPTIMAL : SearchMode.SPECIFIC;
-        RecommendationPreference preference = RecommendationPreference.valueOf(intent.preference());
+        RecommendationPreference preference = parsePreference(intent.preference());
         AccessibilityContext access = AccessibilityContext.of(intent.wheelchairAccessible(), intent.walkingSpeedKmh());
 
         List<Route> routes = routeOptimizationService
@@ -137,25 +158,57 @@ public class NaturalLanguageRouteController {
     }
 
     /**
-     * 장소명 → Location. 2단계 fallback:
+     * 장소명 → Location. 2단계 fallback (reactive — 호출부에서 origin/destination 병렬 zip):
      *   1) 네이버 지오코딩 (주소 정확 일치)
      *   2) 네이버 장소검색 (POI 검색, "강남역" 같은 역/상호 매칭)
      */
-    private Location geocode(String placeName) {
-        if (placeName == null || placeName.isBlank()) return null;
+    private Mono<Location> resolveLocation(String placeName) {
+        if (placeName == null || placeName.isBlank()) return Mono.empty();
 
-        Location byGeocode = geocodingClient.geocode(placeName)
-                .blockOptional(Duration.ofSeconds(5))
-                .flatMap(opt -> opt.map(latLng -> new Location(placeName, latLng[0], latLng[1])))
-                .orElse(null);
-        if (byGeocode != null) return byGeocode;
+        Mono<Location> byGeocode = geocodingClient.geocode(placeName)
+                .filter(Optional::isPresent)
+                .map(opt -> {
+                    double[] latLng = opt.get();
+                    return new Location(placeName, latLng[0], latLng[1]);
+                });
 
         // Fallback: POI 장소 검색 (역/상호명 대응)
-        return localSearchClient.searchPlaces(placeName, 1)
-                .blockOptional(Duration.ofSeconds(5))
+        Mono<Location> byPlaceSearch = Mono.defer(() -> localSearchClient.searchPlaces(placeName, 1)
                 .filter(list -> !list.isEmpty())
-                .map(list -> list.getFirst())
-                .map(item -> new Location(placeName, item.lat(), item.lng()))
-                .orElse(null);
+                .map(list -> new Location(placeName, list.getFirst().lat(), list.getFirst().lng())));
+
+        return byGeocode.switchIfEmpty(byPlaceSearch)
+                .timeout(GEOCODE_TIMEOUT)
+                .onErrorResume(e -> {
+                    log.warn("[NLP] 지오코딩 실패: \"{}\" — {}", placeName, e.getMessage());
+                    return Mono.empty();
+                });
+    }
+
+    /** LLM 이 스펙 밖 preference 를 반환해도 500 대신 기본값(RELIABILITY) 으로 폴백. */
+    private static RecommendationPreference parsePreference(String raw) {
+        if (raw == null || raw.isBlank()) return RecommendationPreference.RELIABILITY;
+        try {
+            return RecommendationPreference.valueOf(raw);
+        } catch (IllegalArgumentException e) {
+            log.warn("[NLP] 알 수 없는 preference \"{}\" → RELIABILITY 폴백", raw);
+            return RecommendationPreference.RELIABILITY;
+        }
+    }
+
+    /** LLM 이 스펙 밖 mobility 를 반환하면 해당 값만 건너뛴다 (전체 요청 실패 방지). */
+    private static List<MobilityType> parseMobilityTypes(List<String> raw) {
+        if (raw == null) return List.of();
+        return raw.stream()
+                .filter(m -> m != null && !m.isBlank())
+                .flatMap(m -> {
+                    try {
+                        return java.util.stream.Stream.of(MobilityType.valueOf(m));
+                    } catch (IllegalArgumentException e) {
+                        log.warn("[NLP] 알 수 없는 mobility \"{}\" 무시", m);
+                        return java.util.stream.Stream.empty();
+                    }
+                })
+                .toList();
     }
 }

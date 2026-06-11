@@ -41,26 +41,26 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     private final MobilityAvailabilityPort mobilityAvailabilityPort;
     private final HubSelector hubSelector;
     private final RouteEvaluator routeEvaluator;
-    private final RecommendationPreference recommendationPreference;
     private final MobilitySegmentBuilder mobilitySegmentBuilder;
 
     public OptimalSearchStrategy(TransitRoutePort transitRoutePort,
                                   MobilityTimePort mobilityTimePort,
                                   MobilityAvailabilityPort mobilityAvailabilityPort,
                                   HubSelector hubSelector,
-                                  RouteEvaluator routeEvaluator,
-                                  RecommendationPreference recommendationPreference) {
+                                  RouteEvaluator routeEvaluator) {
         this.transitRoutePort = transitRoutePort;
         this.mobilityTimePort = mobilityTimePort;
         this.mobilityAvailabilityPort = mobilityAvailabilityPort;
         this.hubSelector = hubSelector;
         this.routeEvaluator = routeEvaluator;
-        this.recommendationPreference = recommendationPreference;
         this.mobilitySegmentBuilder = new MobilitySegmentBuilder(mobilityTimePort);
     }
 
+    /** OPTIMAL 모드는 이동수단을 자동 선택하므로 {@code mobilityTypes} 파라미터를 무시한다. */
     @Override
-    public Mono<List<Route>> search(Location origin, Location destination) {
+    public Mono<List<Route>> search(Location origin, Location destination,
+                                    List<MobilityType> mobilityTypes,
+                                    RecommendationPreference preference) {
         return transitRoutePort.getTransitRoute(origin, destination)
                 .flatMap(baseLegs -> {
                     final List<Leg> baseRouteLegs;
@@ -103,10 +103,10 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                                     return buildNoMixedDiagnostics(origin, destination, baseLegs)
                                             .map(diagnostics -> {
                                                 Route enrichedBaseRoute = withDiagnostics(baseRoute, diagnostics);
-                                                return rank(List.of(enrichedBaseRoute), baseMinutes, enrichedBaseRoute);
+                                                return rank(List.of(enrichedBaseRoute), baseMinutes, enrichedBaseRoute, preference);
                                             });
                                 }
-                                return Mono.just(rank(candidates, baseMinutes, baseRoute));
+                                return Mono.just(rank(candidates, baseMinutes, baseRoute, preference));
                             });
                 });
     }
@@ -411,9 +411,10 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
         return type == MobilityType.KICKBOARD_SHARED || type == MobilityType.PERSONAL_KICKBOARD;
     }
 
-    private List<Route> rank(List<Route> candidates, int baseMinutes, Route baseRoute) {
+    private List<Route> rank(List<Route> candidates, int baseMinutes, Route baseRoute,
+                             RecommendationPreference preference) {
         List<Route> evaluated = candidates.stream()
-                .map(route -> routeEvaluator.evaluate(route, baseRoute, baseMinutes, false, recommendationPreference))
+                .map(route -> routeEvaluator.evaluate(route, baseRoute, baseMinutes, false, preference))
                 .sorted(Comparator.comparingDouble(Route::score).reversed())
                 .limit(5)
                 .toList();
@@ -424,7 +425,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
 
         List<Route> result = new ArrayList<>(evaluated);
         Route top = result.getFirst();
-        result.set(0, routeEvaluator.evaluate(top, baseRoute, baseMinutes, true, recommendationPreference));
+        result.set(0, routeEvaluator.evaluate(top, baseRoute, baseMinutes, true, preference));
         return result;
     }
 

@@ -11,6 +11,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.scheduling.annotation.Scheduled;
 import reactor.core.publisher.Mono;
 
 import java.util.Optional;
@@ -362,6 +363,19 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                     type
             );
         }
+    }
+
+
+    /**
+     * 만료 캐시 엔트리 주기 청소.
+     * segmentAvailabilityCache 는 (start × end × type) 조합 키라 경우의 수가
+     * 특히 많아 evict 없이는 장기 운영 시 힙 잠식이 가장 빠른 캐시다.
+     */
+    @Scheduled(fixedDelayString = "${navigation.cache.purge-interval-ms:300000}")
+    void purgeExpiredCacheEntries() {
+        long now = System.currentTimeMillis();
+        availabilityCache.entrySet().removeIf(e -> e.getValue().isExpired(now));
+        segmentAvailabilityCache.entrySet().removeIf(e -> e.getValue().isExpired(now));
     }
 
     private record CacheEntry<T>(Mono<T> value, long expiresAtMs) {

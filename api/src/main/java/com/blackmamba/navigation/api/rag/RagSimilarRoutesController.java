@@ -114,7 +114,7 @@ public class RagSimilarRoutesController {
         int safeTopK = Math.max(1, Math.min(MAX_TOP_K, topK));
         List<MobilityType> mobilityFilter = parseMobility(mobility);
 
-        RagSearchRequest request = new RagSearchRequest(
+        RagSearchRequest request = RagSearchRequest.byGeohash(
                 query, safeTopK, threshold,
                 originGeohash, destinationGeohash, mobilityFilter
         );

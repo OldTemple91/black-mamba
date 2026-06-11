@@ -19,16 +19,16 @@ import java.util.List;
 @Service
 public class RouteOptimizationService {
 
-    private final TransitRoutePort transitRoutePort;
-    private final MobilityTimePort mobilityTimePort;
-    private final MobilityAvailabilityPort mobilityAvailabilityPort;
-    private final HubSelector hubSelector;
-    private final RouteEvaluator routeEvaluator;
     private final CarReferenceCalculator carReferenceCalculator;
     private final CarbonFootprintCalculator carbonFootprintCalculator;
     private final AccessibilityPostProcessor accessibilityPostProcessor;
     private final WeatherAwareRouteAdjuster weatherAwareRouteAdjuster;
     private final RouteHistoryRecorder routeHistoryRecorder;
+
+    // 전략은 stateless — 요청별 상태(preference, mobilityTypes)는 search() 파라미터로 전달.
+    // 매 요청 객체 생성을 피해 싱글톤으로 보유 (GC 압력 제거).
+    private final RouteSearchStrategy optimalStrategy;
+    private final RouteSearchStrategy specificStrategy;
 
     public RouteOptimizationService(TransitRoutePort transitRoutePort,
                                      MobilityTimePort mobilityTimePort,
@@ -40,16 +40,15 @@ public class RouteOptimizationService {
                                      AccessibilityPostProcessor accessibilityPostProcessor,
                                      WeatherAwareRouteAdjuster weatherAwareRouteAdjuster,
                                      RouteHistoryRecorder routeHistoryRecorder) {
-        this.transitRoutePort = transitRoutePort;
-        this.mobilityTimePort = mobilityTimePort;
-        this.mobilityAvailabilityPort = mobilityAvailabilityPort;
-        this.hubSelector = hubSelector;
-        this.routeEvaluator = routeEvaluator;
         this.carReferenceCalculator = carReferenceCalculator;
         this.carbonFootprintCalculator = carbonFootprintCalculator;
         this.accessibilityPostProcessor = accessibilityPostProcessor;
         this.weatherAwareRouteAdjuster = weatherAwareRouteAdjuster;
         this.routeHistoryRecorder = routeHistoryRecorder;
+        this.optimalStrategy = new OptimalSearchStrategy(
+                transitRoutePort, mobilityTimePort, mobilityAvailabilityPort, hubSelector, routeEvaluator);
+        this.specificStrategy = new SpecificMobilityStrategy(
+                transitRoutePort, mobilityTimePort, mobilityAvailabilityPort, hubSelector, routeEvaluator);
     }
 
     public Mono<List<Route>> findRoutes(Location origin, Location destination,
@@ -86,17 +85,13 @@ public class RouteOptimizationService {
                                         AccessibilityContext accessibilityContext,
                                         WeatherContext weatherContext) {
         RouteSearchStrategy strategy = switch (searchMode) {
-            case OPTIMAL -> new OptimalSearchStrategy(
-                    transitRoutePort, mobilityTimePort,
-                    mobilityAvailabilityPort, hubSelector, routeEvaluator, recommendationPreference);
-            case SPECIFIC -> new SpecificMobilityStrategy(
-                    mobilityTypes, transitRoutePort, mobilityTimePort,
-                    mobilityAvailabilityPort, hubSelector, routeEvaluator, recommendationPreference);
+            case OPTIMAL -> optimalStrategy;
+            case SPECIFIC -> specificStrategy;
         };
         String preferenceName = recommendationPreference == null
                 ? "RELIABILITY" : recommendationPreference.name();
 
-        return strategy.search(origin, destination)
+        return strategy.search(origin, destination, mobilityTypes, recommendationPreference)
                 .map(routes -> accessibilityPostProcessor.apply(routes, accessibilityContext))
                 .map(routes -> weatherAwareRouteAdjuster.apply(routes, weatherContext))   // A-4
                 .map(routes -> attachCarbonAndComparison(routes, origin, destination))
