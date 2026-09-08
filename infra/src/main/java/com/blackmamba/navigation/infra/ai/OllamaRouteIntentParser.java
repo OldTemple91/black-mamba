@@ -1,35 +1,45 @@
-package com.blackmamba.navigation.api.nlp;
+package com.blackmamba.navigation.infra.ai;
 
+import com.blackmamba.navigation.application.route.RecommendationPreference;
+import com.blackmamba.navigation.application.route.RouteIntent;
+import com.blackmamba.navigation.application.route.port.RouteIntentParser;
+import com.blackmamba.navigation.domain.route.MobilityType;
+import com.blackmamba.navigation.infra.ai.dto.OllamaIntentPayload;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
-import org.springframework.ai.ollama.OllamaChatModel;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
 /**
- * LLM (Ollama)을 호출해 자연어 요청을 {@link RouteSearchIntent}로 파싱.
+ * LLM (Ollama)을 호출해 자연어 요청을 {@link RouteIntent}로 파싱하는 어댑터.
  * <p>
  * 원칙:
  * - 라우팅 핵심 알고리즘은 결정론적으로 유지 (LLM은 <b>의도 파싱에만</b>)
  * - JSON 출력 강제 + 저온도(0.2)로 재현성 확보
  * - 실패 시 예외를 던져 API 레이어에서 폴백 처리 가능하게
+ * - 모델이 스펙 밖 enum 값을 내면 500 으로 흘리지 않고 기본값/무시로 흡수
  *
  * <h3>사용 흐름</h3>
  * <pre>
  * 사용자: "강남에서 홍대까지 노인도 쉬운 경로로"
  *   ↓
- * RouteSearchIntent{origin=강남, destination=홍대, walkingSpeedKmh=3.0}
+ * RouteIntent{origin=강남, destination=홍대, walkingSpeedKmh=3.0}
  *   ↓
- * Controller가 origin/destination을 Geocoding으로 좌표 변환 후 /api/routes 호출
+ * Controller가 origin/destination을 Geocoding으로 좌표 변환 후 경로 탐색 호출
  * </pre>
  */
 @Component
-public class NlpRouteIntentParser {
+public class OllamaRouteIntentParser implements RouteIntentParser {
 
-    private static final Logger log = LoggerFactory.getLogger(NlpRouteIntentParser.class);
+    private static final Logger log = LoggerFactory.getLogger(OllamaRouteIntentParser.class);
 
     /** LLM에 전달할 시스템 프롬프트. JSON 스키마 + Few-shot 예시로 3B 모델 지시 준수력 보강 */
     private static final String SYSTEM_PROMPT = """
@@ -90,39 +100,41 @@ public class NlpRouteIntentParser {
     private final ChatClient chatClient;
     private final ObjectMapper objectMapper;
 
-    public NlpRouteIntentParser(OllamaChatModel ollamaChatModel, ObjectMapper objectMapper) {
-        this.chatClient = ChatClient.builder(ollamaChatModel)
+    public OllamaRouteIntentParser(ChatModel chatModel, ObjectMapper objectMapper) {
+        this.chatClient = ChatClient.builder(chatModel)
                 .defaultSystem(SYSTEM_PROMPT)
                 .build();
         this.objectMapper = objectMapper;
     }
 
-    /**
-     * 자연어 요청을 파싱하여 구조화된 Intent 반환.
-     * @throws IllegalStateException 파싱 실패 시
-     */
-    public RouteSearchIntent parse(String userQuery) {
-        if (userQuery == null || userQuery.isBlank()) {
+    @Override
+    public RouteIntent parse(String query) {
+        if (query == null || query.isBlank()) {
             throw new IllegalArgumentException("자연어 요청이 비어 있습니다");
         }
 
-        Prompt prompt = new PromptTemplate(USER_PROMPT_TEMPLATE)
-                .create(java.util.Map.of("query", userQuery));
+        Prompt prompt = new PromptTemplate(USER_PROMPT_TEMPLATE).create(Map.of("query", query));
 
         String rawResponse = chatClient.prompt(prompt).call().content();
         log.debug("[NLP] LLM raw response: {}", rawResponse);
 
         String jsonBody = extractJson(rawResponse);
 
+        OllamaIntentPayload payload;
         try {
-            RouteSearchIntent intent = objectMapper.readValue(jsonBody, RouteSearchIntent.class);
-            log.info("[NLP] 파싱 성공: query=\"{}\" → {}", userQuery, intent);
-            validate(intent);
-            return intent;
+            payload = objectMapper.readValue(jsonBody, OllamaIntentPayload.class);
         } catch (Exception e) {
             log.error("[NLP] 파싱 실패. raw={}, error={}", rawResponse, e.getMessage());
             throw new IllegalStateException("자연어 요청을 이해하지 못했습니다. 더 명확히 입력해 주세요.", e);
         }
+        if (!payload.hasOriginAndDestination()) {
+            log.error("[NLP] 출발지/도착지 파싱 실패: {}", payload);
+            throw new IllegalStateException("자연어 요청을 이해하지 못했습니다. 출발지와 도착지를 명확히 입력해 주세요.");
+        }
+
+        RouteIntent intent = toIntent(payload);
+        log.info("[NLP] 파싱 성공: query=\"{}\" → {}", query, intent);
+        return intent;
     }
 
     /**
@@ -138,10 +150,40 @@ public class NlpRouteIntentParser {
         return raw.substring(start, end + 1);
     }
 
-    private void validate(RouteSearchIntent intent) {
-        if (intent.origin() == null || intent.origin().isBlank()
-                || intent.destination() == null || intent.destination().isBlank()) {
-            throw new IllegalStateException("출발지/도착지 파싱 실패: " + intent);
+    private RouteIntent toIntent(OllamaIntentPayload payload) {
+        return new RouteIntent(
+                payload.origin().trim(),
+                payload.destination().trim(),
+                parsePreference(payload.preference()),
+                parseMobilityTypes(payload.mobility()),
+                payload.wheelchairAccessible(),
+                payload.walkingSpeedKmh()
+        );
+    }
+
+    /** 스펙 밖 preference 는 기본값(RELIABILITY) 으로 폴백. */
+    private static RecommendationPreference parsePreference(String raw) {
+        if (raw == null || raw.isBlank()) return RecommendationPreference.RELIABILITY;
+        try {
+            return RecommendationPreference.valueOf(raw.trim());
+        } catch (IllegalArgumentException e) {
+            log.warn("[NLP] 알 수 없는 preference \"{}\" → RELIABILITY 폴백", raw);
+            return RecommendationPreference.RELIABILITY;
         }
+    }
+
+    /** 스펙 밖 mobility 는 해당 값만 건너뛴다 (전체 요청 실패 방지). */
+    private static List<MobilityType> parseMobilityTypes(List<String> raw) {
+        if (raw == null) return List.of();
+        List<MobilityType> types = new ArrayList<>();
+        for (String value : raw) {
+            if (value == null || value.isBlank()) continue;
+            try {
+                types.add(MobilityType.valueOf(value.trim()));
+            } catch (IllegalArgumentException e) {
+                log.warn("[NLP] 알 수 없는 mobility \"{}\" 무시", value);
+            }
+        }
+        return types;
     }
 }

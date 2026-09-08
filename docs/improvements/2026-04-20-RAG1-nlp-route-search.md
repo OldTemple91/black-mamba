@@ -73,11 +73,13 @@ Spring AI의 `ToolCallback`로 LLM이 직접 `/api/routes`를 호출하게 할 �
 
 ### 3-1. 변경된 파일
 - **신규**:
-  - `api/src/main/java/.../nlp/RouteSearchIntent.java` (record)
-  - `api/src/main/java/.../nlp/NlpRouteIntentParser.java` (ChatClient 래퍼)
-  - `api/src/main/java/.../nlp/NaturalLanguageRouteController.java` (REST)
+  - `application/.../route/RouteIntent.java` (record) + `port/RouteIntentParser.java` (Port)
+  - `infra/.../ai/OllamaRouteIntentParser.java` (ChatClient 어댑터) + `ai/dto/OllamaIntentPayload.java`
+  - `infra/.../naver/NaverPlaceResolverAdapter.java` (`PlaceResolverPort` — 지오코딩→POI 폴백)
+  - `api/src/main/java/.../nlp/NaturalLanguageRouteController.java` (REST — Port 만 의존)
+  - (초기 구현은 파서·Intent 가 api 모듈에 있었으나 Hexagonal 정합을 위해 Port/Adapter 로 이관)
 - **수정**:
-  - `api/build.gradle` (Spring AI BOM + Ollama starter)
+  - `api/build.gradle` (Spring AI BOM + Ollama starter — `runtimeOnly`, api 는 컴파일 의존 없음)
   - `api/src/main/resources/application.yml` (ollama 설정)
   - `docker-compose.yml` (`host.docker.internal` 매핑)
 

@@ -6,6 +6,7 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 /**
@@ -79,6 +80,32 @@ class HexagonalArchitectureTest {
         noClasses().that().resideInAPackage(INFRA)
                 .should().dependOnClassesThat().resideInAPackage(API)
                 .because("어댑터는 표현 계층과 무관해야 교체 가능하다")
+                .check(classes);
+    }
+
+    @Test
+    void api_는_LLM_벡터DB_SDK_를_직접_의존하지_않는다() {
+        noClasses().that().resideInAPackage(API)
+                .should().dependOnClassesThat()
+                .resideInAnyPackage("org.springframework.ai..", "io.qdrant..", "ch.hsr.geohash..")
+                .because("모델/벡터DB 접근은 infra 어댑터 책임 — 표현 계층은 Port 만 안다")
+                .check(classes);
+    }
+
+    @Test
+    void application_은_웹_스케줄링_기술에_의존하지_않는다() {
+        noClasses().that().resideInAPackage(APPLICATION)
+                .should().dependOnClassesThat()
+                .resideInAnyPackage("org.springframework.web..", "org.springframework.scheduling..", "jakarta.servlet..")
+                .because("유스케이스는 전송 프로토콜과 타이머를 모른다 — 트리거는 api/infra 책임")
+                .check(classes);
+    }
+
+    @Test
+    void domain_은_불변이다() {
+        classes().that().resideInAPackage(DOMAIN)
+                .should().haveOnlyFinalFields()
+                .because("도메인 상태는 record/enum 기반 불변 — 가변 필드는 동시성·추론 비용을 만든다")
                 .check(classes);
     }
 }
