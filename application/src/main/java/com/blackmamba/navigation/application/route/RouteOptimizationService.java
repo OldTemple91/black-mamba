@@ -22,6 +22,7 @@ public class RouteOptimizationService {
 
     private final CarReferenceCalculator carReferenceCalculator;
     private final CarbonFootprintCalculator carbonFootprintCalculator;
+    private final CarbonMetrics carbonMetrics;
     private final AccessibilityPostProcessor accessibilityPostProcessor;
     private final WeatherAwareRouteAdjuster weatherAwareRouteAdjuster;
     private final RouteHistoryRecorder routeHistoryRecorder;
@@ -38,11 +39,13 @@ public class RouteOptimizationService {
                                      RouteEvaluator routeEvaluator,
                                      CarReferenceCalculator carReferenceCalculator,
                                      CarbonFootprintCalculator carbonFootprintCalculator,
+                                     CarbonMetrics carbonMetrics,
                                      AccessibilityPostProcessor accessibilityPostProcessor,
                                      WeatherAwareRouteAdjuster weatherAwareRouteAdjuster,
                                      RouteHistoryRecorder routeHistoryRecorder) {
         this.carReferenceCalculator = carReferenceCalculator;
         this.carbonFootprintCalculator = carbonFootprintCalculator;
+        this.carbonMetrics = carbonMetrics;
         this.accessibilityPostProcessor = accessibilityPostProcessor;
         this.weatherAwareRouteAdjuster = weatherAwareRouteAdjuster;
         this.routeHistoryRecorder = routeHistoryRecorder;
@@ -115,6 +118,7 @@ public class RouteOptimizationService {
 
     /**
      * C-2: 경로별 탄소 배출량 + 자가용 대비 감축량 계산.
+     * 메트릭은 여기서만 1회 기록한다 (계산기는 순수 함수).
      */
     private CarbonSummary computeCarbon(Route route, Location origin, Location destination) {
         double grams = carbonFootprintCalculator.forRoute(route);
@@ -124,7 +128,7 @@ public class RouteOptimizationService {
         double carKm = haversineKm(origin, destination) * 1.3;  // 자가용 우회계수와 동일
         double carGrams = carbonFootprintCalculator.forCarDistance(carKm);
         double saved = Math.max(0, carGrams - grams);
-        carbonFootprintCalculator.recordSaved(saved);
+        carbonMetrics.record(grams, saved);
 
         return new CarbonSummary(
                 Math.round(grams * 10.0) / 10.0,

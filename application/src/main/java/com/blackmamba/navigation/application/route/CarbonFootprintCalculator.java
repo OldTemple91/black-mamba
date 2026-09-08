@@ -1,18 +1,17 @@
 package com.blackmamba.navigation.application.route;
 
 import com.blackmamba.navigation.domain.route.Leg;
-import com.blackmamba.navigation.domain.route.LegType;
 import com.blackmamba.navigation.domain.route.Route;
-import io.micrometer.core.instrument.DistributionSummary;
-import io.micrometer.core.instrument.MeterRegistry;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
- * C-2: 경로별 탄소 배출량 계산기.
+ * C-2: 경로별 탄소 배출량 계산기 (순수 계산 — 부수효과 없음).
  *
  * <p>"자가용 대비" 가 아니라 <b>경로 자체의 독립 CO₂ 값</b> 을 산출한다.
  * 프론트엔드는 이 값을 이용해 친환경 뱃지 / Carbon Budget 레이아웃을 만든다.
+ * 메트릭 기록은 {@link CarbonMetrics} 가 담당한다 — 계산기 안에서 기록하면
+ * 한 경로에 대해 {@code forRoute} 가 호출될 때마다(친환경 판정, 자가용 비교 등)
+ * 같은 값이 여러 번 기록되어 히스토그램이 부풀려진다.
  *
  * <h3>배출 계수 (g CO₂ / km · 1인 기준)</h3>
  * <ul>
@@ -50,53 +49,19 @@ public class CarbonFootprintCalculator {
     // === 자가용 (비교용) ===
     public static final double CAR_G_PER_KM = 171.0;
 
+    /** 친환경 판정 임계 — km 당 배출 강도가 이 값 미만이면 eco. */
+    private static final double ECO_INTENSITY_G_PER_KM = 20.0;
+
     // === 모드 문자열 상수 (ODsay Mapper 와 일치) ===
     private static final String MODE_SUBWAY = "SUBWAY";
     private static final String MODE_BUS = "BUS";
 
-    // === Prometheus 메트릭 ===
-    private final DistributionSummary routeCarbonSummary;
-    private final DistributionSummary carbonSavedSummary;
-
-    @Autowired
-    public CarbonFootprintCalculator(MeterRegistry meterRegistry) {
-        this.routeCarbonSummary = DistributionSummary.builder("navigation.route.carbon.grams")
-                .description("경로별 탄소 배출량 (g, 1인 환산)")
-                .baseUnit("grams")
-                .publishPercentiles(0.5, 0.95, 0.99)
-                .register(meterRegistry);
-        this.carbonSavedSummary = DistributionSummary.builder("navigation.route.carbon.saved.grams")
-                .description("자가용 대비 탄소 감축량 (g)")
-                .baseUnit("grams")
-                .register(meterRegistry);
-    }
-
-    /** 테스트용 — 메트릭 없이 생성. Spring 컨테이너가 주입할 필요 없는 경우에만 사용. */
-    CarbonFootprintCalculator() {
-        this.routeCarbonSummary = null;
-        this.carbonSavedSummary = null;
-    }
-
     /**
      * Route 전체의 CO₂ 배출량 (g) 계산. 반환값은 음수가 될 수 없다.
-     * 호출 시 {@code navigation.route.carbon.grams} 히스토그램에 샘플 기록.
      */
     public double forRoute(Route route) {
         if (route == null || route.legs() == null) return 0.0;
-        double grams = route.legs().stream().mapToDouble(this::forLeg).sum();
-        if (routeCarbonSummary != null && grams > 0) {
-            routeCarbonSummary.record(grams);
-        }
-        return grams;
-    }
-
-    /**
-     * 자가용 대비 감축량을 {@code navigation.route.carbon.saved.grams} 히스토그램에 기록.
-     */
-    public void recordSaved(double savedGrams) {
-        if (carbonSavedSummary != null && savedGrams > 0) {
-            carbonSavedSummary.record(savedGrams);
-        }
+        return route.legs().stream().mapToDouble(this::forLeg).sum();
     }
 
     /**
@@ -124,7 +89,7 @@ public class CarbonFootprintCalculator {
         if (totalMeters <= 0) return false;
         double grams = forRoute(route);
         double intensityPerKm = grams / (totalMeters / 1_000.0);
-        return intensityPerKm < 20.0;
+        return intensityPerKm < ECO_INTENSITY_G_PER_KM;
     }
 
     private double coefficientFor(Leg leg) {

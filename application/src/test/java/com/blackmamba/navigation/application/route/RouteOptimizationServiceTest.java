@@ -31,6 +31,7 @@ class RouteOptimizationServiceTest {
     @Mock RouteEvaluator routeEvaluator;
     // C-2: CarbonFootprintCalculator는 순수 계산 컴포넌트 → 실제 인스턴스 주입
     @org.mockito.Spy CarbonFootprintCalculator carbonFootprintCalculator = new CarbonFootprintCalculator();
+    @org.mockito.Spy CarbonMetrics carbonMetrics = new CarbonMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
     // F-1: CarReferenceCalculator는 순수 계산 컴포넌트 → 실제 인스턴스 주입
     @org.mockito.Spy CarReferenceCalculator carReferenceCalculator = new CarReferenceCalculator(carbonFootprintCalculator);
     // C-3: AccessibilityPostProcessor도 순수 후처리 → 실제 인스턴스
