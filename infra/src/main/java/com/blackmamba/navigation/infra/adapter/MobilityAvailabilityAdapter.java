@@ -9,6 +9,8 @@ import com.blackmamba.navigation.domain.route.MobilityType;
 import com.blackmamba.navigation.infra.ddareungi.DdareungiApiClient;
 import com.blackmamba.navigation.infra.ddareungi.dto.DdareungiStation;
 import com.blackmamba.navigation.infra.kickboard.KickboardApiClient;
+import com.blackmamba.navigation.infra.common.cache.TtlCache;
+import com.blackmamba.navigation.infra.common.cache.TtlCacheRegistry;
 import com.blackmamba.navigation.infra.kickboard.dto.KickboardDevice;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -16,11 +18,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.scheduling.annotation.Scheduled;
 import reactor.core.publisher.Mono;
 
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 @Component
@@ -38,13 +38,8 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
     private final Counter ddareungiFallbackErrorCounter;
     private final Counter kickboardFallbackErrorCounter;
     private final Counter kickboardFallbackEmptyCounter;
-    private final Counter availabilityCacheHitCounter;
-    private final Counter availabilityCacheMissCounter;
-    private final Counter segmentCacheHitCounter;
-    private final Counter segmentCacheMissCounter;
-    private final ConcurrentHashMap<AvailabilityKey, CacheEntry<Optional<MobilityInfo>>> availabilityCache = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<SegmentAvailabilityKey, CacheEntry<MobilityInfo>> segmentAvailabilityCache = new ConcurrentHashMap<>();
-    private final long availabilityCacheTtlMs;
+    private final TtlCache<AvailabilityKey, Optional<MobilityInfo>> availabilityCache;
+    private final TtlCache<SegmentAvailabilityKey, MobilityInfo> segmentAvailabilityCache;
     private final int searchRadiusMeters;
     private final boolean tagoEnabled;
 
@@ -53,12 +48,15 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                                        @Value("${navigation.mobility.search-radius-meters:700}") int searchRadiusMeters,
                                        @Value("${navigation.cache.mobility-availability-ttl-ms:20000}") long availabilityCacheTtlMs,
                                        @Value("${tago.enabled:false}") boolean tagoEnabled,
-                                       MeterRegistry meterRegistry) {
+                                       MeterRegistry meterRegistry,
+                                       TtlCacheRegistry cacheRegistry) {
         this.ddareungiClient = ddareungiClient;
         this.kickboardClient = kickboardClient;
         this.searchRadiusMeters = searchRadiusMeters;
-        this.availabilityCacheTtlMs = availabilityCacheTtlMs;
         this.tagoEnabled = tagoEnabled;
+        this.availabilityCache = cacheRegistry.create("mobility_availability", availabilityCacheTtlMs);
+        // (start × end × type) 조합 키라 경우의 수가 특히 많다 — registry 의 주기 청소가 힙 잠식을 막는다
+        this.segmentAvailabilityCache = cacheRegistry.create("mobility_segment", availabilityCacheTtlMs);
         this.ddareungiFallbackErrorCounter = meterRegistry.counter(
                 "navigation.mobility.fallback.total",
                 "mobility", "ddareungi",
@@ -73,26 +71,6 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                 "navigation.mobility.fallback.total",
                 "mobility", "kickboard_shared",
                 "reason", "empty"
-        );
-        this.availabilityCacheHitCounter = meterRegistry.counter(
-                "navigation.cache.total",
-                "cache", "mobility_availability",
-                "result", "hit"
-        );
-        this.availabilityCacheMissCounter = meterRegistry.counter(
-                "navigation.cache.total",
-                "cache", "mobility_availability",
-                "result", "miss"
-        );
-        this.segmentCacheHitCounter = meterRegistry.counter(
-                "navigation.cache.total",
-                "cache", "mobility_segment",
-                "result", "hit"
-        );
-        this.segmentCacheMissCounter = meterRegistry.counter(
-                "navigation.cache.total",
-                "cache", "mobility_segment",
-                "result", "miss"
         );
     }
 
@@ -123,16 +101,8 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
 
     @Override
     public Mono<MobilityInfo> findSegmentMobility(double startLat, double startLng, double endLat, double endLng, MobilityType type) {
-        long now = System.currentTimeMillis();
         SegmentAvailabilityKey key = SegmentAvailabilityKey.of(startLat, startLng, endLat, endLng, type);
-        return segmentAvailabilityCache.compute(key, (ignored, existing) -> {
-            if (existing != null && !existing.isExpired(now)) {
-                segmentCacheHitCounter.increment();
-                return existing;
-            }
-            segmentCacheMissCounter.increment();
-            return new CacheEntry<>(loadSegmentMobility(startLat, startLng, endLat, endLng, type).cache(), now + availabilityCacheTtlMs);
-        }).value();
+        return segmentAvailabilityCache.get(key, () -> loadSegmentMobility(startLat, startLng, endLat, endLng, type));
     }
 
     private Mono<MobilityInfo> loadSegmentMobility(double startLat, double startLng, double endLat, double endLng, MobilityType type) {
@@ -182,16 +152,8 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
 
     private Mono<Optional<MobilityInfo>> cachedLookup(double lat, double lng, MobilityType type, boolean dropoff,
                                                       Supplier<Mono<Optional<MobilityInfo>>> loaderSupplier) {
-        long now = System.currentTimeMillis();
         AvailabilityKey key = AvailabilityKey.of(lat, lng, type, dropoff);
-        return availabilityCache.compute(key, (ignored, existing) -> {
-            if (existing != null && !existing.isExpired(now)) {
-                availabilityCacheHitCounter.increment();
-                return existing;
-            }
-            availabilityCacheMissCounter.increment();
-            return new CacheEntry<>(loaderSupplier.get().cache(), now + availabilityCacheTtlMs);
-        }).value();
+        return availabilityCache.get(key, loaderSupplier);
     }
 
     private Mono<Optional<MobilityInfo>> findNearbyDdareungi(double lat, double lng) {
@@ -364,24 +326,6 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                     roundCoordinate(endLng),
                     type
             );
-        }
-    }
-
-    /**
-     * 만료 캐시 엔트리 주기 청소.
-     * segmentAvailabilityCache 는 (start × end × type) 조합 키라 경우의 수가
-     * 특히 많아 evict 없이는 장기 운영 시 힙 잠식이 가장 빠른 캐시다.
-     */
-    @Scheduled(fixedDelayString = "${navigation.cache.purge-interval-ms:300000}")
-    void purgeExpiredCacheEntries() {
-        long now = System.currentTimeMillis();
-        availabilityCache.entrySet().removeIf(e -> e.getValue().isExpired(now));
-        segmentAvailabilityCache.entrySet().removeIf(e -> e.getValue().isExpired(now));
-    }
-
-    private record CacheEntry<T>(Mono<T> value, long expiresAtMs) {
-        private boolean isExpired(long nowMs) {
-            return nowMs >= expiresAtMs;
         }
     }
 }

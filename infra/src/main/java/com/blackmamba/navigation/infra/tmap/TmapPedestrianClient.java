@@ -2,6 +2,8 @@ package com.blackmamba.navigation.infra.tmap;
 
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.infra.common.GeohashKeyGenerator;
+import com.blackmamba.navigation.infra.common.cache.TtlCache;
+import com.blackmamba.navigation.infra.common.cache.TtlCacheRegistry;
 import com.blackmamba.navigation.infra.tmap.dto.TmapPedestrianResponse;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
@@ -17,7 +19,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -25,7 +26,6 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -43,11 +43,8 @@ public class TmapPedestrianClient {
     private final Counter fallbackCounter;
     private final Counter quotaFallbackCounter;
     private final Counter quotaShortCircuitCounter;
-    private final Counter routeCacheHitCounter;
-    private final Counter routeCacheMissCounter;
     // B-3: Geohash 기반 키 (150m 격자 내 좌표는 동일 키로 공유)
-    private final ConcurrentHashMap<String, CacheEntry<Optional<TmapRouteData>>> routeCache = new ConcurrentHashMap<>();
-    private final long routeCacheTtlMs;
+    private final TtlCache<String, Optional<TmapRouteData>> routeCache;
     private final long quotaBackoffMs;
     private final AtomicLong quotaBlockedUntilMs = new AtomicLong(0L);
     // T-3: Resilience4j
@@ -61,11 +58,12 @@ public class TmapPedestrianClient {
             @Value("${navigation.cache.tmap-rate-limit-backoff-ms:3600000}") long quotaBackoffMs,
             MeterRegistry meterRegistry,
             CircuitBreakerRegistry circuitBreakerRegistry,
-            RetryRegistry retryRegistry
+            RetryRegistry retryRegistry,
+            TtlCacheRegistry cacheRegistry
     ) {
         this.webClient = webClientBuilder.baseUrl(BASE_URL).build();
         this.appKey = appKey;
-        this.routeCacheTtlMs = routeCacheTtlMs;
+        this.routeCache = cacheRegistry.create("tmap_pedestrian_route", routeCacheTtlMs);
         this.quotaBackoffMs = quotaBackoffMs;
         this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("tmap");
         this.retry = retryRegistry.retry("tmap");
@@ -75,16 +73,6 @@ public class TmapPedestrianClient {
                 "navigation.tmap.fallback.total", "reason", "quota_exceeded");
         this.quotaShortCircuitCounter = meterRegistry.counter(
                 "navigation.tmap.fallback.total", "reason", "quota_short_circuit");
-        this.routeCacheHitCounter = meterRegistry.counter(
-                "navigation.cache.total",
-                "cache", "tmap_pedestrian_route",
-                "result", "hit"
-        );
-        this.routeCacheMissCounter = meterRegistry.counter(
-                "navigation.cache.total",
-                "cache", "tmap_pedestrian_route",
-                "result", "miss"
-        );
     }
 
     /**
@@ -104,14 +92,7 @@ public class TmapPedestrianClient {
             return Mono.just(Optional.empty());
         }
         String key = GeohashKeyGenerator.forRoute(origin, destination);
-        return routeCache.compute(key, (ignored, existing) -> {
-            if (existing != null && !existing.isExpired(now)) {
-                routeCacheHitCounter.increment();
-                return existing;
-            }
-            routeCacheMissCounter.increment();
-            return new CacheEntry<>(requestRoute(origin, destination).cache(), now + routeCacheTtlMs);
-        }).value();
+        return routeCache.get(key, () -> requestRoute(origin, destination));
     }
 
     private Mono<Optional<TmapRouteData>> requestRoute(Location origin, Location destination) {
@@ -167,18 +148,4 @@ public class TmapPedestrianClient {
     }
 
     public record TmapRouteData(int distanceMeters, List<Location> coordinates) {}
-
-
-    /** 만료 캐시 엔트리 주기 청소 — 재조회 없는 키의 영구 잔류(힙 잠식) 방지. */
-    @Scheduled(fixedDelayString = "${navigation.cache.purge-interval-ms:300000}")
-    void purgeExpiredCacheEntries() {
-        long now = System.currentTimeMillis();
-        routeCache.entrySet().removeIf(e -> e.getValue().isExpired(now));
-    }
-
-    private record CacheEntry<T>(Mono<T> value, long expiresAtMs) {
-        private boolean isExpired(long nowMs) {
-            return nowMs >= expiresAtMs;
-        }
-    }
 }

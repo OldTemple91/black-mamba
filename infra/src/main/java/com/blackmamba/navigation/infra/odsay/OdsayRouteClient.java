@@ -5,6 +5,8 @@ import com.blackmamba.navigation.domain.location.GeoDistance;
 import com.blackmamba.navigation.domain.route.Leg;
 import com.blackmamba.navigation.domain.route.TransitSearchDistancePolicy;
 import com.blackmamba.navigation.infra.common.GeohashKeyGenerator;
+import com.blackmamba.navigation.infra.common.cache.TtlCache;
+import com.blackmamba.navigation.infra.common.cache.TtlCacheRegistry;
 import com.blackmamba.navigation.infra.odsay.dto.OdsayRouteResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -20,7 +22,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
@@ -28,7 +29,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Component
@@ -45,12 +45,9 @@ public class OdsayRouteClient {
     private final Counter transitTimeEstimateFallbackCounter;
     private final Counter transitRouteShortDistanceSkipCounter;
     private final Counter transitTimeShortDistanceSkipCounter;
-    private final Counter routeCacheHitCounter;
-    private final Counter routeCacheMissCounter;
     private final AtomicLong nextPermitMs = new AtomicLong(0);
     // B-3: Geohash 기반 키 → 150m 격자 내 좌표는 동일 키로 캐시 공유
-    private final ConcurrentHashMap<String, CacheEntry<List<Leg>>> routeCache = new ConcurrentHashMap<>();
-    private final long routeCacheTtlMs;
+    private final TtlCache<String, List<Leg>> routeCache;
     // T-3: Resilience4j — 회로 차단 + 재시도 + 최종 폴백
     private final CircuitBreaker circuitBreaker;
     private final Retry retry;
@@ -64,12 +61,13 @@ public class OdsayRouteClient {
             @Value("${navigation.cache.odsay-route-ttl-ms:30000}") long routeCacheTtlMs,
             MeterRegistry meterRegistry,
             CircuitBreakerRegistry circuitBreakerRegistry,
-            RetryRegistry retryRegistry
+            RetryRegistry retryRegistry,
+            TtlCacheRegistry cacheRegistry
     ) {
         this.mapper = mapper;
         this.objectMapper = objectMapper;
         this.apiKey = apiKey;
-        this.routeCacheTtlMs = routeCacheTtlMs;
+        this.routeCache = cacheRegistry.create("odsay_route", routeCacheTtlMs);
         this.webClient = webClientBuilder.baseUrl(baseUrl).build();
         this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("odsay");
         this.retry = retryRegistry.retry("odsay");
@@ -92,16 +90,6 @@ public class OdsayRouteClient {
                 "navigation.odsay.fallback.total",
                 "type", "transit_time",
                 "reason", "short_distance"
-        );
-        this.routeCacheHitCounter = meterRegistry.counter(
-                "navigation.cache.total",
-                "cache", "odsay_route",
-                "result", "hit"
-        );
-        this.routeCacheMissCounter = meterRegistry.counter(
-                "navigation.cache.total",
-                "cache", "odsay_route",
-                "result", "miss"
         );
     }
 
@@ -132,15 +120,7 @@ public class OdsayRouteClient {
             return Mono.just(List.of());
         }
         String key = GeohashKeyGenerator.forRoute(origin, destination);
-        long now = System.currentTimeMillis();
-        return routeCache.compute(key, (ignored, existing) -> {
-            if (existing != null && !existing.isExpired(now)) {
-                routeCacheHitCounter.increment();
-                return existing;
-            }
-            routeCacheMissCounter.increment();
-            return new CacheEntry<>(requestTransitRoute(origin, destination).cache(), now + routeCacheTtlMs);
-        }).value();
+        return routeCache.get(key, () -> requestTransitRoute(origin, destination));
     }
 
     private Mono<List<Leg>> requestTransitRoute(Location origin, Location destination) {
@@ -273,23 +253,5 @@ public class OdsayRouteClient {
     static int haversineTransitEstimate(Location a, Location b) {
         double distKm = GeoDistance.kilometers(a, b);
         return Math.max((int) Math.ceil(distKm * 1.4 / 25.0 * 60), 5);
-    }
-
-    /**
-     * 만료 캐시 엔트리 주기 청소.
-     * <p>
-     * 조회 시 만료 검사만으로는 "재조회가 없는 키" 가 영구 잔류해 힙을 잠식한다
-     * — OD 쌍 키는 조합 수가 많아 장기 운영 시 OOM 위험.
-     */
-    @Scheduled(fixedDelayString = "${navigation.cache.purge-interval-ms:300000}")
-    void purgeExpiredCacheEntries() {
-        long now = System.currentTimeMillis();
-        routeCache.entrySet().removeIf(e -> e.getValue().isExpired(now));
-    }
-
-    private record CacheEntry<T>(Mono<T> value, long expiresAtMs) {
-        private boolean isExpired(long nowMs) {
-            return nowMs >= expiresAtMs;
-        }
     }
 }

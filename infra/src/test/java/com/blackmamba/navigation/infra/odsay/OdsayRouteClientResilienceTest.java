@@ -1,6 +1,7 @@
 package com.blackmamba.navigation.infra.odsay;
 
 import com.blackmamba.navigation.domain.location.Location;
+import com.blackmamba.navigation.infra.common.cache.TtlCacheRegistry;
 import com.blackmamba.navigation.domain.route.Leg;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.WireMockServer;
@@ -100,7 +101,8 @@ class OdsayRouteClientResilienceTest {
                 0L,                         // cache TTL = 0 → 매 테스트마다 실제 호출
                 meterRegistry,
                 cbRegistry,
-                retryRegistry
+                retryRegistry,
+                new TtlCacheRegistry(meterRegistry)
         );
     }
 
