@@ -3,6 +3,7 @@ package com.blackmamba.navigation.infra.odsay;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.location.GeoDistance;
 import com.blackmamba.navigation.domain.route.Leg;
+import com.blackmamba.navigation.domain.route.TransitSearchDistancePolicy;
 import com.blackmamba.navigation.infra.common.GeohashKeyGenerator;
 import com.blackmamba.navigation.infra.odsay.dto.OdsayRouteResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,7 +37,6 @@ public class OdsayRouteClient {
     private static final Logger log = LoggerFactory.getLogger(OdsayRouteClient.class);
 
     private static final long RATE_INTERVAL_MS = 200L; // max 5 req/sec
-    private static final double ODSAY_MIN_TRANSIT_DISTANCE_METERS = 700.0;
     private final WebClient webClient;
     private final OdsayRouteMapper mapper;
     private final ObjectMapper objectMapper;
@@ -125,9 +125,10 @@ public class OdsayRouteClient {
             contextualName = "ODsay 대중교통 경로 조회",
             lowCardinalityKeyValues = {"external.api", "odsay"})
     public Mono<List<Leg>> getTransitRoute(Location origin, Location destination) {
-        if (isTooShortForTransit(origin, destination)) {
+        if (TransitSearchDistancePolicy.isTooCloseForTransit(origin, destination)) {
             transitRouteShortDistanceSkipCounter.increment();
-            log.info("[ODsay] 직선거리 700m 이하 구간은 호출 생략 ({} -> {})", origin.name(), destination.name());
+            log.info("[ODsay] 직선거리 {}m 이하 구간은 호출 생략 ({} -> {})",
+                    (int) TransitSearchDistancePolicy.MIN_TRANSIT_DISTANCE_METERS, origin.name(), destination.name());
             return Mono.just(List.of());
         }
         String key = GeohashKeyGenerator.forRoute(origin, destination);
@@ -252,7 +253,7 @@ public class OdsayRouteClient {
             contextualName = "ODsay 소요시간 조회",
             lowCardinalityKeyValues = {"external.api", "odsay"})
     public Mono<Integer> getTransitTimeMinutes(Location origin, Location destination) {
-        if (isTooShortForTransit(origin, destination)) {
+        if (TransitSearchDistancePolicy.isTooCloseForTransit(origin, destination)) {
             transitTimeShortDistanceSkipCounter.increment();
             return Mono.just(haversineTransitEstimate(origin, destination));
         }
@@ -273,15 +274,6 @@ public class OdsayRouteClient {
         double distKm = GeoDistance.kilometers(a, b);
         return Math.max((int) Math.ceil(distKm * 1.4 / 25.0 * 60), 5);
     }
-
-    private boolean isTooShortForTransit(Location origin, Location destination) {
-        return haversineMeters(origin, destination) <= ODSAY_MIN_TRANSIT_DISTANCE_METERS;
-    }
-
-    private double haversineMeters(Location a, Location b) {
-        return GeoDistance.meters(a, b);
-    }
-
 
     /**
      * 만료 캐시 엔트리 주기 청소.

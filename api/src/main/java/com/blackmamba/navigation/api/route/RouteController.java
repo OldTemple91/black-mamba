@@ -6,9 +6,12 @@ import com.blackmamba.navigation.application.route.RouteOptimizationService;
 import com.blackmamba.navigation.application.route.RecommendationPreference;
 import com.blackmamba.navigation.application.route.SearchMode;
 import com.blackmamba.navigation.application.route.WeatherContext;
+import com.blackmamba.navigation.api.support.MobilityTypes;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.MobilityType;
 import com.blackmamba.navigation.domain.route.Route;
+import com.blackmamba.navigation.domain.route.TransitSearchDistancePolicy;
+import com.blackmamba.navigation.domain.weather.WeatherCondition;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,7 +33,6 @@ import java.util.Map;
 public class RouteController {
 
     private static final Logger log = LoggerFactory.getLogger(RouteController.class);
-    private static final double ODSAY_MIN_DISTANCE_METERS = 700.0;
     private static final Duration ROUTE_SEARCH_TIMEOUT = Duration.ofSeconds(30);
     private final RouteOptimizationService routeOptimizationService;
     private final RouteNarrativeEnhancer narrativeEnhancer;  // RAG-4: 추천 경로 LLM narrative
@@ -93,33 +95,27 @@ public class RouteController {
         Location origin      = new Location("출발지", originLat, originLng);
         Location destination = new Location("목적지", destLat, destLng);
 
-        if (distanceMeters(origin, destination) <= ODSAY_MIN_DISTANCE_METERS) {
+        if (TransitSearchDistancePolicy.isTooCloseForTransit(origin, destination)) {
             return ResponseEntity.badRequest().body(Map.of(
                     "code", "SHORT_DISTANCE",
-                    "message", "출발지와 목적지가 700m 이내라 현재 대중교통/복합 경로 탐색을 지원하지 않습니다. 도보 이동을 이용하거나 더 먼 목적지를 검색해 주세요."
+                    "message", "출발지와 목적지가 " + (int) TransitSearchDistancePolicy.MIN_TRANSIT_DISTANCE_METERS
+                            + "m 이내라 현재 대중교통/복합 경로 탐색을 지원하지 않습니다. 도보 이동을 이용하거나 더 먼 목적지를 검색해 주세요."
             ));
         }
 
         List<MobilityType> mobilityTypes;
         try {
-            mobilityTypes = mobility.stream()
-                    .filter(m -> !m.isBlank())
-                    .map(MobilityType::valueOf)
-                    .toList();
+            mobilityTypes = MobilityTypes.parseStrict(mobility);
         } catch (IllegalArgumentException e) {
-            String allowed = java.util.Arrays.stream(MobilityType.values())
-                    .map(Enum::name)
-                    .collect(java.util.stream.Collectors.joining(", "));
             log.warn("[경로 탐색] 잘못된 이동수단 타입 입력: {} → 400 반환", mobility);
             return ResponseEntity.badRequest().body(Map.of(
                     "code", "INVALID_MOBILITY_TYPE",
-                    "message", "지원하지 않는 이동수단 타입입니다. 허용 값: " + allowed
+                    "message", "지원하지 않는 이동수단 타입입니다. 허용 값: " + MobilityTypes.allowedValues()
             ));
         }
 
         AccessibilityContext accessibilityContext = AccessibilityContext.of(wheelchairAccessible, walkingSpeedKmh);
-        WeatherContext weatherContext = WeatherContext.of(
-                com.blackmamba.navigation.domain.weather.WeatherCondition.parse(weather));
+        WeatherContext weatherContext = WeatherContext.of(WeatherCondition.parse(weather));
 
         Timer.Sample sample = Timer.start(meterRegistry);
         try {
@@ -156,14 +152,5 @@ public class RouteController {
                     "message", "경로 탐색 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요."
             ));
         }
-    }
-
-    private double distanceMeters(Location origin, Location destination) {
-        double dLat = Math.toRadians(destination.lat() - origin.lat());
-        double dLng = Math.toRadians(destination.lng() - origin.lng());
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(origin.lat())) * Math.cos(Math.toRadians(destination.lat()))
-                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-        return 6_371_000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 }

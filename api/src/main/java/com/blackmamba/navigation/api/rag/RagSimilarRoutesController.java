@@ -3,6 +3,7 @@ package com.blackmamba.navigation.api.rag;
 import com.blackmamba.navigation.application.route.port.RagSearchRequest;
 import com.blackmamba.navigation.application.route.port.RouteHistoryPort;
 import com.blackmamba.navigation.application.route.port.ScoredRouteHistoryEntry;
+import com.blackmamba.navigation.api.support.MobilityTypes;
 import com.blackmamba.navigation.domain.route.MobilityType;
 import io.micrometer.observation.annotation.Observed;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,7 +18,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -112,7 +112,7 @@ public class RagSimilarRoutesController {
         }
 
         int safeTopK = Math.max(1, Math.min(MAX_TOP_K, topK));
-        List<MobilityType> mobilityFilter = parseMobility(mobility);
+        List<MobilityType> mobilityFilter = MobilityTypes.parseLenient(mobility);
 
         RagSearchRequest request = RagSearchRequest.byGeohash(
                 query, safeTopK, threshold,
@@ -141,23 +141,5 @@ public class RagSimilarRoutesController {
                 "hitCount", items.size(),
                 "results", items
         ));
-    }
-
-    private static List<MobilityType> parseMobility(List<String> raw) {
-        if (raw == null || raw.isEmpty()) return List.of();
-        List<MobilityType> types = new ArrayList<>();
-        for (String token : raw) {
-            if (token == null) continue;
-            for (String t : token.split(",")) {
-                String trimmed = t.trim();
-                if (trimmed.isEmpty()) continue;
-                try {
-                    types.add(MobilityType.valueOf(trimmed));
-                } catch (IllegalArgumentException ignored) {
-                    log.debug("[RAG] 알 수 없는 mobility 값 무시: {}", trimmed);
-                }
-            }
-        }
-        return types;
     }
 }

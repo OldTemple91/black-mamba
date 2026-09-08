@@ -5,8 +5,10 @@ import com.blackmamba.navigation.application.route.RecommendationPreference;
 import com.blackmamba.navigation.application.route.RouteStreamService;
 import com.blackmamba.navigation.application.route.SearchMode;
 import com.blackmamba.navigation.application.route.StreamEventPayload;
+import com.blackmamba.navigation.api.support.MobilityTypes;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.MobilityType;
+import com.blackmamba.navigation.domain.route.TransitSearchDistancePolicy;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -55,7 +57,6 @@ import java.util.List;
 public class RouteStreamController {
 
     private static final Logger log = LoggerFactory.getLogger(RouteStreamController.class);
-    private static final double ODSAY_MIN_DISTANCE_METERS = 700.0;
 
     private final RouteStreamService routeStreamService;
 
@@ -104,19 +105,18 @@ public class RouteStreamController {
         Location origin = new Location("출발지", originLat, originLng);
         Location destination = new Location("목적지", destLat, destLng);
 
-        if (distanceMeters(origin, destination) <= ODSAY_MIN_DISTANCE_METERS) {
+        if (TransitSearchDistancePolicy.isTooCloseForTransit(origin, destination)) {
             return Flux.error(new IllegalArgumentException(
-                    "출발지와 목적지가 700m 이내는 스트리밍 탐색을 지원하지 않습니다."));
+                    "출발지와 목적지가 " + (int) TransitSearchDistancePolicy.MIN_TRANSIT_DISTANCE_METERS
+                            + "m 이내는 스트리밍 탐색을 지원하지 않습니다."));
         }
 
         List<MobilityType> mobilityTypes;
         try {
-            mobilityTypes = mobility.stream()
-                    .filter(m -> !m.isBlank())
-                    .map(MobilityType::valueOf)
-                    .toList();
+            mobilityTypes = MobilityTypes.parseStrict(mobility);
         } catch (IllegalArgumentException e) {
-            return Flux.error(new IllegalArgumentException("지원하지 않는 이동수단 타입입니다."));
+            return Flux.error(new IllegalArgumentException(
+                    "지원하지 않는 이동수단 타입입니다. 허용 값: " + MobilityTypes.allowedValues()));
         }
 
         AccessibilityContext accessibility = AccessibilityContext.of(wheelchairAccessible, walkingSpeedKmh);
@@ -140,14 +140,5 @@ public class RouteStreamController {
         return ServerSentEvent.<StreamEventPayload>builder(payload)
                 .event(eventName)
                 .build();
-    }
-
-    private double distanceMeters(Location origin, Location destination) {
-        double dLat = Math.toRadians(destination.lat() - origin.lat());
-        double dLng = Math.toRadians(destination.lng() - origin.lng());
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(origin.lat())) * Math.cos(Math.toRadians(destination.lat()))
-                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-        return 6_371_000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 }
