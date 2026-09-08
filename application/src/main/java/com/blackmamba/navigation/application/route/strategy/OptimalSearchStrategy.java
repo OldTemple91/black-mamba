@@ -1,18 +1,33 @@
 package com.blackmamba.navigation.application.route.strategy;
 
-import com.blackmamba.navigation.application.route.*;
-import com.blackmamba.navigation.application.route.port.*;
+import com.blackmamba.navigation.application.route.HubSelector;
+import com.blackmamba.navigation.application.route.LastMileHubPrioritizer;
+import com.blackmamba.navigation.application.route.MobilityConfig;
+import com.blackmamba.navigation.application.route.MobilitySegmentBuilder;
+import com.blackmamba.navigation.application.route.RecommendationPreference;
+import com.blackmamba.navigation.application.route.RouteEvaluator;
+import com.blackmamba.navigation.application.route.RouteHubExtractor;
+import com.blackmamba.navigation.application.route.port.MobilityAvailabilityPort;
+import com.blackmamba.navigation.application.route.port.MobilityTimePort;
+import com.blackmamba.navigation.application.route.port.TransitRoutePort;
+import com.blackmamba.navigation.application.route.strategy.MobilityDiagnostics.Phase;
 import com.blackmamba.navigation.domain.hub.Hub;
-import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.location.GeoDistance;
-import com.blackmamba.navigation.domain.route.*;
+import com.blackmamba.navigation.domain.location.Location;
+import com.blackmamba.navigation.domain.route.GenerationDiagnostic;
+import com.blackmamba.navigation.domain.route.Leg;
+import com.blackmamba.navigation.domain.route.MobilityInfo;
+import com.blackmamba.navigation.domain.route.MobilityType;
+import com.blackmamba.navigation.domain.route.Route;
+import com.blackmamba.navigation.domain.route.RouteHub;
+import com.blackmamba.navigation.domain.route.RouteType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -29,19 +44,19 @@ import java.util.Optional;
 public class OptimalSearchStrategy implements RouteSearchStrategy {
 
     private static final Logger log = LoggerFactory.getLogger(OptimalSearchStrategy.class);
-    private static final int MAX_CANDIDATE_HUBS = 5;
+    private static final int MAX_CANDIDATE_HUBS = LastMileHubPrioritizer.MAX_CANDIDATE_HUBS;
     // KICKBOARD_SHARED 제외: TAGO API 서울 데이터 미제공 (B-1)
     // PERSONAL_EBIKE/PERSONAL_KICKBOARD 제외: 사용자 보유 전제, SPECIFIC 모드에서만 사용
     private static final List<MobilityType> ALL_TYPES =
             List.of(MobilityType.DDAREUNGI);
 
     private final TransitRoutePort transitRoutePort;
-    private final MobilityTimePort mobilityTimePort;
     private final MobilityAvailabilityPort mobilityAvailabilityPort;
     private final HubSelector hubSelector;
-    private final RouteEvaluator routeEvaluator;
     private final MobilitySegmentBuilder mobilitySegmentBuilder;
     private final LastMileHubPrioritizer hubPrioritizer;
+    private final MobilityDiagnostics diagnostics;
+    private final RouteRanker ranker;
 
     public OptimalSearchStrategy(TransitRoutePort transitRoutePort,
                                   MobilityTimePort mobilityTimePort,
@@ -49,12 +64,12 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                                   HubSelector hubSelector,
                                   RouteEvaluator routeEvaluator) {
         this.transitRoutePort = transitRoutePort;
-        this.mobilityTimePort = mobilityTimePort;
         this.mobilityAvailabilityPort = mobilityAvailabilityPort;
         this.hubSelector = hubSelector;
-        this.routeEvaluator = routeEvaluator;
         this.mobilitySegmentBuilder = new MobilitySegmentBuilder(mobilityTimePort);
         this.hubPrioritizer = new LastMileHubPrioritizer(hubSelector, mobilityAvailabilityPort);
+        this.diagnostics = new MobilityDiagnostics(mobilityAvailabilityPort);
+        this.ranker = new RouteRanker(routeEvaluator);
     }
 
     /** OPTIMAL 모드는 이동수단을 자동 선택하므로 {@code mobilityTypes} 파라미터를 무시한다. */
@@ -64,30 +79,23 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                                     RecommendationPreference preference) {
         return transitRoutePort.getTransitRoute(origin, destination)
                 .flatMap(baseLegs -> {
-                    final List<Leg> baseRouteLegs;
-                    final int baseMinutes;
-                    if (baseLegs.isEmpty()) {
-                        baseMinutes = haversineTransitMinutes(origin, destination);
-                        baseRouteLegs = List.of(
-                                new Leg(LegType.TRANSIT, "대중교통", baseMinutes, 0, origin, destination, null, null, null)
-                        );
-                        log.warn("[OPTIMAL] baseLegs 비어있음 → haversine 추정 {}분 사용", baseMinutes);
+                    BaselineTransitRoute baseline = BaselineTransitRoute.from(baseLegs, origin, destination);
+                    if (baseline.estimated()) {
+                        log.warn("[OPTIMAL] baseLegs 비어있음 → haversine 추정 {}분 사용", baseline.minutes());
                     } else {
-                        baseMinutes = baseLegs.stream().mapToInt(Leg::durationMinutes).sum();
-                        baseRouteLegs = baseLegs;
-                        log.info("[OPTIMAL] baseLegs={}개 totalMin={}", baseLegs.size(), baseMinutes);
+                        log.info("[OPTIMAL] baseLegs={}개 totalMin={}", baseLegs.size(), baseline.minutes());
                     }
 
                     // 후보 지점 진단
-                    MobilityConfig diagConfig = MobilityConfig.bike();
-                    List<Hub> diagHubs = hubSelector.selectLastMileHubs(baseLegs, destination, diagConfig);
+                    List<Hub> diagHubs = hubSelector.selectLastMileHubs(baseLegs, destination, MobilityConfig.bike());
                     log.info("[OPTIMAL] lastMile 허브={}개 (ddareungi 기준)", diagHubs.size());
 
-                    Route baseRoute = Route.of(baseRouteLegs, RouteType.TRANSIT_ONLY);
+                    Route baseRoute = baseline.toRoute();
+                    int baseMinutes = baseline.minutes();
 
                     Flux<Route> allPatterns = Flux.fromIterable(ALL_TYPES)
                             .flatMap(type -> {
-                                MobilityConfig config = configFor(type);
+                                MobilityConfig config = MobilityConfigs.forType(type);
                                 return Flux.merge(
                                         patternB(origin, destination, baseLegs, type, config),
                                         patternC(origin, destination, baseLegs, type, config),
@@ -102,12 +110,12 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                             .flatMap(candidates -> {
                                 if (hasOnlyTransitCandidate(candidates)) {
                                     return buildNoMixedDiagnostics(origin, destination, baseLegs)
-                                            .map(diagnostics -> {
-                                                Route enrichedBaseRoute = withDiagnostics(baseRoute, diagnostics);
-                                                return rank(List.of(enrichedBaseRoute), baseMinutes, enrichedBaseRoute, preference);
+                                            .map(reasons -> {
+                                                Route enrichedBaseRoute = RouteRanker.withDiagnostics(baseRoute, reasons);
+                                                return ranker.rank(List.of(enrichedBaseRoute), enrichedBaseRoute, baseMinutes, preference);
                                             });
                                 }
-                                return Mono.just(rank(candidates, baseMinutes, baseRoute, preference));
+                                return Mono.just(ranker.rank(candidates, baseRoute, baseMinutes, preference));
                             });
                 });
     }
@@ -137,7 +145,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                                                         )
                                                         .map(tuple -> {
                                                             List<Leg> partialTransit = tuple.getT2().isEmpty()
-                                                                    ? List.of(transitLeg(tuple.getT3(), transitStart, destination, baseLegs))
+                                                                    ? List.of(TransitLegFactory.approximate(tuple.getT3(), transitStart, destination, baseLegs))
                                                                     : tuple.getT2();
                                                             List<Leg> legs = new ArrayList<>();
                                                             legs.addAll(tuple.getT1());
@@ -168,11 +176,11 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                                             )
                                             .map(tuple -> {
                                                 List<Leg> partialTransit = tuple.getT1().isEmpty()
-                                                        ? List.of(transitLeg(tuple.getT2(), origin, switchPoint, baseLegs))
+                                                        ? List.of(TransitLegFactory.approximate(tuple.getT2(), origin, switchPoint, baseLegs))
                                                         : tuple.getT1();
                                                 List<Leg> legs = new ArrayList<>(partialTransit);
                                                 legs.addAll(tuple.getT3());
-                                                return buildRoute(legs, routeTypeFor(type),
+                                                return buildRoute(legs, MobilityConfigs.routeTypeFor(type),
                                                         List.of(RouteHubExtractor.fromSelectedHub(lastHub, "LAST_MILE_CANDIDATE")));
                                             });
                                 });
@@ -212,7 +220,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                                             return Mono.zip(startSegment, tranLegs, tranTime, endSegment)
                                                     .map(t -> {
                                                         List<Leg> middleTransit = t.getT2().isEmpty()
-                                                                ? List.of(transitLeg(t.getT3(), transitStart, transitEnd, baseLegs))
+                                                                ? List.of(TransitLegFactory.approximate(t.getT3(), transitStart, transitEnd, baseLegs))
                                                                 : t.getT2();
                                                         List<Leg> legs = new ArrayList<>();
                                                         legs.addAll(t.getT1());
@@ -233,7 +241,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     // 패턴 E: 이동수단만 (직선거리 < 수단 최대범위)
     private Flux<Route> patternE(Location origin, Location destination,
                                   MobilityType type, MobilityConfig config) {
-        double dist = haversineMeters(origin.lat(), origin.lng(), destination.lat(), destination.lng());
+        double dist = GeoDistance.meters(origin, destination);
         if (dist > config.maxRangeMeters()) return Flux.empty();
 
         return mobilityInfoForSegment(origin, destination, type)
@@ -247,13 +255,12 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     }
 
     private Mono<Boolean> hasPickupNearOrigin(Location origin, MobilityType type) {
-        if (type == MobilityType.PERSONAL_EBIKE || type == MobilityType.PERSONAL_KICKBOARD) {
+        if (MobilityConfigs.isPersonal(type)) {
             return Mono.just(true);
         }
         return mobilityAvailabilityPort.findNearbyMobility(origin.lat(), origin.lng(), type)
                 .map(Optional::isPresent);
     }
-
 
     // ── 헬퍼 ──────────────────────────────────────────────────────────────────
 
@@ -261,96 +268,8 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
         return Route.of(legs, type).withSelectedHubs(selectedHubs);
     }
 
-    /**
-     * 혼합 경로의 대중교통 구간 Leg 생성.
-     * baseLegs에서 노선명·색상을 추출해 TransitInfo를 채운다.
-     * baseLegs가 비어있거나 TRANSIT 정보가 없으면 transitInfo=null.
-     */
-    private Leg transitLeg(int minutes, Location from, Location to, List<Leg> baseLegs) {
-        List<Leg> transitLegs = baseLegs.stream()
-                .filter(l -> l.type() == LegType.TRANSIT && l.transitInfo() != null)
-                .toList();
-
-        if (transitLegs.isEmpty()) {
-            return new Leg(LegType.TRANSIT, "대중교통", minutes, 0, from, to, null, null, null);
-        }
-
-        // 노선명: 최대 3개 중복 제거 후 합산 (예: "2호선, 64번")
-        String lineName = transitLegs.stream()
-                .map(l -> l.transitInfo().lineName())
-                .filter(n -> n != null && !n.isBlank())
-                .distinct()
-                .limit(3)
-                .collect(Collectors.joining(", "));
-
-        // 노선 색상: 첫 번째 TRANSIT leg 색상 사용
-        String lineColor = transitLegs.stream()
-                .map(l -> l.transitInfo().lineColor())
-                .filter(c -> c != null && !c.isBlank())
-                .findFirst()
-                .orElse(null);
-
-        // 정거장 수: 전체 기준 소요시간 비율로 근사
-        int totalBaseMinutes = baseLegs.stream().mapToInt(Leg::durationMinutes).sum();
-        int totalStations = transitLegs.stream().mapToInt(l -> l.transitInfo().stationCount()).sum();
-        int approxStations = totalBaseMinutes > 0
-                ? Math.max(2, (int) Math.round((double) minutes / totalBaseMinutes * totalStations))
-                : Math.max(2, totalStations / 2);
-
-        // 경유 정류장: base 경로의 passThroughStations 합산 (근사 표시용)
-        List<Location> passThroughStations = transitLegs.stream()
-                .filter(l -> l.transitInfo().passThroughStations() != null)
-                .flatMap(l -> l.transitInfo().passThroughStations().stream())
-                .toList();
-
-        TransitInfo transitInfo = lineName.isBlank() ? null
-                : new TransitInfo(lineName, lineColor, approxStations, 0, passThroughStations);
-
-        return new Leg(LegType.TRANSIT, "대중교통", minutes, 0, from, to, transitInfo, null, null);
-    }
-
-    private MobilityConfig configFor(MobilityType type) {
-        return switch (type) {
-            case PERSONAL_EBIKE     -> MobilityConfig.personalEbike();
-            case PERSONAL_KICKBOARD -> MobilityConfig.personalKickboard();
-            case KICKBOARD_SHARED   -> MobilityConfig.kickboard();
-            case DDAREUNGI          -> MobilityConfig.bike();
-        };
-    }
-
-    private RouteType routeTypeFor(MobilityType type) {
-        return isKickboardType(type)
-                ? RouteType.TRANSIT_WITH_KICKBOARD : RouteType.TRANSIT_WITH_BIKE;
-    }
-
-    private static boolean isKickboardType(MobilityType type) {
-        return type == MobilityType.KICKBOARD_SHARED || type == MobilityType.PERSONAL_KICKBOARD;
-    }
-
-    private List<Route> rank(List<Route> candidates, int baseMinutes, Route baseRoute,
-                             RecommendationPreference preference) {
-        List<Route> evaluated = candidates.stream()
-                .map(route -> routeEvaluator.evaluate(route, baseRoute, baseMinutes, false, preference))
-                .sorted(Comparator.comparingDouble(Route::score).reversed())
-                .limit(5)
-                .toList();
-
-        if (evaluated.isEmpty()) {
-            return evaluated;
-        }
-
-        List<Route> result = new ArrayList<>(evaluated);
-        Route top = result.getFirst();
-        result.set(0, routeEvaluator.evaluate(top, baseRoute, baseMinutes, true, preference));
-        return result;
-    }
-
     private boolean hasOnlyTransitCandidate(List<Route> candidates) {
         return candidates.size() == 1 && candidates.getFirst().type() == RouteType.TRANSIT_ONLY;
-    }
-
-    private Route withDiagnostics(Route route, List<GenerationDiagnostic> diagnostics) {
-        return route.withInsights(new RouteInsights(List.of(), List.of(), diagnostics, List.of()));
     }
 
     private Mono<List<GenerationDiagnostic>> buildNoMixedDiagnostics(Location origin, Location destination, List<Leg> baseLegs) {
@@ -358,13 +277,11 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                 .flatMap(type -> diagnosticsForType(origin, destination, baseLegs, type))
                 .distinct()
                 .collectList()
-                .map(list -> list.isEmpty()
-                        ? List.of(diagnostic("ROUTE_COMPOSITION", null, "NO_MIXED_ROUTE", 0, "혼합 경로 후보를 만들지 못했습니다."))
-                        : list);
+                .map(list -> list.isEmpty() ? List.of(MobilityDiagnostics.noMixedRoute()) : list);
     }
 
     private Flux<GenerationDiagnostic> diagnosticsForType(Location origin, Location destination, List<Leg> baseLegs, MobilityType type) {
-        MobilityConfig config = configFor(type);
+        MobilityConfig config = MobilityConfigs.forType(type);
         List<Hub> lastMileHubs = hubSelector.selectLastMileHubs(baseLegs, destination, config).stream()
                 .limit(MAX_CANDIDATE_HUBS)
                 .toList();
@@ -373,199 +290,22 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                 .toList();
 
         List<GenerationDiagnostic> immediateReasons = new ArrayList<>();
-        if (firstMileHubs.isEmpty()) immediateReasons.add(
-                diagnostic("FIRST_MILE", type, "NO_CANDIDATE_HUB", 0, labelFor(type) + " 퍼스트마일 후보 허브가 없습니다."));
-        if (lastMileHubs.isEmpty()) immediateReasons.add(
-                diagnostic("LAST_MILE", type, "NO_CANDIDATE_HUB", 0, labelFor(type) + " 라스트마일 후보 허브가 없습니다."));
+        if (firstMileHubs.isEmpty()) immediateReasons.add(MobilityDiagnostics.noCandidateHub(Phase.FIRST_MILE, type));
+        if (lastMileHubs.isEmpty()) immediateReasons.add(MobilityDiagnostics.noCandidateHub(Phase.LAST_MILE, type));
 
-        double directDistance = haversineMeters(origin.lat(), origin.lng(), destination.lat(), destination.lng());
+        double directDistance = GeoDistance.meters(origin, destination);
         if (directDistance > config.maxRangeMeters()) {
-            immediateReasons.add(diagnostic("DIRECT", type, "DIRECT_DISTANCE_EXCEEDED", 0,
-                    labelFor(type) + " 직접 이동 가능 거리(" + config.maxRangeMeters() + "m)를 초과했습니다. 현재 직선거리 약 " + (int) directDistance + "m"));
+            immediateReasons.add(MobilityDiagnostics.directDistanceExceeded(type, config.maxRangeMeters(), directDistance));
         }
 
-        Mono<Optional<GenerationDiagnostic>> lastMileReason = diagnoseSegmentAvailability(
-                Flux.fromIterable(lastMileHubs)
-                        .flatMap(hub -> diagnoseSegment(origin, hub.location(), destination, type, false)),
-                labelFor(type),
-                "라스트마일",
-                "LAST_MILE",
-                type,
-                lastMileHubs.size(),
-                candidateSummary(lastMileHubs),
-                buildHintProvider(representativeHubLocation(lastMileHubs), type, false),
-                buildHintProvider(destination, type, true)
-        );
-
-        Mono<Optional<GenerationDiagnostic>> firstMileReason = diagnoseSegmentAvailability(
-                Flux.fromIterable(firstMileHubs)
-                        .flatMap(hub -> diagnoseSegment(origin, hub.location(), destination, type, true)),
-                labelFor(type),
-                "퍼스트마일",
-                "FIRST_MILE",
-                type,
-                firstMileHubs.size(),
-                candidateSummary(firstMileHubs),
-                buildHintProvider(origin, type, false),
-                buildHintProvider(representativeHubLocation(firstMileHubs), type, true)
-        );
-
-        return Mono.zip(firstMileReason, lastMileReason)
+        return Mono.zip(
+                        diagnostics.diagnosePhase(Phase.FIRST_MILE, type, firstMileHubs, origin, destination),
+                        diagnostics.diagnosePhase(Phase.LAST_MILE, type, lastMileHubs, origin, destination))
                 .flatMapMany(tuple -> {
                     List<GenerationDiagnostic> reasons = new ArrayList<>(immediateReasons);
                     tuple.getT1().ifPresent(reasons::add);
                     tuple.getT2().ifPresent(reasons::add);
                     return Flux.fromIterable(reasons);
                 });
-    }
-
-    private Mono<Optional<GenerationDiagnostic>> diagnoseSegmentAvailability(Flux<SegmentDiagnostic> diagnostics,
-                                                               String label,
-                                                               String phaseLabel,
-                                                               String phaseCode,
-                                                               MobilityType mobilityType,
-                                                               int hubCount,
-                                                               String hubSummary,
-                                                               Mono<Optional<String>> noPickupHintProvider,
-                                                               Mono<Optional<String>> noDropoffHintProvider) {
-        return diagnostics.collectList()
-                .flatMap(items -> {
-                    if (hubCount == 0 || items.isEmpty()) {
-                        return Mono.just(Optional.<GenerationDiagnostic>empty());
-                    }
-                    long validCount = items.stream().filter(SegmentDiagnostic::isValid).count();
-                    if (validCount > 0) {
-                        return Mono.just(Optional.<GenerationDiagnostic>empty());
-                    }
-                    long noPickup = items.stream().filter(item -> item.reason() == DiagnosticReason.NO_PICKUP).count();
-                    long noDropoff = items.stream().filter(item -> item.reason() == DiagnosticReason.NO_DROPOFF).count();
-                    long sameStation = items.stream().filter(item -> item.reason() == DiagnosticReason.SAME_STATION).count();
-
-                    if (sameStation > 0) {
-                        return Mono.just(Optional.of(diagnostic(phaseCode, mobilityType, "SAME_PICKUP_DROPOFF", hubCount,
-                                label + " " + phaseLabel + " 후보 " + hubSummary + "를 확인했지만 동일 정류소 대여/반납 조합만 발견되어 제외했습니다.")));
-                    }
-                    if (noDropoff > 0 && noPickup == 0) {
-                        return noDropoffHintProvider.map(hint -> Optional.of(diagnostic(phaseCode, mobilityType, "NO_DROPOFF", hubCount,
-                                label + " " + phaseLabel + " 후보 " + hubSummary + "를 확인했지만 반납 가능한 정류소를 찾지 못했습니다."
-                                        + hint.map(value -> " " + value).orElse(""))));
-                    }
-                    if (noPickup > 0 && noDropoff == 0) {
-                        return noPickupHintProvider.map(hint -> Optional.of(diagnostic(phaseCode, mobilityType, "NO_PICKUP", hubCount,
-                                label + " " + phaseLabel + " 후보 " + hubSummary + "를 확인했지만 반경 내 대여 가능한 수단을 찾지 못했습니다."
-                                        + hint.map(value -> " " + value).orElse(""))));
-                    }
-                    return Mono.just(Optional.of(diagnostic(phaseCode, mobilityType, "NO_VALID_COMBINATION", hubCount,
-                            label + " " + phaseLabel + " 후보 " + hubSummary + "를 확인했지만 대여/반납 가능한 수단을 찾지 못했습니다.")));
-                });
-    }
-
-    private Mono<Optional<String>> buildHintProvider(Location location, MobilityType mobilityType, boolean dropoff) {
-        return mobilityAvailabilityPort.findNearestMobilityHint(location.lat(), location.lng(), mobilityType, dropoff)
-                .map(optionalHint -> optionalHint.map(MobilitySearchHint::toDiagnosticSuffix));
-    }
-
-    private Location representativeHubLocation(List<Hub> hubs) {
-        return hubs.isEmpty() ? destinationFallbackLocation() : hubs.getFirst().location();
-    }
-
-    private Location destinationFallbackLocation() {
-        return new Location("fallback", 0.0, 0.0);
-    }
-
-    private String candidateSummary(List<Hub> hubs) {
-        long primaryCount = hubs.stream()
-                .filter(hub -> "PRIMARY".equals(hub.metadata().get("selectionStrategy")))
-                .count();
-        long fallbackCount = hubs.stream()
-                .filter(hub -> "FALLBACK_NEAREST".equals(hub.metadata().get("selectionStrategy")))
-                .count();
-        if (fallbackCount == 0) {
-            return hubs.size() + "개";
-        }
-        return hubs.size() + "개(기본 " + primaryCount + ", fallback " + fallbackCount + ")";
-    }
-
-    private GenerationDiagnostic diagnostic(String phase, MobilityType type, String reasonCode, int candidateCount, String message) {
-        return new GenerationDiagnostic(phase, type != null ? type.name() : null, reasonCode, candidateCount, message);
-    }
-
-    private Mono<SegmentDiagnostic> diagnoseSegment(Location origin,
-                                                    Location switchPoint,
-                                                    Location destination,
-                                                    MobilityType type,
-                                                    boolean firstMile) {
-        Location start = firstMile ? origin : switchPoint;
-        Location end = firstMile ? switchPoint : destination;
-
-        Mono<Optional<MobilityInfo>> pickup = mobilityAvailabilityPort.findNearbyMobility(start.lat(), start.lng(), type);
-
-        if (type != MobilityType.DDAREUNGI) {
-            return pickup.map(result -> result.isPresent()
-                    ? SegmentDiagnostic.success()
-                    : SegmentDiagnostic.of(DiagnosticReason.NO_PICKUP));
-        }
-
-        Mono<Optional<MobilityInfo>> dropoff = mobilityAvailabilityPort.findNearbyDropoff(end.lat(), end.lng(), type);
-        return Mono.zip(pickup, dropoff)
-                .map(tuple -> {
-                    Optional<MobilityInfo> pickupInfo = tuple.getT1();
-                    Optional<MobilityInfo> dropoffInfo = tuple.getT2();
-                    if (pickupInfo.isEmpty()) {
-                        return SegmentDiagnostic.of(DiagnosticReason.NO_PICKUP);
-                    }
-                    if (dropoffInfo.isEmpty()) {
-                        return SegmentDiagnostic.of(DiagnosticReason.NO_DROPOFF);
-                    }
-                    MobilityInfo enriched = pickupInfo.get().withDropoffStation(
-                            dropoffInfo.get().stationId(),
-                            dropoffInfo.get().stationName(),
-                            dropoffInfo.get().lat(),
-                            dropoffInfo.get().lng()
-                    );
-                    if (enriched.hasSamePickupAndDropoffStation()) {
-                        return SegmentDiagnostic.of(DiagnosticReason.SAME_STATION);
-                    }
-                        return SegmentDiagnostic.success();
-                });
-    }
-
-    private record SegmentDiagnostic(boolean valid, DiagnosticReason reason) {
-        private boolean isValid() {
-            return valid;
-        }
-
-        private static SegmentDiagnostic success() {
-            return new SegmentDiagnostic(true, DiagnosticReason.VALID);
-        }
-
-        private static SegmentDiagnostic of(DiagnosticReason reason) {
-            return new SegmentDiagnostic(false, reason);
-        }
-    }
-
-    private enum DiagnosticReason {
-        VALID,
-        NO_PICKUP,
-        NO_DROPOFF,
-        SAME_STATION
-    }
-
-    private String labelFor(MobilityType type) {
-        return switch (type) {
-            case DDAREUNGI          -> "따릉이";
-            case KICKBOARD_SHARED   -> "공유 킥보드";
-            case PERSONAL_EBIKE     -> "개인 전기자전거";
-            case PERSONAL_KICKBOARD -> "개인 킥보드";
-        };
-    }
-
-    private double haversineMeters(double lat1, double lng1, double lat2, double lng2) {
-        return GeoDistance.meters(lat1, lng1, lat2, lng2);
-    }
-
-    private static int haversineTransitMinutes(Location a, Location b) {
-        double distKm = GeoDistance.kilometers(a, b);
-        return Math.max((int) Math.ceil(distKm * 1.4 / 25.0 * 60), 5);
     }
 }

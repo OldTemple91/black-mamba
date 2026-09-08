@@ -32,7 +32,8 @@ import java.util.Optional;
  */
 public class LastMileHubPrioritizer {
 
-    private static final int MAX_CANDIDATE_HUBS = 5;
+    /** 한 단계(퍼스트/라스트마일)에서 실제 탐색·진단할 허브 후보 상한. */
+    public static final int MAX_CANDIDATE_HUBS = 5;
     private static final int MAX_HINT_PRIORITY_DISTANCE_METERS = 1_100;
 
     private final HubSelector hubSelector;
