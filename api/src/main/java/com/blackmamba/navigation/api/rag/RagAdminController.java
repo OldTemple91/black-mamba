@@ -1,6 +1,6 @@
 package com.blackmamba.navigation.api.rag;
 
-import com.blackmamba.navigation.application.route.RouteHistorySeeder;
+import com.blackmamba.navigation.infra.vector.RouteHistorySeeder;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.context.annotation.Profile;

@@ -1,4 +1,4 @@
-package com.blackmamba.navigation.application.route;
+package com.blackmamba.navigation.infra.vector;
 
 import com.blackmamba.navigation.application.route.port.RouteHistoryPort;
 import com.blackmamba.navigation.domain.location.Location;
@@ -6,6 +6,7 @@ import com.blackmamba.navigation.domain.route.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.time.DayOfWeek;
@@ -22,6 +23,9 @@ import java.util.List;
  * 데모/발표용 시드 데이터를 {@link RouteHistoryPort} 에 일괄 적재.
  * <p>
  * 운영 기동 시 자동 실행하지 않는다 — 관리자가 {@code POST /api/rag/admin/seed} 로 명시 트리거.
+ * 트리거 컨트롤러({@code RagAdminController})와 같은 {@code @Profile("!prod")} — 운영에서는
+ * 픽스처 배열까지 아예 인스턴스화되지 않는다. 데모 픽스처는 유스케이스가 아니므로
+ * application 이 아닌 infra(벡터 저장소 옆)에 둔다.
  *
  * <h3>시드 구성 (RAG-6 확장)</h3>
  * <pre>
@@ -37,6 +41,7 @@ import java.util.List;
  * 시간 맥락 쿼리가 실효적으로 동작한다.
  */
 @Component
+@Profile("!prod")
 public class RouteHistorySeeder {
 
     private static final Logger log = LoggerFactory.getLogger(RouteHistorySeeder.class);
