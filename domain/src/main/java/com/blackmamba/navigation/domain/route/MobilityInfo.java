@@ -16,7 +16,7 @@ public record MobilityInfo(
         String dropoffStationName,
         double dropoffLat,
         double dropoffLng,
-        String availabilitySource
+        AvailabilitySource availabilitySource
 ) {
     public MobilityInfo(MobilityType mobilityType,
                         String operatorName,
@@ -83,5 +83,25 @@ public record MobilityInfo(
             return stationName.equals(dropoffStationName);
         }
         return false;
+    }
+
+    public boolean isDdareungi() {
+        return mobilityType == MobilityType.DDAREUNGI;
+    }
+
+    public boolean isSharedKickboard() {
+        return mobilityType == MobilityType.KICKBOARD_SHARED;
+    }
+
+    public boolean hasStaleAvailability() {
+        return availabilitySource != null && availabilitySource.isStale();
+    }
+
+    public boolean hasEmptyAvailability() {
+        return availabilitySource != null && availabilitySource.isEmpty();
+    }
+
+    public boolean hasEstimatedAvailability() {
+        return availabilitySource != null && availabilitySource.isEstimated();
     }
 }

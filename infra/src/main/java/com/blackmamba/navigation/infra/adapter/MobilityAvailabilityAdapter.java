@@ -1,28 +1,38 @@
 package com.blackmamba.navigation.infra.adapter;
 
-import com.blackmamba.navigation.domain.location.GeoDistance;
-
 import com.blackmamba.navigation.application.route.port.MobilityAvailabilityPort;
+import com.blackmamba.navigation.domain.location.GeoDistance;
+import com.blackmamba.navigation.domain.route.AvailabilitySource;
 import com.blackmamba.navigation.domain.route.MobilityInfo;
 import com.blackmamba.navigation.domain.route.MobilitySearchHint;
 import com.blackmamba.navigation.domain.route.MobilityType;
 import com.blackmamba.navigation.infra.ddareungi.DdareungiApiClient;
+import com.blackmamba.navigation.infra.ddareungi.dto.DdareungiStation;
 import com.blackmamba.navigation.infra.kickboard.KickboardApiClient;
+import com.blackmamba.navigation.infra.kickboard.dto.KickboardDevice;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.scheduling.annotation.Scheduled;
 import reactor.core.publisher.Mono;
 
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 @Component
 public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
 
     private static final Logger log = LoggerFactory.getLogger(MobilityAvailabilityAdapter.class);
+    private static final String DDAREUNGI_OPERATOR = "서울시 따릉이";
+    private static final String SYNTHETIC_KICKBOARD_OPERATOR = "공유 킥보드(추정)";
+    /** 실 배터리 미확인 시 표시할 기본값 (B-4: battery=0 노출 방지) */
+    private static final int SYNTHETIC_KICKBOARD_BATTERY = 50;
+    private static final int MIN_HINT_RADIUS_METERS = 1_400;
+
     private final DdareungiApiClient ddareungiClient;
     private final KickboardApiClient kickboardClient;
     private final Counter ddareungiFallbackErrorCounter;
@@ -40,9 +50,9 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
 
     public MobilityAvailabilityAdapter(DdareungiApiClient ddareungiClient,
                                        KickboardApiClient kickboardClient,
-                                       @org.springframework.beans.factory.annotation.Value("${navigation.mobility.search-radius-meters:700}") int searchRadiusMeters,
-                                       @org.springframework.beans.factory.annotation.Value("${navigation.cache.mobility-availability-ttl-ms:20000}") long availabilityCacheTtlMs,
-                                       @org.springframework.beans.factory.annotation.Value("${tago.enabled:false}") boolean tagoEnabled,
+                                       @Value("${navigation.mobility.search-radius-meters:700}") int searchRadiusMeters,
+                                       @Value("${navigation.cache.mobility-availability-ttl-ms:20000}") long availabilityCacheTtlMs,
+                                       @Value("${tago.enabled:false}") boolean tagoEnabled,
                                        MeterRegistry meterRegistry) {
         this.ddareungiClient = ddareungiClient;
         this.kickboardClient = kickboardClient;
@@ -100,25 +110,8 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
     public Mono<Optional<MobilityInfo>> findNearbyDropoff(double lat, double lng, MobilityType type) {
         return cachedLookup(lat, lng, type, true, () -> switch (type) {
             case DDAREUNGI -> ddareungiClient.getNearbyStations(lat, lng, searchRadiusMeters, false)
-                    .map(stations -> stations.stream().findFirst()
-                            .map(s -> new MobilityInfo(
-                                    MobilityType.DDAREUNGI,
-                                    "서울시 따릉이",
-                                    null,
-                                    100,
-                                    s.stationId(),
-                                    s.stationName(),
-                                    s.rackTotalCount(),
-                                    s.lat(),
-                                    s.lng(),
-                                    s.availableCount(),
-                                    distanceMeters(lat, lng, s.lat(), s.lng()),
-                                    null,
-                                    null,
-                                    0.0,
-                                    0.0,
-                                    ddareungiClient.currentSnapshotMode()
-                            )))
+                    .map(snapshot -> snapshot.stations().stream().findFirst()
+                            .map(station -> ddareungiInfo(station, distanceMeters(lat, lng, station.lat(), station.lng()), snapshot.source())))
                     .onErrorResume(ex -> {
                         log.error("[따릉이] 반납 정류소 조회 오류: {}", ex.getMessage());
                         ddareungiFallbackErrorCounter.increment();
@@ -170,9 +163,9 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
             return Mono.just(Optional.empty());
         }
 
-        int hintRadiusMeters = Math.max(searchRadiusMeters * 2, 1400);
+        int hintRadiusMeters = Math.max(searchRadiusMeters * 2, MIN_HINT_RADIUS_METERS);
         return ddareungiClient.getNearbyStations(lat, lng, hintRadiusMeters, false)
-                .map(stations -> stations.stream().findFirst()
+                .map(snapshot -> snapshot.stations().stream().findFirst()
                         .map(station -> new MobilitySearchHint(
                                 station.stationName(),
                                 station.stationId(),
@@ -188,7 +181,7 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
     }
 
     private Mono<Optional<MobilityInfo>> cachedLookup(double lat, double lng, MobilityType type, boolean dropoff,
-                                                      java.util.function.Supplier<Mono<Optional<MobilityInfo>>> loaderSupplier) {
+                                                      Supplier<Mono<Optional<MobilityInfo>>> loaderSupplier) {
         long now = System.currentTimeMillis();
         AvailabilityKey key = AvailabilityKey.of(lat, lng, type, dropoff);
         return availabilityCache.compute(key, (ignored, existing) -> {
@@ -203,32 +196,15 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
 
     private Mono<Optional<MobilityInfo>> findNearbyDdareungi(double lat, double lng) {
         return ddareungiClient.getNearbyStations(lat, lng, searchRadiusMeters)
-                .map(stations -> {
+                .map(snapshot -> {
                     log.info("[따릉이] 검색 lat={}, lng={}, 반경={}m → 반경 내 대여가능 정류소 {}개",
-                            lat, lng, searchRadiusMeters, stations.size());
-                    Optional<MobilityInfo> result = stations.stream().findFirst()
-                            .map(s -> {
-                                int dist = distanceMeters(lat, lng, s.lat(), s.lng());
+                            lat, lng, searchRadiusMeters, snapshot.stations().size());
+                    Optional<MobilityInfo> result = snapshot.stations().stream().findFirst()
+                            .map(station -> {
+                                int dist = distanceMeters(lat, lng, station.lat(), station.lng());
                                 log.info("[따릉이] 선택: {} | 대여가능 {}대 | 거리 {}m",
-                                        s.stationName(), s.availableCount(), dist);
-                                return new MobilityInfo(
-                                        MobilityType.DDAREUNGI,
-                                        "서울시 따릉이",
-                                        null,
-                                        100,
-                                        s.stationId(),
-                                        s.stationName(),
-                                        s.rackTotalCount(),
-                                        s.lat(),
-                                        s.lng(),
-                                        s.availableCount(),
-                                        dist,
-                                        null,
-                                        null,
-                                        0.0,
-                                        0.0,
-                                        ddareungiClient.currentSnapshotMode()
-                                );
+                                        station.stationName(), station.availableCount(), dist);
+                                return ddareungiInfo(station, dist, snapshot.source());
                             });
                     if (result.isEmpty()) {
                         log.info("[따릉이] 반경 내 대여 가능한 정류소 없음");
@@ -260,28 +236,11 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                         return Optional.of(syntheticKickboard(lat, lng));
                     }
                     return devices.stream().findFirst()
-                            .map(d -> {
-                                int dist = distanceMeters(lat, lng, d.lat(), d.lng());
+                            .map(device -> {
+                                int dist = distanceMeters(lat, lng, device.lat(), device.lng());
                                 log.info("[킥보드] 선택: {} | 기기 ID {} | 배터리 {}% | 거리 {}m",
-                                        d.operatorName(), d.deviceId(), d.batteryLevel(), dist);
-                                return new MobilityInfo(
-                                        MobilityType.KICKBOARD_SHARED,
-                                        d.operatorName(),
-                                        d.deviceId(),
-                                        d.batteryLevel(),
-                                        null,
-                                        null,
-                                        0,
-                                        d.lat(),
-                                        d.lng(),
-                                        1,
-                                        dist,
-                                        null,
-                                        null,
-                                        0.0,
-                                        0.0,
-                                        "LIVE"
-                                );
+                                        device.operatorName(), device.deviceId(), device.batteryLevel(), dist);
+                                return sharedKickboard(device, dist);
                             });
                 })
                 .onErrorResume(ex -> {
@@ -291,7 +250,51 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                 });
     }
 
-    private MobilityInfo personalMobility(double lat, double lng, MobilityType type, String operatorName) {
+    // ── MobilityInfo 조립 ─────────────────────────────────────────────────
+
+    private static MobilityInfo ddareungiInfo(DdareungiStation station, int distanceMeters, AvailabilitySource source) {
+        return new MobilityInfo(
+                MobilityType.DDAREUNGI,
+                DDAREUNGI_OPERATOR,
+                null,
+                100,
+                station.stationId(),
+                station.stationName(),
+                station.rackTotalCount(),
+                station.lat(),
+                station.lng(),
+                station.availableCount(),
+                distanceMeters,
+                null,
+                null,
+                0.0,
+                0.0,
+                source
+        );
+    }
+
+    private static MobilityInfo sharedKickboard(KickboardDevice device, int distanceMeters) {
+        return new MobilityInfo(
+                MobilityType.KICKBOARD_SHARED,
+                device.operatorName(),
+                device.deviceId(),
+                device.batteryLevel(),
+                null,
+                null,
+                0,
+                device.lat(),
+                device.lng(),
+                1,
+                distanceMeters,
+                null,
+                null,
+                0.0,
+                0.0,
+                AvailabilitySource.LIVE
+        );
+    }
+
+    private static MobilityInfo personalMobility(double lat, double lng, MobilityType type, String operatorName) {
         return new MobilityInfo(
                 type,
                 operatorName,
@@ -303,38 +306,38 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                 lat,
                 lng,
                 1,
-            0,
-            null,
-            null,
-            0.0,
-            0.0,
-            "OWNED"
+                0,
+                null,
+                null,
+                0.0,
+                0.0,
+                AvailabilitySource.OWNED
         );
     }
 
-    // B-4: battery=0 노출 방지. TAGO API 미제공으로 실 데이터 없음을 명시.
-    private MobilityInfo syntheticKickboard(double lat, double lng) {
+    /** TAGO API 미제공으로 실 데이터 없음을 출처(ESTIMATED)로 명시. */
+    private static MobilityInfo syntheticKickboard(double lat, double lng) {
         return new MobilityInfo(
                 MobilityType.KICKBOARD_SHARED,
-                "공유 킥보드(추정)",
+                SYNTHETIC_KICKBOARD_OPERATOR,
                 null,
-                50,   // 실 배터리 미확인 → 50% 기본값 표시
+                SYNTHETIC_KICKBOARD_BATTERY,
                 null,
                 null,
                 0,
                 lat,
                 lng,
                 1,
-            0,
-            null,
-            null,
-            0.0,
-            0.0,
-            "ESTIMATED"
+                0,
+                null,
+                null,
+                0.0,
+                0.0,
+                AvailabilitySource.ESTIMATED
         );
     }
 
-    private int distanceMeters(double lat1, double lng1, double lat2, double lng2) {
+    private static int distanceMeters(double lat1, double lng1, double lat2, double lng2) {
         return (int) GeoDistance.meters(lat1, lng1, lat2, lng2);
     }
 
@@ -363,7 +366,6 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
             );
         }
     }
-
 
     /**
      * 만료 캐시 엔트리 주기 청소.

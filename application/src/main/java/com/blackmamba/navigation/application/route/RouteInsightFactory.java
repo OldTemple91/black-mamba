@@ -3,6 +3,7 @@ package com.blackmamba.navigation.application.route;
 import com.blackmamba.navigation.domain.route.Leg;
 import com.blackmamba.navigation.domain.route.LegType;
 import com.blackmamba.navigation.domain.route.GenerationDiagnostic;
+import com.blackmamba.navigation.domain.route.MobilityInfo;
 import com.blackmamba.navigation.domain.route.Route;
 import com.blackmamba.navigation.domain.route.RouteInsights;
 import org.springframework.stereotype.Component;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 @Component
@@ -134,29 +136,25 @@ public class RouteInsightFactory {
             diagnostics.add("일부 이동수단 구간은 TMAP 대신 직선거리 기반 추정으로 계산되었습니다.");
         }
 
-        boolean ddareungiStale = route.legs().stream()
+        List<MobilityInfo> mobilityInfos = route.legs().stream()
                 .map(Leg::mobilityInfo)
-                .filter(java.util.Objects::nonNull)
-                .anyMatch(info -> info.mobilityType() == com.blackmamba.navigation.domain.route.MobilityType.DDAREUNGI
-                        && "STALE".equals(info.availabilitySource()));
+                .filter(Objects::nonNull)
+                .toList();
+
+        boolean ddareungiStale = mobilityInfos.stream()
+                .anyMatch(info -> info.isDdareungi() && info.hasStaleAvailability());
         if (ddareungiStale) {
             diagnostics.add("따릉이 정류소 정보는 최근 snapshot 재사용 결과입니다.");
         }
 
-        boolean ddareungiEmpty = route.legs().stream()
-                .map(Leg::mobilityInfo)
-                .filter(java.util.Objects::nonNull)
-                .anyMatch(info -> info.mobilityType() == com.blackmamba.navigation.domain.route.MobilityType.DDAREUNGI
-                        && "EMPTY".equals(info.availabilitySource()));
+        boolean ddareungiEmpty = mobilityInfos.stream()
+                .anyMatch(info -> info.isDdareungi() && info.hasEmptyAvailability());
         if (ddareungiEmpty) {
             diagnostics.add("따릉이 실시간 정류소 정보를 확보하지 못해 빈 결과 기준으로 계산되었습니다.");
         }
 
-        boolean kickboardEstimated = route.legs().stream()
-                .map(Leg::mobilityInfo)
-                .filter(java.util.Objects::nonNull)
-                .anyMatch(info -> info.mobilityType() == com.blackmamba.navigation.domain.route.MobilityType.KICKBOARD_SHARED
-                        && "ESTIMATED".equals(info.availabilitySource()));
+        boolean kickboardEstimated = mobilityInfos.stream()
+                .anyMatch(info -> info.isSharedKickboard() && info.hasEstimatedAvailability());
         if (kickboardEstimated) {
             diagnostics.add("킥보드 가용성은 실시간 데이터 대신 추정값을 사용했습니다.");
         }
