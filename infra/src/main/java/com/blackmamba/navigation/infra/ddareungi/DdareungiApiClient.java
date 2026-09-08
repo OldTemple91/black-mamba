@@ -55,8 +55,8 @@ public class DdareungiApiClient {
             WebClient.Builder webClientBuilder,
             @Value("${ddareungi.api-key}") String apiKey,
             @Value("${navigation.cache.ddareungi-snapshot-ttl-ms:30000}") long snapshotCacheTtlMs,
-            @Value("${navigation.ddareungi.request-timeout-ms:5000}") long requestTimeoutMs,
-            @Value("${navigation.ddareungi.refresh-backoff-ms:30000}") long refreshBackoffMs,
+            @Value("${ddareungi.request-timeout-ms:5000}") long requestTimeoutMs,
+            @Value("${ddareungi.refresh-backoff-ms:30000}") long refreshBackoffMs,
             MeterRegistry meterRegistry,
             CircuitBreakerRegistry circuitBreakerRegistry,
             RetryRegistry retryRegistry

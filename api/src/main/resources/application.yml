@@ -35,10 +35,14 @@ ddareungi:
 tago:
   api-key: ${TAGO_API_KEY}
   city-code: 11   # 서울특별시 지역코드
+  request-timeout-ms: 5000
   # 공유 킥보드 조회용 TAGO API (GetPMListByProvider).
   # 서울 데이터 미제공 상태 (2026-04 기준) → 기본값 false 로 외부 호출 스킵.
   # 추후 서울 데이터 제공 시 TAGO_ENABLED=true 로 복구 가능.
   enabled: ${TAGO_ENABLED:false}
+
+tmap:
+  app-key: ${TMAP_APP_KEY}
 
 naver:
   client-id: ${NAVER_CLIENT_ID}
@@ -131,6 +135,8 @@ navigation:
   mobility:
     search-radius-meters: 700
   cache:
+    # 만료 엔트리 주기 청소 간격 (@Scheduled fixedDelay) — 재조회 없는 키의 힙 잔류 방지
+    purge-interval-ms: 300000
     odsay-route-ttl-ms: 30000
     ddareungi-snapshot-ttl-ms: 30000
     kickboard-snapshot-ttl-ms: 30000
@@ -167,6 +173,8 @@ resilience4j:
         baseConfig: default
       ddareungi:
         baseConfig: default
+      kickboard:
+        baseConfig: default
       naver-geocoding:
         baseConfig: default
       naver-local:
@@ -188,6 +196,8 @@ resilience4j:
       tmap:
         baseConfig: default
       ddareungi:
+        baseConfig: default
+      kickboard:
         baseConfig: default
       naver-geocoding:
         baseConfig: default

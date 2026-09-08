@@ -6,6 +6,10 @@ ddareungi:
 
 tago:
   api-key: test-tago-key
+  city-code: 11
+
+tmap:
+  app-key: test-tmap-key
 
 naver:
   client-id: test-naver-client-id
