@@ -3,10 +3,10 @@ package com.blackmamba.navigation.application.route;
 import com.blackmamba.navigation.application.route.port.*;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.*;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -29,26 +29,28 @@ class RouteOptimizationServiceTest {
     @Mock MobilityAvailabilityPort mobilityAvailabilityPort;
     @Mock HubSelector hubSelector;
     @Mock RouteEvaluator routeEvaluator;
-    // C-2: CarbonFootprintCalculator는 순수 계산 컴포넌트 → 실제 인스턴스 주입
-    @org.mockito.Spy CarbonFootprintCalculator carbonFootprintCalculator = new CarbonFootprintCalculator();
-    @org.mockito.Spy CarbonMetrics carbonMetrics = new CarbonMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
-    // F-1: CarReferenceCalculator는 순수 계산 컴포넌트 → 실제 인스턴스 주입
-    @org.mockito.Spy CarReferenceCalculator carReferenceCalculator = new CarReferenceCalculator(carbonFootprintCalculator);
-    // C-3: AccessibilityPostProcessor도 순수 후처리 → 실제 인스턴스
-    @org.mockito.Spy AccessibilityPostProcessor accessibilityPostProcessor =
-            new AccessibilityPostProcessor(new AccessibilityStationRegistry());
-    // A-4: WeatherAwareRouteAdjuster 도 순수 후처리 → 실제 인스턴스
-    @org.mockito.Spy WeatherAwareRouteAdjuster weatherAwareRouteAdjuster = new WeatherAwareRouteAdjuster();
     // RAG Phase 2: Recorder 는 비동기 fire-and-forget이라 mock 으로 주입 (호출 검증 불필요)
     @Mock RouteHistoryRecorder routeHistoryRecorder;
 
-    @InjectMocks RouteOptimizationService service;
+    // 후처리 파이프라인은 순수 계산 컴포넌트들의 조합 → 실제 인스턴스
+    private final CarbonFootprintCalculator carbonFootprintCalculator = new CarbonFootprintCalculator();
+    private final RouteEnrichmentPipeline enrichmentPipeline = new RouteEnrichmentPipeline(
+            new AccessibilityPostProcessor(new AccessibilityStationRegistry()),
+            new WeatherAwareRouteAdjuster(),
+            carbonFootprintCalculator,
+            new CarReferenceCalculator(carbonFootprintCalculator),
+            new CarbonMetrics(new SimpleMeterRegistry()));
+
+    RouteOptimizationService service;
 
     Location origin = new Location("서울역", 37.5547, 126.9706);
     Location dest   = new Location("강남역", 37.4979, 127.0276);
 
     @BeforeEach
     void setUp() {
+        RouteSearchStrategyRegistry strategyRegistry = new RouteSearchStrategyRegistry(
+                transitRoutePort, mobilityTimePort, mobilityAvailabilityPort, hubSelector, routeEvaluator);
+        service = new RouteOptimizationService(strategyRegistry, enrichmentPipeline, routeHistoryRecorder);
         when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of());
         when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of());
         when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any()))
