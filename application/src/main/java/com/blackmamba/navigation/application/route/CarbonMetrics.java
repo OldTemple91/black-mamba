@@ -1,5 +1,7 @@
 package com.blackmamba.navigation.application.route;
 
+import com.blackmamba.navigation.domain.route.CarbonFootprintCalculator;
+
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Component;

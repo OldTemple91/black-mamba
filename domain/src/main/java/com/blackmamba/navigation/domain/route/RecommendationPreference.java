@@ -1,4 +1,4 @@
-package com.blackmamba.navigation.application.route;
+package com.blackmamba.navigation.domain.route;
 
 public enum RecommendationPreference {
     RELIABILITY,

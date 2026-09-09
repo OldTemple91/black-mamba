@@ -3,7 +3,7 @@ package com.blackmamba.navigation.api.route;
 import com.blackmamba.navigation.application.route.AccessibilityContext;
 import com.blackmamba.navigation.application.route.RouteNarrativeEnhancer;
 import com.blackmamba.navigation.application.route.RouteOptimizationService;
-import com.blackmamba.navigation.application.route.RecommendationPreference;
+import com.blackmamba.navigation.domain.route.RecommendationPreference;
 import com.blackmamba.navigation.application.route.SearchMode;
 import com.blackmamba.navigation.application.route.WeatherContext;
 import com.blackmamba.navigation.api.support.MobilityTypes;

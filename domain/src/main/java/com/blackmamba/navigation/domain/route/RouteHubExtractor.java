@@ -1,11 +1,7 @@
-package com.blackmamba.navigation.application.route;
+package com.blackmamba.navigation.domain.route;
 
 import com.blackmamba.navigation.domain.hub.Hub;
 import com.blackmamba.navigation.domain.hub.HubType;
-import com.blackmamba.navigation.domain.route.Leg;
-import com.blackmamba.navigation.domain.route.LegType;
-import com.blackmamba.navigation.domain.route.Route;
-import com.blackmamba.navigation.domain.route.RouteHub;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

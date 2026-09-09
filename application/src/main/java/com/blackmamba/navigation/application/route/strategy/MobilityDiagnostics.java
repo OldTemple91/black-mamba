@@ -185,7 +185,7 @@ final class MobilityDiagnostics {
     }
 
     private static GenerationDiagnostic diagnostic(String phase, MobilityType type, String reasonCode, int candidateCount, String message) {
-        return new GenerationDiagnostic(phase, type != null ? type.name() : null, reasonCode, candidateCount, message);
+        return new GenerationDiagnostic(phase, type, reasonCode, candidateCount, message);
     }
 
     private record SegmentDiagnostic(boolean valid, DiagnosticReason reason) {

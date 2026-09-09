@@ -1,8 +1,5 @@
-package com.blackmamba.navigation.application.route;
+package com.blackmamba.navigation.domain.route;
 
-import com.blackmamba.navigation.domain.route.Leg;
-import com.blackmamba.navigation.domain.route.Route;
-import org.springframework.stereotype.Component;
 
 /**
  * C-2: 경로별 탄소 배출량 계산기 (순수 계산 — 부수효과 없음).
@@ -31,7 +28,6 @@ import org.springframework.stereotype.Component;
  *   <li>Leg.mode() 의 "SUBWAY"/"BUS" 문자열로 지하철/버스 구분 (ODsay Mapper 가 설정).</li>
  * </ul>
  */
-@Component
 public class CarbonFootprintCalculator {
 
     // === 대중교통 (1인 환산) ===

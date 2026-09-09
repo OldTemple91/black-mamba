@@ -1,11 +1,6 @@
-package com.blackmamba.navigation.application.route;
+package com.blackmamba.navigation.domain.route;
 
 import com.blackmamba.navigation.domain.location.Location;
-import com.blackmamba.navigation.domain.route.Leg;
-import com.blackmamba.navigation.domain.route.LegType;
-import com.blackmamba.navigation.domain.route.MobilityInfo;
-import com.blackmamba.navigation.domain.route.Route;
-import com.blackmamba.navigation.domain.route.RouteType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

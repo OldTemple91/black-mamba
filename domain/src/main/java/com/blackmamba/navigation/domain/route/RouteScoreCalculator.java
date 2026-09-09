@@ -1,8 +1,5 @@
-package com.blackmamba.navigation.application.route;
+package com.blackmamba.navigation.domain.route;
 
-import com.blackmamba.navigation.domain.route.Route;
-import com.blackmamba.navigation.domain.route.RouteEvaluation;
-import org.springframework.stereotype.Component;
 
 /**
  * 경로 점수 계산기.
@@ -11,7 +8,6 @@ import org.springframework.stereotype.Component;
  * 정규화: 1.0 - min(value/max, 1.0) — 낮을수록 좋은 값을 높은 점수로 변환
  * 최종 점수 범위: 0.0 ~ 1.0 (높을수록 좋음)
  */
-@Component
 public class RouteScoreCalculator {
     private static final WeightProfile RELIABILITY_PROFILE = new WeightProfile(
             0.40, 0.15, 0.10, 0.10, 0.10, 0.15,
@@ -84,7 +80,7 @@ public class RouteScoreCalculator {
                 accessWalkScore,
                 reliabilityScore,
                 totalScore,
-                preference.name(),
+                preference,
                 walkingDistance,
                 transferCount,
                 accessWalkDistance,

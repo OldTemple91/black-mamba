@@ -1,9 +1,5 @@
-package com.blackmamba.navigation.application.route;
+package com.blackmamba.navigation.domain.route;
 
-import com.blackmamba.navigation.domain.route.Leg;
-import com.blackmamba.navigation.domain.route.LegType;
-import com.blackmamba.navigation.domain.route.RouteHub;
-import com.blackmamba.navigation.domain.route.Route;
 
 final class RouteReliabilityMetrics {
 

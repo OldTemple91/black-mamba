@@ -1,12 +1,5 @@
-package com.blackmamba.navigation.application.route;
+package com.blackmamba.navigation.domain.route;
 
-import com.blackmamba.navigation.domain.route.Leg;
-import com.blackmamba.navigation.domain.route.LegType;
-import com.blackmamba.navigation.domain.route.GenerationDiagnostic;
-import com.blackmamba.navigation.domain.route.MobilityInfo;
-import com.blackmamba.navigation.domain.route.Route;
-import com.blackmamba.navigation.domain.route.RouteInsights;
-import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -14,7 +7,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-@Component
 public class RouteInsightFactory {
 
     private static final int ACCESS_WALK_WARNING_METERS_RELIABILITY = 300;

@@ -1,7 +1,6 @@
-package com.blackmamba.navigation.application.route;
+package com.blackmamba.navigation.domain.route;
 
 import com.blackmamba.navigation.domain.location.Location;
-import com.blackmamba.navigation.domain.route.*;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

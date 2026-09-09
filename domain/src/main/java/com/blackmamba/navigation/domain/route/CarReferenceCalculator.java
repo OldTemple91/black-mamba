@@ -1,11 +1,7 @@
-package com.blackmamba.navigation.application.route;
+package com.blackmamba.navigation.domain.route;
 
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.location.GeoDistance;
-import com.blackmamba.navigation.domain.route.CarReference;
-import com.blackmamba.navigation.domain.route.Route;
-import com.blackmamba.navigation.domain.route.RouteComparison;
-import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -30,7 +26,6 @@ import java.util.Map;
  * </ul>
  * 향후 application.yml 에 상수로 빼서 지역별/차종별 조정 가능하도록 확장 여지.
  */
-@Component
 public class CarReferenceCalculator {
 
     // 주행 환경 구분 (km)
