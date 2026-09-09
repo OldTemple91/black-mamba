@@ -4,6 +4,7 @@ import com.blackmamba.navigation.application.route.port.RagSearchRequest;
 import com.blackmamba.navigation.application.route.port.RouteHistoryPort;
 import com.blackmamba.navigation.application.route.port.ScoredRouteHistoryEntry;
 import com.blackmamba.navigation.api.support.MobilityTypes;
+import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.MobilityType;
 import io.micrometer.observation.annotation.Observed;
 import io.swagger.v3.oas.annotations.Operation;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -27,10 +29,11 @@ import java.util.Map;
  * <h3>3축 하이브리드 검색</h3>
  * <ul>
  *   <li>의미 유사도 (벡터): bge-m3 임베딩 + 코사인</li>
- *   <li>공간 필터 (payload): geohash7 격자 AND</li>
+ *   <li>공간 필터 (payload): 출발/도착 좌표 → 저장소가 150m 격자로 색인 (AND)</li>
  *   <li>이동수단 필터 (payload): MobilityType OR</li>
  * </ul>
  * 품질 임계값({@code threshold}) 으로 무관한 쿼리는 빈 응답을 정직하게 준다.
+ * 격자 인코딩 방식(geohash)은 저장소 어댑터의 구현 세부라 API 계약에 드러내지 않는다.
  *
  * <h3>관측성</h3>
  * {@code @Observed} 로 Tempo span 자동 생성 + Prometheus 메트릭 자동 집계.
@@ -43,6 +46,7 @@ public class RagSimilarRoutesController {
 
     private static final Logger log = LoggerFactory.getLogger(RagSimilarRoutesController.class);
     private static final int MAX_TOP_K = 50;
+    private static final Duration SEARCH_TIMEOUT = Duration.ofSeconds(15);
 
     private final RouteHistoryPort routeHistoryPort; // null 가능 (Qdrant 빈 부재 시)
 
@@ -60,14 +64,14 @@ public class RagSimilarRoutesController {
 
                     **검색 축:**
                     - `q`: 자연어 의미 (필수)
-                    - `originGeohash` / `destinationGeohash`: 150m 격자 필터 (AND)
+                    - `originLat`/`originLng`, `destLat`/`destLng`: 출발/도착 좌표 필터 — 같은 150m 격자의 이력만 (AND)
                     - `mobility`: 이동수단 필터 — `DDAREUNGI`, `PERSONAL_EBIKE`, `PERSONAL_KICKBOARD` (OR, 콤마로 여러 개)
                     - `threshold`: 유사도 임계값 (0.0~1.0, 기본 0)
 
                     **예시:**
                     - `q=출퇴근 빠른 경로&mobility=DDAREUNGI`
                       → 따릉이 포함 + '출퇴근 빠른' 의미
-                    - `q=빠른 경로&originGeohash=wydm6d6&threshold=0.5`
+                    - `q=빠른 경로&originLat=37.498&originLng=127.0276&threshold=0.5`
                       → 강남역 격자 출발 + 관련도 0.5 이상만
                     - `q=아무말&threshold=0.5`
                       → 결과가 없을 수 있음 (관련 경로 없음을 정직하게 응답)
@@ -89,11 +93,14 @@ public class RagSimilarRoutesController {
             @Parameter(description = "유사도 임계값 0~1 (기본 0 = 필터 없음)", example = "0.5")
             @RequestParam(value = "threshold", defaultValue = "0.0") double threshold,
 
-            @Parameter(description = "출발지 geohash7 필터 (선택, 예: wydm6d6)")
-            @RequestParam(value = "originGeohash", required = false) String originGeohash,
-
-            @Parameter(description = "도착지 geohash7 필터 (선택, 예: wydm8jp)")
-            @RequestParam(value = "destinationGeohash", required = false) String destinationGeohash,
+            @Parameter(description = "출발지 위도 (경도와 함께 지정 시 공간 필터)", example = "37.498")
+            @RequestParam(value = "originLat", required = false) Double originLat,
+            @Parameter(description = "출발지 경도", example = "127.0276")
+            @RequestParam(value = "originLng", required = false) Double originLng,
+            @Parameter(description = "도착지 위도 (경도와 함께 지정 시 공간 필터)", example = "37.557")
+            @RequestParam(value = "destLat", required = false) Double destLat,
+            @Parameter(description = "도착지 경도", example = "126.924")
+            @RequestParam(value = "destLng", required = false) Double destLng,
 
             @Parameter(description = "이동수단 필터 (OR, 콤마로 여러 개). DDAREUNGI|PERSONAL_EBIKE|PERSONAL_KICKBOARD")
             @RequestParam(value = "mobility", required = false) List<String> mobility
@@ -113,18 +120,17 @@ public class RagSimilarRoutesController {
 
         int safeTopK = Math.max(1, Math.min(MAX_TOP_K, topK));
         List<MobilityType> mobilityFilter = MobilityTypes.parseLenient(mobility);
+        Location origin = toLocation("출발지", originLat, originLng);
+        Location destination = toLocation("도착지", destLat, destLng);
 
-        RagSearchRequest request = RagSearchRequest.byGeohash(
-                query, safeTopK, threshold,
-                originGeohash, destinationGeohash, mobilityFilter
-        );
+        RagSearchRequest request = RagSearchRequest.nearLocations(
+                query, safeTopK, threshold, origin, destination, mobilityFilter);
 
-        log.info("[RAG] similar-routes query=\"{}\" topK={} threshold={} geohash=({},{}) mobility={}",
-                query, safeTopK, request.similarityThreshold(),
-                originGeohash, destinationGeohash, mobilityFilter);
+        log.info("[RAG] similar-routes query=\"{}\" topK={} threshold={} origin={} dest={} mobility={}",
+                query, safeTopK, request.similarityThreshold(), origin, destination, mobilityFilter);
 
-        List<ScoredRouteHistoryEntry> scored = routeHistoryPort.search(request);
-        List<SimilarRouteResponse> items = scored.stream()
+        List<ScoredRouteHistoryEntry> scored = routeHistoryPort.search(request).block(SEARCH_TIMEOUT);
+        List<SimilarRouteResponse> items = (scored == null ? List.<ScoredRouteHistoryEntry>of() : scored).stream()
                 .map(SimilarRouteResponse::from)
                 .toList();
 
@@ -133,13 +139,19 @@ public class RagSimilarRoutesController {
                 "topK", safeTopK,
                 "threshold", request.similarityThreshold(),
                 "filter", Map.of(
-                        "originGeohash", originGeohash == null ? "" : originGeohash,
-                        "destinationGeohash", destinationGeohash == null ? "" : destinationGeohash,
+                        "origin", origin == null ? Map.of() : Map.of("lat", origin.lat(), "lng", origin.lng()),
+                        "destination", destination == null ? Map.of() : Map.of("lat", destination.lat(), "lng", destination.lng()),
                         "mobility", mobilityFilter.stream().map(Enum::name).toList(),
                         "applied", request.hasAnyPayloadFilter() || request.similarityThreshold() > 0.0
                 ),
                 "hitCount", items.size(),
                 "results", items
         ));
+    }
+
+    /** 위도·경도가 모두 있어야 공간 필터로 쓴다. 한쪽만 오면 필터 없음. */
+    private static Location toLocation(String name, Double lat, Double lng) {
+        if (lat == null || lng == null) return null;
+        return new Location(name, lat, lng);
     }
 }

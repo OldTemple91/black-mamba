@@ -8,6 +8,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -67,19 +69,23 @@ public class RouteHistorySeeder {
         List<Instant> timeSlots = buildTimeSlots();   // 5개
         String[] preferences = {"RELIABILITY", "TIME_PRIORITY"};
 
-        int saved = 0;
+        List<Mono<Void>> saves = new ArrayList<>();
         for (OdSpec od : odPool) {
             for (Instant slot : timeSlots) {
                 for (String pref : preferences) {
                     Route route = toRoute(od, pref);
-                    routeHistoryPort.save(route, od.origin, od.destination, pref, slot);
-                    saved++;
+                    saves.add(routeHistoryPort.save(route, od.origin, od.destination, pref, slot));
                 }
             }
         }
+        // 임베딩 서버 과부하 방지 — 순차 실행 (기존 동기 루프와 같은 부하 특성)
+        Flux.fromIterable(saves)
+                .concatMap(save -> save)
+                .then()
+                .block();
         log.info("[RAG] Seed 완료 — OD {}개 × 시간대 {}개 × 선호도 {}개 = {}건 저장",
-                odPool.size(), timeSlots.size(), preferences.length, saved);
-        return saved;
+                odPool.size(), timeSlots.size(), preferences.length, saves.size());
+        return saves.size();
     }
 
     // ─── OD 풀 (서울 주요 생활권 20개) ───────────────

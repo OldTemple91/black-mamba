@@ -91,17 +91,6 @@ public final class RouteHistoryDescriber {
         return sb.toString();
     }
 
-    /** 서술의 바깥에서 사용자 쿼리도 같은 스타일로 맞추고 싶을 때 쓰는 유틸 (대칭성 확보). */
-    public static String describeQuery(String origin, String destination, String preference) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(origin == null ? "출발지" : origin).append("에서 ")
-                .append(destination == null ? "도착지" : destination).append("까지");
-        if (preference != null) {
-            sb.append(". ").append(preferenceNarrative(preference));
-        }
-        return sb.toString();
-    }
-
     // ─── 맥락 태그 ───────────────────────────────
 
     /**
@@ -198,16 +187,6 @@ public final class RouteHistoryDescriber {
             case "RELIABILITY" -> "안정적이고 환승 적은 경로";
             default -> preference;
         };
-    }
-
-    /**
-     * Leg 에서 LegType 조합을 단순 태그로 반환 (Qdrant payload 필터용).
-     */
-    public static Set<LegType> extractLegTypes(List<Leg> legs) {
-        if (legs == null) return Set.of();
-        Set<LegType> types = new LinkedHashSet<>();
-        for (Leg leg : legs) if (leg.type() != null) types.add(leg.type());
-        return types;
     }
 
     /**

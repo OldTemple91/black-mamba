@@ -17,6 +17,8 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder.Op;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -50,6 +52,10 @@ import java.util.stream.Collectors;
  *   <li>이동수단 필터: has_&lt;MobilityType&gt; (payload EQ, OR)</li>
  *   <li>품질 임계값: similarityThreshold 미만 제외 (Spring AI 자체 지원)</li>
  * </ol>
+ *
+ * <h3>블로킹 격리</h3>
+ * Spring AI VectorStore 는 동기 SDK 다. 포트 계약은 Reactor 이므로 이 어댑터가
+ * {@code Schedulers.boundedElastic()} 에 offload 한다 — 호출자는 스케줄러를 모른다.
  *
  * <h3>장애 대응</h3>
  * <ul>
@@ -96,7 +102,13 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
     // ─── 쓰기 ─────────────────────────────────────
 
     @Override
-    public void save(Route route, Location origin, Location destination, String preference, Instant timestamp) {
+    public Mono<Void> save(Route route, Location origin, Location destination, String preference, Instant timestamp) {
+        return Mono.fromRunnable(() -> saveBlocking(route, origin, destination, preference, timestamp))
+                .subscribeOn(Schedulers.boundedElastic())
+                .then();
+    }
+
+    private void saveBlocking(Route route, Location origin, Location destination, String preference, Instant timestamp) {
         if (route == null || origin == null || destination == null) {
             log.debug("[RAG] save 생략 — route/origin/destination null");
             return;
@@ -147,7 +159,12 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
     // ─── 읽기 ─────────────────────────────────────
 
     @Override
-    public List<ScoredRouteHistoryEntry> search(RagSearchRequest request) {
+    public Mono<List<ScoredRouteHistoryEntry>> search(RagSearchRequest request) {
+        return Mono.fromCallable(() -> searchBlocking(request))
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private List<ScoredRouteHistoryEntry> searchBlocking(RagSearchRequest request) {
         if (request == null) return List.of();
         try {
             SearchRequest.Builder builder = SearchRequest.builder()
@@ -189,20 +206,12 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
         FilterExpressionBuilder b = new FilterExpressionBuilder();
         List<Op> parts = new ArrayList<>();
 
-        // 명시적 geohash 문자열 우선, 없으면 Location 좌표를 어댑터가 geohash 로 변환
-        // (geohash 인코딩은 infra 의 관심사 — save 경로와 동일한 변환기 사용)
-        String originGeohash = request.hasOriginGeohash()
-                ? request.originGeohash()
-                : (request.hasOriginLocation() ? GeohashKeyGenerator.of(request.origin()) : null);
-        String destGeohash = request.hasDestinationGeohash()
-                ? request.destinationGeohash()
-                : (request.hasDestinationLocation() ? GeohashKeyGenerator.of(request.destination()) : null);
-
-        if (originGeohash != null) {
-            parts.add(b.eq(META_ORIGIN_GEOHASH, originGeohash));
+        // 좌표 → geohash 격자는 여기서만 변환한다 (save 경로와 동일한 변환기 — infra 의 관심사)
+        if (request.hasOriginLocation()) {
+            parts.add(b.eq(META_ORIGIN_GEOHASH, GeohashKeyGenerator.of(request.origin())));
         }
-        if (destGeohash != null) {
-            parts.add(b.eq(META_DEST_GEOHASH, destGeohash));
+        if (request.hasDestinationLocation()) {
+            parts.add(b.eq(META_DEST_GEOHASH, GeohashKeyGenerator.of(request.destination())));
         }
         if (request.hasMobilityFilter()) {
             // OR of has_XXX flags
@@ -249,8 +258,6 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
                 description,
                 origin,
                 destination,
-                asString(md.get(META_ORIGIN_GEOHASH), ""),
-                asString(md.get(META_DEST_GEOHASH), ""),
                 mobilityTypes,
                 routeType,
                 minutes,
@@ -267,8 +274,8 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
         try {
             Double s = doc.getScore();
             if (s != null) return s;
-        } catch (Throwable ignore) {
-            // Spring AI 버전차: getScore() 없으면 metadata 폴백
+        } catch (RuntimeException ignore) {
+            // 점수 미제공 구현체: metadata 폴백
         }
         Object dist = doc.getMetadata().get("distance");
         if (dist instanceof Number n) {
@@ -286,7 +293,7 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
     private static String safeDocumentText(Document doc) {
         try {
             return doc.getText();
-        } catch (Throwable t) {
+        } catch (RuntimeException e) {
             return "";
         }
     }

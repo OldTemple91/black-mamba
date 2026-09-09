@@ -209,8 +209,9 @@ public static String describe(Route route, Location origin, Location destination
 private Filter.Expression buildFilter(RagSearchRequest request) {
     FilterExpressionBuilder b = new FilterExpressionBuilder();
     List<Op> parts = new ArrayList<>();
-    if (request.hasOriginGeohash())     parts.add(b.eq("originGeohash", request.originGeohash()));
-    if (request.hasDestinationGeohash())parts.add(b.eq("destinationGeohash", request.destinationGeohash()));
+    // 좌표 → geohash 격자 변환은 어댑터 안에서만 (포트 계약엔 Location 만 있다)
+    if (request.hasOriginLocation())      parts.add(b.eq("originGeohash", GeohashKeyGenerator.of(request.origin())));
+    if (request.hasDestinationLocation()) parts.add(b.eq("destinationGeohash", GeohashKeyGenerator.of(request.destination())));
     if (request.hasMobilityFilter()) {
         Op or = null;
         for (MobilityType m : request.mobilityFilter()) {
@@ -276,7 +277,7 @@ public ResponseEntity<?> findSimilarRoutes(...) { ... }
 | 3 | `q=환승 없는 안정적인 경로&topK=5` | top 5 전부 `RELIABILITY`+직행 (score 0.50~0.52) | 추상 수식어 포착 |
 | 4 | `q=우주 여행&threshold=0.5` | **hitCount=0** | 무관 쿼리 정직한 빈 응답 |
 | 5 | `q=출퇴근&mobility=DDAREUNGI` | 따릉이 포함 4건만 정확 매칭 | payload 필터 |
-| 6 | `q=출퇴근&threshold=0.4&mobility=DDAREUNGI&originGeohash=wydm6d6` | 강남 출발+따릉이 2건 | **3축 하이브리드** |
+| 6 | `q=출퇴근&threshold=0.4&mobility=DDAREUNGI&originLat=37.498&originLng=127.0276` | 강남 출발+따릉이 2건 | **3축 하이브리드** |
 
 ### 4-2. Qdrant 실제 저장 샘플
 

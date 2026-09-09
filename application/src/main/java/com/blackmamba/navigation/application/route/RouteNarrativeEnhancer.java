@@ -92,19 +92,17 @@ public class RouteNarrativeEnhancer {
 
     private Route enhanceOne(Route route, Location origin, Location destination, String preference) {
         try {
-            // Retrieval: Qdrant 에서 유사 이력 조회
-            List<ScoredRouteHistoryEntry> similar = fetchSimilar(route, origin, destination, preference);
-            similarHitSummary.record(similar.size());
-
-            // Augmented + Generation: LLM 호출 (boundedElastic 으로 블로킹 격리)
             String originalNarrative = route.carComparison() == null ? null : route.carComparison().narrative();
-            // 타임아웃은 .timeout() 한 곳에서만 관리.
+            // Retrieval(포트, 어댑터가 스케줄러 격리) → Augmented + Generation(LLM, boundedElastic 격리)
+            // 타임아웃은 .timeout() 한 곳에서만 관리 — 조회 + 생성 전체에 걸린다.
             // blockOptional(LLM_TIMEOUT) 로 이중 설정하면 바깥 타임아웃이 먼저 만료될 때
             // 내부 Mono 가 취소되지 않은 채 boundedElastic 스레드를 계속 점유한다 (스레드 누수).
-            String llmNarrative = Mono.fromCallable(() ->
-                            narrativeGenerator.generate(
-                                    route, origin, destination, preference, similar, originalNarrative))
-                    .subscribeOn(Schedulers.boundedElastic())
+            String llmNarrative = fetchSimilar(origin, destination, preference)
+                    .doOnNext(similar -> similarHitSummary.record(similar.size()))
+                    .flatMap(similar -> Mono.fromCallable(() ->
+                                    narrativeGenerator.generate(
+                                            route, origin, destination, preference, similar, originalNarrative))
+                            .subscribeOn(Schedulers.boundedElastic()))
                     .timeout(LLM_TIMEOUT)
                     .onErrorResume(e -> {
                         log.warn("[RAG4] LLM 타임아웃/실패 → 원본 narrative 유지. err={}", e.getMessage());
@@ -124,33 +122,31 @@ public class RouteNarrativeEnhancer {
         }
     }
 
-    private List<ScoredRouteHistoryEntry> fetchSimilar(Route route,
-                                                       Location origin,
-                                                       Location destination,
-                                                       String preference) {
-        if (routeHistoryPort == null) return List.of();
-        try {
-            // 쿼리 = 경로의 서술 요약 (RAG-2 에서 이미 임베딩된 형식과 유사)
-            String query = String.format(
-                    "%s에서 %s까지 %s 선호 경로",
-                    origin.name() == null ? "" : origin.name(),
-                    destination.name() == null ? "" : destination.name(),
-                    "TIME_PRIORITY".equalsIgnoreCase(preference) ? "빠른 시간" : "안정적"
-            );
+    private Mono<List<ScoredRouteHistoryEntry>> fetchSimilar(Location origin,
+                                                             Location destination,
+                                                             String preference) {
+        if (routeHistoryPort == null) return Mono.just(List.of());
 
-            // 공간 필터: 같은 OD 격자의 이력만 — 타지역 사례가 narrative 근거로 오염되는 것 방지.
-            // geohash 변환은 infra 어댑터 책임 (application 은 좌표만 전달).
-            RagSearchRequest request = RagSearchRequest.nearLocations(
-                    query, SIMILAR_TOP_K, SIMILAR_MIN_SCORE,
-                    origin, destination, List.of()
-            );
-            List<ScoredRouteHistoryEntry> results = routeHistoryPort.search(request);
-            log.debug("[RAG4] similar history hit: {} 건", results.size());
-            return results;
-        } catch (Exception e) {
-            log.warn("[RAG4] similar history 조회 실패 — 빈 리스트로 진행. err={}", e.getMessage());
-            return List.of();
-        }
+        // 쿼리 = 경로의 서술 요약 (RAG-2 에서 이미 임베딩된 형식과 유사)
+        String query = String.format(
+                "%s에서 %s까지 %s 선호 경로",
+                origin.name() == null ? "" : origin.name(),
+                destination.name() == null ? "" : destination.name(),
+                "TIME_PRIORITY".equalsIgnoreCase(preference) ? "빠른 시간" : "안정적"
+        );
+
+        // 공간 필터: 같은 OD 격자의 이력만 — 타지역 사례가 narrative 근거로 오염되는 것 방지.
+        // 격자 인코딩은 infra 어댑터 책임 (application 은 좌표만 전달).
+        RagSearchRequest request = RagSearchRequest.nearLocations(
+                query, SIMILAR_TOP_K, SIMILAR_MIN_SCORE,
+                origin, destination, List.of()
+        );
+        return routeHistoryPort.search(request)
+                .doOnNext(results -> log.debug("[RAG4] similar history hit: {} 건", results.size()))
+                .onErrorResume(e -> {
+                    log.warn("[RAG4] similar history 조회 실패 — 빈 리스트로 진행. err={}", e.getMessage());
+                    return Mono.just(List.of());
+                });
     }
 
     private static RouteComparison replaceNarrative(RouteComparison original, String newNarrative) {

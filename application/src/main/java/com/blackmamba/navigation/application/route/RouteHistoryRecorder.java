@@ -10,8 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
+import reactor.core.publisher.Flux;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -27,8 +26,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * <ul>
  *   <li><b>Optional 주입 흡수:</b> Qdrant 빈이 없는 환경에서도 앱이 뜨도록
  *       {@link ObjectProvider#getIfAvailable()} 로 null 허용.</li>
- *   <li><b>블로킹 격리:</b> Spring AI VectorStore.add() 는 동기라,
- *       {@code Schedulers.boundedElastic()} 에 offload 해 본 요청 응답에 영향 없음.</li>
+ *   <li><b>비동기 발사:</b> 포트가 돌려주는 Mono 를 구독만 하고 결과를 기다리지 않는다.
+ *       블로킹 SDK 를 어느 스케줄러에 격리할지는 어댑터 책임.</li>
  *   <li><b>실패 격리:</b> Qdrant/Ollama 장애 시 경고 로그만 남기고 조용히 실패.</li>
  * </ul>
  *
@@ -114,13 +113,9 @@ public class RouteHistoryRecorder {
         markSaved(origin, destination, preference);
 
         int savingCount = toSave.size();
-        // Mono.fromRunnable 은 Mono<Void> 라 onNext 가 발생하지 않음 → doOnSuccess/doOnError 로 훅
-        Mono.fromRunnable(() -> {
-                    for (Route r : toSave) {
-                        routeHistoryPort.save(r, origin, destination, preference);
-                    }
-                })
-                .subscribeOn(Schedulers.boundedElastic())
+        Flux.fromIterable(toSave)
+                .concatMap(r -> routeHistoryPort.save(r, origin, destination, preference))
+                .then()
                 .doOnSuccess(v -> savedCounter.increment(savingCount))
                 .doOnError(err -> log.warn("[RAG] 비동기 저장 실패 — {}: {}",
                         err.getClass().getSimpleName(), err.getMessage()))
