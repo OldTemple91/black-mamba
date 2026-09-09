@@ -1,6 +1,5 @@
 package com.blackmamba.navigation.application.route;
 
-import com.blackmamba.navigation.application.route.port.HubSearchPort;
 import com.blackmamba.navigation.domain.hub.Hub;
 import com.blackmamba.navigation.domain.hub.HubType;
 import com.blackmamba.navigation.domain.location.Location;
@@ -19,20 +18,20 @@ public class HubSelector {
 
     private static final int DEFAULT_HUB_RADIUS_METERS = 150;
 
-    private final HubSearchPort hubSearchPort;
+    private final BaselineTransitHubSearch hubSearch;
 
-    public HubSelector(HubSearchPort hubSearchPort) {
-        this.hubSearchPort = hubSearchPort;
+    public HubSelector(BaselineTransitHubSearch hubSearch) {
+        this.hubSearch = hubSearch;
     }
 
     public List<Hub> selectLastMileHubs(List<Leg> legs, Location destination, MobilityConfig config) {
-        List<Location> primaryCandidates = hubSearchPort.findLastMilePrimaryCandidates(legs, destination, config);
+        List<Location> primaryCandidates = hubSearch.findLastMilePrimaryCandidates(legs, destination, config);
         if (!primaryCandidates.isEmpty()) {
             return toTransitHubs(primaryCandidates, legs, config, destination, "LAST_MILE", "PRIMARY");
         }
 
         return toTransitHubs(
-                hubSearchPort.findLastMileFallbackCandidates(destination, legs, config),
+                hubSearch.findLastMileFallbackCandidates(destination, legs, config),
                 legs,
                 config,
                 destination,
@@ -42,13 +41,13 @@ public class HubSelector {
     }
 
     public List<Hub> selectFirstMileHubs(Location origin, List<Leg> legs, MobilityConfig config) {
-        List<Location> primaryCandidates = hubSearchPort.findFirstMilePrimaryCandidates(origin, legs, config);
+        List<Location> primaryCandidates = hubSearch.findFirstMilePrimaryCandidates(origin, legs, config);
         if (!primaryCandidates.isEmpty()) {
             return toTransitHubs(primaryCandidates, legs, config, origin, "FIRST_MILE", "PRIMARY");
         }
 
         return toTransitHubs(
-                hubSearchPort.findFirstMileFallbackCandidates(origin, legs, config),
+                hubSearch.findFirstMileFallbackCandidates(origin, legs, config),
                 legs,
                 config,
                 origin,

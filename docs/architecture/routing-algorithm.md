@@ -104,7 +104,7 @@ Mixed 후보 0개이면 `OPTIMAL` 은 **"왜 안 만들어졌는지"** 를 진�
 
 ## 2. Two-Phase Hub Selection (Primary + Fallback)
 
-**파일**: `HubSelector.java`, `BaselineTransitHubSearchAdapter.java`
+**파일**: `HubSelector.java`, `BaselineTransitHubSearch.java`
 **핵심 아이디어**: "원하는 반경 조건" 으로 먼저 찾고, 없으면 **조건 완화해서** 가장 가까운 것을 선택.
 
 ### 2-1. 2단계 구조

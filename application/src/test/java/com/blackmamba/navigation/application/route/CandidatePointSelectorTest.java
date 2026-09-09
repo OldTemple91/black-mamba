@@ -145,8 +145,8 @@ class CandidatePointSelectorTest {
                 null
         );
 
-        BaselineTransitHubSearchAdapter adapter = new BaselineTransitHubSearchAdapter(selector);
-        List<Location> candidates = adapter.findFirstMilePrimaryCandidates(origin, List.of(leg), MobilityConfig.kickboard());
+        BaselineTransitHubSearch hubSearch = new BaselineTransitHubSearch(selector);
+        List<Location> candidates = hubSearch.findFirstMilePrimaryCandidates(origin, List.of(leg), MobilityConfig.kickboard());
 
         assertThat(candidates).isNotEmpty();
         double previous = -1;
