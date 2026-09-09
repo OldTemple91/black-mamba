@@ -3,6 +3,8 @@ package com.blackmamba.navigation.api.rag;
 import com.blackmamba.navigation.application.route.port.RagSearchRequest;
 import com.blackmamba.navigation.application.route.port.RouteHistoryPort;
 import com.blackmamba.navigation.application.route.port.ScoredRouteHistoryEntry;
+import com.blackmamba.navigation.api.config.ErrorResponse;
+import com.blackmamba.navigation.api.place.PlaceResponse;
 import com.blackmamba.navigation.api.support.MobilityTypes;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.MobilityType;
@@ -13,6 +15,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,7 +24,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 
 /**
  * RAG Phase 2 — 경로 이력 유사 검색 엔드포인트.
@@ -106,16 +108,12 @@ public class RagSimilarRoutesController {
             @RequestParam(value = "mobility", required = false) List<String> mobility
     ) {
         if (routeHistoryPort == null) {
-            return ResponseEntity.status(503).body(Map.of(
-                    "code", "VECTOR_STORE_UNAVAILABLE",
-                    "message", "벡터 DB 가 기동되지 않았습니다 (docker compose up -d qdrant)."
-            ));
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(ErrorResponse.of("VECTOR_STORE_UNAVAILABLE", "벡터 DB 가 기동되지 않았습니다 (docker compose up -d qdrant)."));
         }
         if (query == null || query.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "code", "QUERY_REQUIRED",
-                    "message", "쿼리 파라미터 'q' 가 비어 있습니다."
-            ));
+            return ResponseEntity.badRequest()
+                    .body(ErrorResponse.of("QUERY_REQUIRED", "쿼리 파라미터 'q' 가 비어 있습니다."));
         }
 
         int safeTopK = Math.max(1, Math.min(MAX_TOP_K, topK));
@@ -134,19 +132,14 @@ public class RagSimilarRoutesController {
                 .map(SimilarRouteResponse::from)
                 .toList();
 
-        return ResponseEntity.ok(Map.of(
-                "query", query,
-                "topK", safeTopK,
-                "threshold", request.similarityThreshold(),
-                "filter", Map.of(
-                        "origin", origin == null ? Map.of() : Map.of("lat", origin.lat(), "lng", origin.lng()),
-                        "destination", destination == null ? Map.of() : Map.of("lat", destination.lat(), "lng", destination.lng()),
-                        "mobility", mobilityFilter.stream().map(Enum::name).toList(),
-                        "applied", request.hasAnyPayloadFilter() || request.similarityThreshold() > 0.0
-                ),
-                "hitCount", items.size(),
-                "results", items
-        ));
+        SimilarRoutesResponse.AppliedFilter filter = new SimilarRoutesResponse.AppliedFilter(
+                origin == null ? null : PlaceResponse.from(origin),
+                destination == null ? null : PlaceResponse.from(destination),
+                mobilityFilter.stream().map(Enum::name).toList(),
+                request.hasAnyPayloadFilter() || request.similarityThreshold() > 0.0
+        );
+        return ResponseEntity.ok(new SimilarRoutesResponse(
+                query, safeTopK, request.similarityThreshold(), filter, items.size(), items));
     }
 
     /** 위도·경도가 모두 있어야 공간 필터로 쓴다. 한쪽만 오면 필터 없음. */

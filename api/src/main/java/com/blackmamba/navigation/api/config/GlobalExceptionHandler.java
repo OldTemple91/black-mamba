@@ -9,9 +9,6 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import java.time.Instant;
-import java.util.Map;
-
 /**
  * 전역 예외 핸들러.
  * <p>
@@ -29,40 +26,30 @@ public class GlobalExceptionHandler {
 
     /** 404 (NoResourceFoundException은 Spring 기본 상태를 유지) */
     @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleNotFound(NoResourceFoundException e) {
+    public ResponseEntity<ErrorResponse> handleNotFound(NoResourceFoundException e) {
         log.warn("[404] 존재하지 않는 리소스: {}", e.getResourcePath());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
-                "code", "NOT_FOUND",
-                "message", "요청한 리소스가 존재하지 않습니다: " + e.getResourcePath(),
-                "timestamp", Instant.now().toString()
-        ));
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ErrorResponse.of("NOT_FOUND", "요청한 리소스가 존재하지 않습니다: " + e.getResourcePath()));
     }
 
     /** Spring ErrorResponseException 계열은 본인이 가진 상태코드 유지 */
     @ExceptionHandler(ErrorResponseException.class)
-    public ResponseEntity<Map<String, Object>> handleErrorResponse(ErrorResponseException e) {
+    public ResponseEntity<ErrorResponse> handleErrorResponse(ErrorResponseException e) {
         log.warn("[{}] {}", e.getStatusCode(), e.getMessage());
-        return ResponseEntity.status(e.getStatusCode()).body(Map.of(
-                "code", e.getStatusCode().toString(),
-                "message", e.getMessage() != null ? e.getMessage() : "요청 처리 실패",
-                "timestamp", Instant.now().toString()
-        ));
+        String message = e.getMessage() != null ? e.getMessage() : "요청 처리 실패";
+        return ResponseEntity.status(e.getStatusCode())
+                .body(ErrorResponse.of(e.getStatusCode().toString(), message));
     }
 
     /** 나머지 예외는 500 */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleUnhandled(Exception e) {
+    public ResponseEntity<ErrorResponse> handleUnhandled(Exception e) {
         // e를 인자로 넘겨야 SLF4J가 stackTrace를 event.throwable에 저장 → structuredMetadata 의 %xException 에서 사용
         // line 자체에는 예외 타입 + 메시지만 출력 (스택트레이스는 분리)
         log.error("[전역 예외] {}: {}", e.getClass().getSimpleName(), e.getMessage(), e);
         // 응답에는 예외 메시지를 싣지 않는다 — 내부 경로·외부 API 상세 등 민감 정보 노출 가능.
         // 상세 원인은 위 ERROR 로그(traceId 포함)로만 추적.
-        return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of(
-                        "code", "INTERNAL_SERVER_ERROR",
-                        "message", "서버 내부 오류가 발생했습니다.",
-                        "timestamp", Instant.now().toString()
-                ));
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ErrorResponse.of("INTERNAL_SERVER_ERROR", "서버 내부 오류가 발생했습니다."));
     }
 }

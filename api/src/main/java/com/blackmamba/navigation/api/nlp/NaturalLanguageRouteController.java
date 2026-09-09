@@ -1,5 +1,7 @@
 package com.blackmamba.navigation.api.nlp;
 
+import com.blackmamba.navigation.api.config.ErrorResponse;
+import com.blackmamba.navigation.api.place.PlaceResponse;
 import com.blackmamba.navigation.application.route.AccessibilityContext;
 import com.blackmamba.navigation.application.route.RouteIntent;
 import com.blackmamba.navigation.application.route.RouteNarrativeEnhancer;
@@ -79,22 +81,18 @@ public class NaturalLanguageRouteController {
                     """
     )
     @GetMapping
-    public ResponseEntity<Map<String, Object>> searchByNaturalLanguage(
+    public ResponseEntity<?> searchByNaturalLanguage(
             @Parameter(description = "자연어 경로 요청", example = "강남에서 홍대까지 환승 적은 경로")
             @RequestParam("q") String query
     ) {
         // Step 0: 입력 검증 — LLM 프롬프트로 들어가는 입력이므로 길이 상한 필수
         if (query == null || query.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "code", "QUERY_REQUIRED",
-                    "message", "쿼리 파라미터 'q' 가 비어 있습니다."
-            ));
+            return ResponseEntity.badRequest()
+                    .body(ErrorResponse.of("QUERY_REQUIRED", "쿼리 파라미터 'q' 가 비어 있습니다."));
         }
         if (query.length() > MAX_QUERY_LENGTH) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "code", "QUERY_TOO_LONG",
-                    "message", "쿼리는 " + MAX_QUERY_LENGTH + "자 이하여야 합니다."
-            ));
+            return ResponseEntity.badRequest()
+                    .body(ErrorResponse.of("QUERY_TOO_LONG", "쿼리는 " + MAX_QUERY_LENGTH + "자 이하여야 합니다."));
         }
         log.info("[NLP] 자연어 요청 수신: \"{}\"", query);
 
@@ -104,11 +102,8 @@ public class NaturalLanguageRouteController {
             intent = intentParser.parse(query);
         } catch (IllegalArgumentException | IllegalStateException e) {
             log.warn("[NLP] 파싱 실패: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of(
-                    "code", "NLP_PARSE_FAILED",
-                    "message", e.getMessage(),
-                    "query", query
-            ));
+            return ResponseEntity.badRequest()
+                    .body(ErrorResponse.of("NLP_PARSE_FAILED", e.getMessage(), Map.of("query", query)));
         }
 
         // Step 2: 장소명 → 좌표 — origin/destination 병렬 (직렬 시 최악 2배 지연)
@@ -121,11 +116,9 @@ public class NaturalLanguageRouteController {
         Location destination = resolved == null ? null : resolved.getT2().orElse(null);
 
         if (origin == null || destination == null) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "code", "GEOCODING_FAILED",
-                    "message", "출발지 또는 도착지를 찾지 못했습니다.",
-                    "parsed", intent
-            ));
+            return ResponseEntity.badRequest()
+                    .body(ErrorResponse.of("GEOCODING_FAILED", "출발지 또는 도착지를 찾지 못했습니다.",
+                            Map.of("parsed", intent)));
         }
 
         // Step 3: 기존 경로 탐색 엔진 호출
@@ -142,14 +135,14 @@ public class NaturalLanguageRouteController {
                     routes, origin, destination, intent.preference().name());
         }
 
-        return ResponseEntity.ok(Map.of(
-                "query", query,
-                "parsedIntent", intent,
-                "origin", Map.of("name", intent.origin(), "lat", origin.lat(), "lng", origin.lng()),
-                "destination", Map.of("name", intent.destination(), "lat", destination.lat(), "lng", destination.lng()),
-                "searchMode", mode.name(),
-                "preference", intent.preference().name(),
-                "routes", routes != null ? routes : List.of()
+        return ResponseEntity.ok(new NaturalLanguageRoutesResponse(
+                query,
+                intent,
+                PlaceResponse.from(origin),
+                PlaceResponse.from(destination),
+                mode.name(),
+                intent.preference().name(),
+                routes != null ? routes : List.of()
         ));
     }
 }

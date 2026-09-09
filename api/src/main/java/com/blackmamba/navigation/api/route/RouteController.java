@@ -1,14 +1,15 @@
 package com.blackmamba.navigation.api.route;
 
+import com.blackmamba.navigation.api.config.ErrorResponse;
+import com.blackmamba.navigation.api.support.MobilityTypes;
 import com.blackmamba.navigation.application.route.AccessibilityContext;
 import com.blackmamba.navigation.application.route.RouteNarrativeEnhancer;
 import com.blackmamba.navigation.application.route.RouteOptimizationService;
-import com.blackmamba.navigation.domain.route.RecommendationPreference;
 import com.blackmamba.navigation.application.route.SearchMode;
 import com.blackmamba.navigation.application.route.WeatherContext;
-import com.blackmamba.navigation.api.support.MobilityTypes;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.MobilityType;
+import com.blackmamba.navigation.domain.route.RecommendationPreference;
 import com.blackmamba.navigation.domain.route.Route;
 import com.blackmamba.navigation.domain.route.TransitSearchDistancePolicy;
 import com.blackmamba.navigation.domain.weather.WeatherCondition;
@@ -20,12 +21,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 
 @Tag(name = "경로 탐색", description = "멀티모달 최적 경로 탐색 API")
 @RestController
@@ -66,7 +67,7 @@ public class RouteController {
             }
     )
     @GetMapping
-    public ResponseEntity<Map<String, Object>> searchRoutes(
+    public ResponseEntity<?> searchRoutes(
             @Parameter(description = "출발지 위도", example = "37.5547") @RequestParam double originLat,
             @Parameter(description = "출발지 경도", example = "126.9706") @RequestParam double originLng,
             @Parameter(description = "목적지 위도", example = "37.4979") @RequestParam double destLat,
@@ -80,27 +81,19 @@ public class RouteController {
     ) {
         // 입력값 검증
         if (originLat < -90 || originLat > 90 || destLat < -90 || destLat > 90) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "code", "INVALID_LATITUDE",
-                    "message", "위도는 -90 ~ 90 범위여야 합니다."
-            ));
+            return badRequest("INVALID_LATITUDE", "위도는 -90 ~ 90 범위여야 합니다.");
         }
         if (originLng < -180 || originLng > 180 || destLng < -180 || destLng > 180) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "code", "INVALID_LONGITUDE",
-                    "message", "경도는 -180 ~ 180 범위여야 합니다."
-            ));
+            return badRequest("INVALID_LONGITUDE", "경도는 -180 ~ 180 범위여야 합니다.");
         }
 
         Location origin      = new Location("출발지", originLat, originLng);
         Location destination = new Location("목적지", destLat, destLng);
 
         if (TransitSearchDistancePolicy.isTooCloseForTransit(origin, destination)) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "code", "SHORT_DISTANCE",
-                    "message", "출발지와 목적지가 " + (int) TransitSearchDistancePolicy.MIN_TRANSIT_DISTANCE_METERS
-                            + "m 이내라 현재 대중교통/복합 경로 탐색을 지원하지 않습니다. 도보 이동을 이용하거나 더 먼 목적지를 검색해 주세요."
-            ));
+            return badRequest("SHORT_DISTANCE",
+                    "출발지와 목적지가 " + (int) TransitSearchDistancePolicy.MIN_TRANSIT_DISTANCE_METERS
+                            + "m 이내라 현재 대중교통/복합 경로 탐색을 지원하지 않습니다. 도보 이동을 이용하거나 더 먼 목적지를 검색해 주세요.");
         }
 
         List<MobilityType> mobilityTypes;
@@ -108,10 +101,8 @@ public class RouteController {
             mobilityTypes = MobilityTypes.parseStrict(mobility);
         } catch (IllegalArgumentException e) {
             log.warn("[경로 탐색] 잘못된 이동수단 타입 입력: {} → 400 반환", mobility);
-            return ResponseEntity.badRequest().body(Map.of(
-                    "code", "INVALID_MOBILITY_TYPE",
-                    "message", "지원하지 않는 이동수단 타입입니다. 허용 값: " + MobilityTypes.allowedValues()
-            ));
+            return badRequest("INVALID_MOBILITY_TYPE",
+                    "지원하지 않는 이동수단 타입입니다. 허용 값: " + MobilityTypes.allowedValues());
         }
 
         AccessibilityContext accessibilityContext = AccessibilityContext.of(wheelchairAccessible, walkingSpeedKmh);
@@ -139,7 +130,7 @@ public class RouteController {
                     "mode", searchMode.name(),
                     "preference", recommendationPreference.name()).increment(count);
 
-            return ResponseEntity.ok(Map.of("routes", routes != null ? routes : List.of()));
+            return ResponseEntity.ok(RoutesResponse.from(routes));
         } catch (IllegalStateException e) {
             sample.stop(meterRegistry.timer("navigation.route.duration",
                     "mode", searchMode.name(),
@@ -147,10 +138,12 @@ public class RouteController {
                     "outcome", "timeout"));
             log.error("[경로 탐색] 타임아웃 ({}초 초과): {} → {}", ROUTE_SEARCH_TIMEOUT.getSeconds(),
                     origin.name(), destination.name());
-            return ResponseEntity.status(504).body(Map.of(
-                    "code", "SEARCH_TIMEOUT",
-                    "message", "경로 탐색 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요."
-            ));
+            return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT)
+                    .body(ErrorResponse.of("SEARCH_TIMEOUT", "경로 탐색 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요."));
         }
+    }
+
+    private static ResponseEntity<ErrorResponse> badRequest(String code, String message) {
+        return ResponseEntity.badRequest().body(ErrorResponse.of(code, message));
     }
 }

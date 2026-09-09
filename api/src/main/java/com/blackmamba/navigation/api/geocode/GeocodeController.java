@@ -1,6 +1,7 @@
 package com.blackmamba.navigation.api.geocode;
 
-import com.blackmamba.navigation.infra.naver.NaverGeocodingClient;
+import com.blackmamba.navigation.api.place.PlaceResponse;
+import com.blackmamba.navigation.application.route.port.PlaceSearchPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
@@ -17,21 +18,21 @@ import java.util.List;
 @RequestMapping("/api/geocode")
 public class GeocodeController {
 
-    private final NaverGeocodingClient naverGeocodingClient;
+    private static final int MIN_QUERY_LENGTH = 2;
 
-    public GeocodeController(NaverGeocodingClient naverGeocodingClient) {
-        this.naverGeocodingClient = naverGeocodingClient;
+    private final PlaceSearchPort placeSearchPort;
+
+    public GeocodeController(PlaceSearchPort placeSearchPort) {
+        this.placeSearchPort = placeSearchPort;
     }
 
     @Operation(summary = "주소 → 좌표 변환", description = "네이버 지오코딩 API로 주소를 위도/경도로 변환")
     @GetMapping
     public Mono<ResponseEntity<CoordResponse>> geocode(@RequestParam String query) {
-        return naverGeocodingClient.geocode(query)
-                .map(opt -> opt
-                        .map(latLng -> ResponseEntity.ok(new CoordResponse(latLng[0], latLng[1])))
-                        .orElseGet(() -> ResponseEntity.ok(new CoordResponse(null, null)))
-                )
-                .onErrorReturn(ResponseEntity.ok(new CoordResponse(null, null)));
+        return placeSearchPort.geocode(query)
+                .map(found -> found
+                        .map(location -> ResponseEntity.ok(new CoordResponse(location.lat(), location.lng())))
+                        .orElseGet(() -> ResponseEntity.ok(CoordResponse.empty())));
     }
 
     /**
@@ -40,12 +41,18 @@ public class GeocodeController {
      */
     @Operation(summary = "장소명 자동완성", description = "최소 2글자 이상 입력 시 연관 장소 목록 반환")
     @GetMapping("/suggest")
-    public Mono<List<NaverGeocodingClient.SuggestItem>> suggest(@RequestParam String query) {
-        if (query == null || query.isBlank() || query.length() < 2) {
+    public Mono<List<PlaceResponse>> suggest(@RequestParam String query) {
+        if (query == null || query.isBlank() || query.length() < MIN_QUERY_LENGTH) {
             return Mono.just(List.of());
         }
-        return naverGeocodingClient.suggest(query);
+        return placeSearchPort.suggest(query)
+                .map(PlaceResponse::fromAll);
     }
 
-    public record CoordResponse(Double lat, Double lng) {}
+    /** 좌표 없음은 null 로 표현한다 (기존 계약 유지). */
+    public record CoordResponse(Double lat, Double lng) {
+        static CoordResponse empty() {
+            return new CoordResponse(null, null);
+        }
+    }
 }
