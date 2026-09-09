@@ -1,8 +1,8 @@
 package com.blackmamba.navigation.application.route.strategy;
 
-import com.blackmamba.navigation.application.route.MobilityConfig;
-import com.blackmamba.navigation.domain.route.MobilityType;
+import com.blackmamba.navigation.application.route.hub.MobilityConfig;
 import com.blackmamba.navigation.domain.route.RouteType;
+import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 

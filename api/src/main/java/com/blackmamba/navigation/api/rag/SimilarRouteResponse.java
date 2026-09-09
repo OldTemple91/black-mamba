@@ -2,8 +2,8 @@ package com.blackmamba.navigation.api.rag;
 
 import com.blackmamba.navigation.application.route.port.ScoredRouteHistoryEntry;
 import com.blackmamba.navigation.domain.location.Location;
-import com.blackmamba.navigation.domain.route.MobilityType;
-import com.blackmamba.navigation.domain.route.RouteHistoryEntry;
+import com.blackmamba.navigation.domain.route.history.RouteHistoryEntry;
+import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.time.Instant;

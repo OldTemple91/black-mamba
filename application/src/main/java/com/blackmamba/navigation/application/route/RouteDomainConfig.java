@@ -1,9 +1,9 @@
 package com.blackmamba.navigation.application.route;
 
-import com.blackmamba.navigation.domain.route.CarReferenceCalculator;
-import com.blackmamba.navigation.domain.route.CarbonFootprintCalculator;
-import com.blackmamba.navigation.domain.route.RouteInsightFactory;
-import com.blackmamba.navigation.domain.route.RouteScoreCalculator;
+import com.blackmamba.navigation.domain.route.comparison.CarReferenceCalculator;
+import com.blackmamba.navigation.domain.route.comparison.CarbonFootprintCalculator;
+import com.blackmamba.navigation.domain.route.evaluation.RouteInsightFactory;
+import com.blackmamba.navigation.domain.route.evaluation.RouteScoreCalculator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 

@@ -1,7 +1,7 @@
 package com.blackmamba.navigation.application.route.port;
 
 import com.blackmamba.navigation.domain.location.Location;
-import com.blackmamba.navigation.domain.route.MobilityType;
+import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 
 import java.util.List;
 

@@ -3,6 +3,8 @@ package com.blackmamba.navigation.infra.vector;
 import com.blackmamba.navigation.application.route.port.RouteHistoryPort;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.*;
+import com.blackmamba.navigation.domain.route.mobility.MobilityInfo;
+import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;

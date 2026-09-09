@@ -1,14 +1,14 @@
 package com.blackmamba.navigation.api.route;
 
-import com.blackmamba.navigation.application.route.AccessibilityContext;
-import com.blackmamba.navigation.domain.route.RecommendationPreference;
+import com.blackmamba.navigation.api.support.MobilityTypes;
 import com.blackmamba.navigation.application.route.RouteStreamService;
 import com.blackmamba.navigation.application.route.SearchMode;
 import com.blackmamba.navigation.application.route.StreamEventPayload;
-import com.blackmamba.navigation.api.support.MobilityTypes;
+import com.blackmamba.navigation.application.route.accessibility.AccessibilityContext;
 import com.blackmamba.navigation.domain.location.Location;
-import com.blackmamba.navigation.domain.route.MobilityType;
 import com.blackmamba.navigation.domain.route.TransitSearchDistancePolicy;
+import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
+import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;

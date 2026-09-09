@@ -1,10 +1,10 @@
 package com.blackmamba.navigation.infra.adapter;
 
 import com.blackmamba.navigation.application.route.port.MobilityTimePort;
-import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.location.GeoDistance;
-import com.blackmamba.navigation.domain.route.MobilityRouteResult;
-import com.blackmamba.navigation.domain.route.MobilityType;
+import com.blackmamba.navigation.domain.location.Location;
+import com.blackmamba.navigation.domain.route.mobility.MobilityRouteResult;
+import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import com.blackmamba.navigation.infra.tmap.TmapPedestrianClient;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;

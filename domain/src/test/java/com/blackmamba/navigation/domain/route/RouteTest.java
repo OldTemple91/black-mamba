@@ -1,8 +1,14 @@
 package com.blackmamba.navigation.domain.route;
 
 import com.blackmamba.navigation.domain.location.Location;
+import com.blackmamba.navigation.domain.route.evaluation.Comparison;
+import com.blackmamba.navigation.domain.route.mobility.MobilityInfo;
+import com.blackmamba.navigation.domain.route.mobility.MobilityType;
+import com.blackmamba.navigation.domain.route.pricing.CostComponent;
 import org.junit.jupiter.api.Test;
+
 import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RouteTest {

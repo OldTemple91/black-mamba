@@ -1,6 +1,14 @@
 package com.blackmamba.navigation.domain.route;
 
 import com.blackmamba.navigation.domain.location.Location;
+import com.blackmamba.navigation.domain.route.comparison.CarbonSummary;
+import com.blackmamba.navigation.domain.route.comparison.RouteComparison;
+import com.blackmamba.navigation.domain.route.evaluation.Comparison;
+import com.blackmamba.navigation.domain.route.evaluation.RouteEvaluation;
+import com.blackmamba.navigation.domain.route.evaluation.RouteHub;
+import com.blackmamba.navigation.domain.route.evaluation.RouteInsights;
+import com.blackmamba.navigation.domain.route.pricing.RouteCostBreakdown;
+import com.blackmamba.navigation.domain.route.pricing.RouteCostEstimator;
 
 import java.util.ArrayList;
 import java.util.List;

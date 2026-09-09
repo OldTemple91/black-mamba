@@ -1,6 +1,6 @@
 package com.blackmamba.navigation.api.support;
 
-import com.blackmamba.navigation.domain.route.MobilityType;
+import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;

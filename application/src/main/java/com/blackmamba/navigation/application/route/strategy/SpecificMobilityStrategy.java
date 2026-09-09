@@ -1,24 +1,24 @@
 package com.blackmamba.navigation.application.route.strategy;
 
-import com.blackmamba.navigation.application.route.HubSelector;
-import com.blackmamba.navigation.application.route.LastMileHubPrioritizer;
-import com.blackmamba.navigation.application.route.MobilityConfig;
-import com.blackmamba.navigation.application.route.MobilitySegmentBuilder;
-import com.blackmamba.navigation.domain.route.RecommendationPreference;
 import com.blackmamba.navigation.application.route.RouteEvaluator;
-import com.blackmamba.navigation.domain.route.RouteHubExtractor;
+import com.blackmamba.navigation.application.route.hub.HubSelector;
+import com.blackmamba.navigation.application.route.hub.LastMileHubPrioritizer;
+import com.blackmamba.navigation.application.route.hub.MobilityConfig;
 import com.blackmamba.navigation.application.route.port.MobilityAvailabilityPort;
 import com.blackmamba.navigation.application.route.port.MobilityTimePort;
 import com.blackmamba.navigation.application.route.port.TransitRoutePort;
+import com.blackmamba.navigation.application.route.segment.MobilitySegmentBuilder;
 import com.blackmamba.navigation.application.route.strategy.MobilityDiagnostics.Phase;
 import com.blackmamba.navigation.domain.hub.Hub;
 import com.blackmamba.navigation.domain.location.Location;
-import com.blackmamba.navigation.domain.route.GenerationDiagnostic;
 import com.blackmamba.navigation.domain.route.Leg;
-import com.blackmamba.navigation.domain.route.MobilityInfo;
-import com.blackmamba.navigation.domain.route.MobilityType;
 import com.blackmamba.navigation.domain.route.Route;
 import com.blackmamba.navigation.domain.route.RouteType;
+import com.blackmamba.navigation.domain.route.evaluation.GenerationDiagnostic;
+import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
+import com.blackmamba.navigation.domain.route.evaluation.RouteHubExtractor;
+import com.blackmamba.navigation.domain.route.mobility.MobilityInfo;
+import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 

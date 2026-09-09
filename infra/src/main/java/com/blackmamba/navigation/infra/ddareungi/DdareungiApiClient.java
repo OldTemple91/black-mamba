@@ -1,6 +1,6 @@
 package com.blackmamba.navigation.infra.ddareungi;
 
-import com.blackmamba.navigation.domain.route.AvailabilitySource;
+import com.blackmamba.navigation.domain.route.mobility.AvailabilitySource;
 import com.blackmamba.navigation.infra.ddareungi.dto.DdareungiStation;
 import com.blackmamba.navigation.infra.ddareungi.dto.DdareungiStationResponse;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -16,8 +16,8 @@ import io.netty.channel.ChannelOption;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;

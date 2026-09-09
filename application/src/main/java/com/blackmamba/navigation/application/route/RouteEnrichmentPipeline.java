@@ -1,12 +1,16 @@
 package com.blackmamba.navigation.application.route;
 
+import com.blackmamba.navigation.application.route.accessibility.AccessibilityContext;
+import com.blackmamba.navigation.application.route.accessibility.AccessibilityPostProcessor;
+import com.blackmamba.navigation.application.route.weather.WeatherAwareRouteAdjuster;
+import com.blackmamba.navigation.application.route.weather.WeatherContext;
 import com.blackmamba.navigation.domain.location.GeoDistance;
 import com.blackmamba.navigation.domain.location.Location;
-import com.blackmamba.navigation.domain.route.CarReferenceCalculator;
-import com.blackmamba.navigation.domain.route.CarbonFootprintCalculator;
-import com.blackmamba.navigation.domain.route.CarbonSummary;
 import com.blackmamba.navigation.domain.route.Leg;
 import com.blackmamba.navigation.domain.route.Route;
+import com.blackmamba.navigation.domain.route.comparison.CarReferenceCalculator;
+import com.blackmamba.navigation.domain.route.comparison.CarbonFootprintCalculator;
+import com.blackmamba.navigation.domain.route.comparison.CarbonSummary;
 import org.springframework.stereotype.Component;
 
 import java.util.List;

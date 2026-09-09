@@ -1,10 +1,10 @@
 package com.blackmamba.navigation.application.route;
 
-import com.blackmamba.navigation.domain.route.Comparison;
-import com.blackmamba.navigation.domain.route.CostComponent;
 import com.blackmamba.navigation.domain.route.Route;
-import com.blackmamba.navigation.domain.route.RouteCostBreakdown;
 import com.blackmamba.navigation.domain.route.RouteType;
+import com.blackmamba.navigation.domain.route.evaluation.Comparison;
+import com.blackmamba.navigation.domain.route.pricing.CostComponent;
+import com.blackmamba.navigation.domain.route.pricing.RouteCostBreakdown;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

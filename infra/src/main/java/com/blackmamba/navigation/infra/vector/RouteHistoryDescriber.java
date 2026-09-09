@@ -3,8 +3,8 @@ package com.blackmamba.navigation.infra.vector;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Leg;
 import com.blackmamba.navigation.domain.route.LegType;
-import com.blackmamba.navigation.domain.route.MobilityType;
 import com.blackmamba.navigation.domain.route.Route;
+import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 
 import java.time.DayOfWeek;
 import java.time.Instant;

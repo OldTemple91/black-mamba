@@ -1,8 +1,8 @@
 package com.blackmamba.navigation.application.route.port;
 
-import com.blackmamba.navigation.domain.route.MobilityInfo;
-import com.blackmamba.navigation.domain.route.MobilitySearchHint;
-import com.blackmamba.navigation.domain.route.MobilityType;
+import com.blackmamba.navigation.domain.route.mobility.MobilityInfo;
+import com.blackmamba.navigation.domain.route.mobility.MobilitySearchHint;
+import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import reactor.core.publisher.Mono;
 
 import java.util.Optional;

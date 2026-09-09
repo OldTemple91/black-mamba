@@ -1,8 +1,8 @@
 package com.blackmamba.navigation.application.route.strategy;
 
-import com.blackmamba.navigation.application.route.MobilityConfig;
-import com.blackmamba.navigation.domain.route.MobilityType;
+import com.blackmamba.navigation.application.route.hub.MobilityConfig;
 import com.blackmamba.navigation.domain.route.RouteType;
+import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 
 /**
  * 이동수단 타입 → 탐색 설정/경로 타입/표시명 매핑.

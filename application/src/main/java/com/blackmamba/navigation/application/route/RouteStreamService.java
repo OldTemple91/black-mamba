@@ -1,10 +1,10 @@
 package com.blackmamba.navigation.application.route;
 
-import com.blackmamba.navigation.domain.route.RecommendationPreference;
-
+import com.blackmamba.navigation.application.route.accessibility.AccessibilityContext;
 import com.blackmamba.navigation.domain.location.Location;
-import com.blackmamba.navigation.domain.route.MobilityType;
 import com.blackmamba.navigation.domain.route.Route;
+import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
+import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;

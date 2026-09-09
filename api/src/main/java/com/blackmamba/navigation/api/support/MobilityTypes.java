@@ -1,6 +1,6 @@
 package com.blackmamba.navigation.api.support;
 
-import com.blackmamba.navigation.domain.route.MobilityType;
+import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

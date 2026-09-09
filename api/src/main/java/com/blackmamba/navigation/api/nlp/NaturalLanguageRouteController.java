@@ -2,11 +2,11 @@ package com.blackmamba.navigation.api.nlp;
 
 import com.blackmamba.navigation.api.config.ErrorResponse;
 import com.blackmamba.navigation.api.place.PlaceResponse;
-import com.blackmamba.navigation.application.route.AccessibilityContext;
 import com.blackmamba.navigation.application.route.RouteIntent;
-import com.blackmamba.navigation.application.route.RouteNarrativeEnhancer;
 import com.blackmamba.navigation.application.route.RouteOptimizationService;
 import com.blackmamba.navigation.application.route.SearchMode;
+import com.blackmamba.navigation.application.route.accessibility.AccessibilityContext;
+import com.blackmamba.navigation.application.route.history.RouteNarrativeEnhancer;
 import com.blackmamba.navigation.application.route.port.PlaceResolverPort;
 import com.blackmamba.navigation.application.route.port.RouteIntentParser;
 import com.blackmamba.navigation.domain.location.Location;

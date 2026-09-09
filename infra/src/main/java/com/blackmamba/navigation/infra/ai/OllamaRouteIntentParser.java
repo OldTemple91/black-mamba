@@ -1,9 +1,9 @@
 package com.blackmamba.navigation.infra.ai;
 
-import com.blackmamba.navigation.domain.route.RecommendationPreference;
 import com.blackmamba.navigation.application.route.RouteIntent;
 import com.blackmamba.navigation.application.route.port.RouteIntentParser;
-import com.blackmamba.navigation.domain.route.MobilityType;
+import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
+import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import com.blackmamba.navigation.infra.ai.dto.OllamaIntentPayload;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;

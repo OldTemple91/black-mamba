@@ -1,13 +1,13 @@
 package com.blackmamba.navigation.api.rag;
 
-import com.blackmamba.navigation.application.route.port.RagSearchRequest;
-import com.blackmamba.navigation.application.route.port.RouteHistoryPort;
-import com.blackmamba.navigation.application.route.port.ScoredRouteHistoryEntry;
 import com.blackmamba.navigation.api.config.ErrorResponse;
 import com.blackmamba.navigation.api.place.PlaceResponse;
 import com.blackmamba.navigation.api.support.MobilityTypes;
+import com.blackmamba.navigation.application.route.port.RagSearchRequest;
+import com.blackmamba.navigation.application.route.port.RouteHistoryPort;
+import com.blackmamba.navigation.application.route.port.ScoredRouteHistoryEntry;
 import com.blackmamba.navigation.domain.location.Location;
-import com.blackmamba.navigation.domain.route.MobilityType;
+import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import io.micrometer.observation.annotation.Observed;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

@@ -1,10 +1,10 @@
 package com.blackmamba.navigation.application.route.strategy;
 
-import com.blackmamba.navigation.domain.route.RecommendationPreference;
 import com.blackmamba.navigation.application.route.RouteEvaluator;
-import com.blackmamba.navigation.domain.route.GenerationDiagnostic;
 import com.blackmamba.navigation.domain.route.Route;
-import com.blackmamba.navigation.domain.route.RouteInsights;
+import com.blackmamba.navigation.domain.route.evaluation.GenerationDiagnostic;
+import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
+import com.blackmamba.navigation.domain.route.evaluation.RouteInsights;
 
 import java.util.ArrayList;
 import java.util.Comparator;

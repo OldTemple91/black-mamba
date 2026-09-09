@@ -1,6 +1,6 @@
 package com.blackmamba.navigation.application.route.port;
 
-import com.blackmamba.navigation.domain.route.RouteHistoryEntry;
+import com.blackmamba.navigation.domain.route.history.RouteHistoryEntry;
 
 /**
  * 벡터 DB 유사 검색 결과에 "유사도 점수" 를 붙인 래퍼.

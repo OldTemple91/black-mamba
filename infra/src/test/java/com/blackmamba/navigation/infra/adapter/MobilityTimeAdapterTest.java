@@ -1,10 +1,10 @@
 package com.blackmamba.navigation.infra.adapter;
 
 import com.blackmamba.navigation.domain.location.Location;
-import com.blackmamba.navigation.domain.route.MobilityRouteResult;
-import com.blackmamba.navigation.domain.route.MobilityType;
-import com.blackmamba.navigation.infra.tmap.TmapPedestrianClient;
+import com.blackmamba.navigation.domain.route.mobility.MobilityRouteResult;
+import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import com.blackmamba.navigation.infra.tmap.TmapPedestrianClient.TmapRouteData;
+import com.blackmamba.navigation.infra.tmap.TmapPedestrianClient;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

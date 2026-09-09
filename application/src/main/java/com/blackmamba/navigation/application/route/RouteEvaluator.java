@@ -1,13 +1,10 @@
 package com.blackmamba.navigation.application.route;
 
-import com.blackmamba.navigation.domain.route.RouteInsightFactory;
-
-import com.blackmamba.navigation.domain.route.RouteScoreCalculator;
-
-import com.blackmamba.navigation.domain.route.RecommendationPreference;
-
-import com.blackmamba.navigation.domain.route.Comparison;
 import com.blackmamba.navigation.domain.route.Route;
+import com.blackmamba.navigation.domain.route.evaluation.Comparison;
+import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
+import com.blackmamba.navigation.domain.route.evaluation.RouteInsightFactory;
+import com.blackmamba.navigation.domain.route.evaluation.RouteScoreCalculator;
 import org.springframework.stereotype.Component;
 
 @Component

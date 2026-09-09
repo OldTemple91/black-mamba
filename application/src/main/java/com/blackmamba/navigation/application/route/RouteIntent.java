@@ -1,8 +1,7 @@
 package com.blackmamba.navigation.application.route;
 
-import com.blackmamba.navigation.domain.route.RecommendationPreference;
-
-import com.blackmamba.navigation.domain.route.MobilityType;
+import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
+import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 
 import java.util.List;
 

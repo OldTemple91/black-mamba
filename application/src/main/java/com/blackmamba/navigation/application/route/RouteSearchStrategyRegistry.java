@@ -1,5 +1,6 @@
 package com.blackmamba.navigation.application.route;
 
+import com.blackmamba.navigation.application.route.hub.HubSelector;
 import com.blackmamba.navigation.application.route.port.MobilityAvailabilityPort;
 import com.blackmamba.navigation.application.route.port.MobilityTimePort;
 import com.blackmamba.navigation.application.route.port.TransitRoutePort;
