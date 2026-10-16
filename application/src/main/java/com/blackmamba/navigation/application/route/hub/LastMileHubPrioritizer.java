@@ -24,7 +24,7 @@ import java.util.Optional;
  * <ol>
  *   <li>hint 가 합리적 거리(1.1km) 이내인 후보를 우선</li>
  *   <li>hint 거리 오름차순 → baseline 선정 순위 순으로 정렬</li>
- *   <li>합리적 후보가 하나도 없으면 원본 순서 유지 (전부 탈락 방지)</li>
+ *   <li>합리적 후보가 하나도 없으면 전부 남긴다 (전부 탈락 방지) — 이때도 정렬은 hint 거리 순, 가까운 정류소가 사용자에게 낫다</li>
  * </ol>
  *
  * <p>원래 {@code OptimalSearchStrategy} / {@code SpecificMobilityStrategy}

@@ -186,6 +186,40 @@ class SpecificMobilityStrategyTest {
         assertThat(routes.getFirst().type()).isEqualTo(RouteType.TRANSIT_ONLY);
     }
 
+    @Test
+    void 허브가_없을_때의_직행_폴백도_수단_최대_범위를_넘으면_만들지_않는다() {
+        // given — 서울역 → 약 12km 떨어진 지점, 개인 킥보드(최대 5km). 대중교통 결과 없음 → 허브 0개
+        Location origin = new Location("서울역", 37.5547, 126.9706);
+        Location farAway = new Location("먼 곳", 37.45, 127.10);
+        when(transitRoutePort.getTransitRoute(any(), any())).thenReturn(Mono.just(List.of()));
+        when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of());
+        when(mobilityTimePort.getMobilityRoute(any(), any(), any())).thenReturn(Mono.just(MobilityRouteResult.timeOnly(70)));
+        when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), any()))
+                .thenReturn(Mono.justOrEmpty(Optional.of(
+                        new MobilityInfo(MobilityType.PERSONAL_KICKBOARD, "개인 킥보드", null, 100, null, 37.5547, 126.9706, 1, 0))));
+        when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any())).thenReturn(Mono.just(Optional.empty()));
+        when(routeEvaluator.evaluate(any(Route.class), any(Route.class), anyInt(), anyBoolean(), eq(RecommendationPreference.RELIABILITY)))
+                .thenAnswer(invocation -> {
+                    Route route = invocation.getArgument(0);
+                    boolean recommended = invocation.getArgument(3);
+                    return route.withScore(0.5, recommended);
+                });
+        when(mobilityAvailabilityPort.findNearestMobilityHint(anyDouble(), anyDouble(), any(), anyBoolean()))
+                .thenReturn(Mono.just(Optional.empty()));
+
+        SpecificMobilityStrategy strategy = new SpecificMobilityStrategy(
+                transitRoutePort, mobilityTimePort, mobilityAvailabilityPort, hubSelector, routeEvaluator);
+
+        // when
+        List<Route> routes = strategy.search(origin, farAway, List.of(MobilityType.PERSONAL_KICKBOARD), RecommendationPreference.RELIABILITY).block();
+
+        // then — 70분짜리 킥보드 경로가 나오면 안 되고, 거리 초과 사유가 남아야 한다
+        assertThat(routes).extracting(Route::type).containsExactly(RouteType.TRANSIT_ONLY);
+        assertThat(routes.getFirst().insights().generationDiagnostics())
+                .extracting(d -> d.reasonCode())
+                .contains("DIRECT_DISTANCE_EXCEEDED");
+    }
+
     private Hub hub(Location location) {
         return new Hub("hub-1", location.name(), HubType.MOBILITY_TRANSFER_POINT, location, 150, Map.of());
     }
