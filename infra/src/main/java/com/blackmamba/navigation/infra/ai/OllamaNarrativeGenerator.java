@@ -55,7 +55,8 @@ public class OllamaNarrativeGenerator implements NarrativeGenerator {
 
     private final ChatClient chatClient;
     private final Counter successCounter;
-    private final Counter fallbackCounter;
+    private final Counter errorCounter;
+    private final Counter shortCounter;
     private final Counter hallucinationCounter;
 
     public OllamaNarrativeGenerator(ChatModel chatModel, MeterRegistry meterRegistry) {
@@ -65,14 +66,17 @@ public class OllamaNarrativeGenerator implements NarrativeGenerator {
         this.successCounter = Counter.builder("navigation.rag.narrative.generated")
                 .description("LLM narrative 생성 성공 건수")
                 .register(meterRegistry);
-        // 같은 metric 이름은 description 도 동일해야 함 (불일치 시 Micrometer 경고) — reason 태그로만 구분
-        this.fallbackCounter = Counter.builder("navigation.rag.narrative.fallback")
+        // 같은 metric 이름은 description 도 동일해야 함 (불일치 시 Micrometer 경고) — reason 태그로만 구분.
+        // 운영자가 "모델이 자주 틀린다" 와 "모델이 짧게/빈 답을 한다" 를 구분할 수 있어야 하므로 사유를 나눈다.
+        this.errorCounter = fallbackCounter(meterRegistry, "error");
+        this.shortCounter = fallbackCounter(meterRegistry, "short");
+        this.hallucinationCounter = fallbackCounter(meterRegistry, "hallucination");
+    }
+
+    static Counter fallbackCounter(MeterRegistry meterRegistry, String reason) {
+        return Counter.builder("navigation.rag.narrative.fallback")
                 .description("LLM narrative 폴백(원본 유지) 건수")
-                .tag("reason", "error_or_short")
-                .register(meterRegistry);
-        this.hallucinationCounter = Counter.builder("navigation.rag.narrative.fallback")
-                .description("LLM narrative 폴백(원본 유지) 건수")
-                .tag("reason", "hallucination")
+                .tag("reason", reason)
                 .register(meterRegistry);
     }
 
@@ -93,21 +97,36 @@ public class OllamaNarrativeGenerator implements NarrativeGenerator {
                     .call()
                     .content();
             String cleaned = cleanOutput(raw);
-            // 할루시네이션 감지: 출력 숫자가 실제 경로 수치와 크게 다르면 폴백
-            String validated = validateAgainstRoute(cleaned, route);
-            if (validated.isEmpty()) {
-                // cleaned 가 빈 문자열이 아니라면 할루시네이션 또는 너무 짧음 → hallucinationCounter
-                // cleaned 가 빈 문자열이면 LLM 응답이 애초에 빈 것 → fallbackCounter
-                if (cleaned == null || cleaned.isBlank()) fallbackCounter.increment();
-                else hallucinationCounter.increment();
+            if (cleaned.isBlank()) {
+                errorCounter.increment();
+                log.warn("[RAG4] LLM 빈 응답 → 폴백(원본 유지). routeId={}", route.routeId());
                 return "";
             }
-            successCounter.increment();
-            log.debug("[RAG4] narrative 생성: \"{}\"", validated);
-            return validated;
+            // 할루시네이션 감지: 출력 숫자가 프롬프트에 준 수치 밖이면 폴백
+            NarrativeFacts facts = NarrativeFacts.of(route, originalNarrative, similarHistory);
+            Validation validation = validate(cleaned, facts);
+            switch (validation.verdict()) {
+                case SHORT -> {
+                    shortCounter.increment();
+                    log.debug("[RAG4] narrative 너무 짧음 → 폴백. routeId={} len={}", route.routeId(), cleaned.length());
+                    return "";
+                }
+                case HALLUCINATION -> {
+                    hallucinationCounter.increment();
+                    log.warn("[RAG4] 할루시네이션 감지 → 폴백. routeId={} 사유={} 출력=\"{}\"",
+                            route.routeId(), validation.detail(), abbreviate(cleaned));
+                    return "";
+                }
+                case OK -> {
+                    successCounter.increment();
+                    log.debug("[RAG4] narrative 생성: \"{}\"", cleaned);
+                    return cleaned;
+                }
+            }
+            return "";
         } catch (Exception e) {
-            log.warn("[RAG4] narrative 생성 실패 — 폴백(원본 유지). err={}", e.getMessage());
-            fallbackCounter.increment();
+            log.warn("[RAG4] narrative 생성 실패 — 폴백(원본 유지). routeId={} err={}", route.routeId(), e.getMessage());
+            errorCounter.increment();
             return "";
         }
     }
@@ -124,56 +143,72 @@ public class OllamaNarrativeGenerator implements NarrativeGenerator {
     private static final Pattern MINUTES_PATTERN = Pattern.compile("(\\d+)\\s*분");
     // "1,650원" / "1650원" 둘 다 매칭
     private static final Pattern WON_PATTERN = Pattern.compile("([\\d,]+)\\s*원");
+    // "3건 중 2건" — 유사 이력 통계 주장
+    private static final Pattern COUNT_PATTERN = Pattern.compile("(\\d+)\\s*건");
+
+    enum Verdict { OK, SHORT, HALLUCINATION }
+
+    record Validation(Verdict verdict, String detail) {
+        static Validation ok() {
+            return new Validation(Verdict.OK, "");
+        }
+    }
 
     /**
-     * LLM 출력에 포함된 숫자가 실제 경로 수치와 큰 차이가 있으면 빈 문자열 반환(폴백).
-     * <p>
-     * 예: 경로가 39분인데 LLM 이 "약 45분" 이라 썼다면 5분 초과 차이 → 할루시네이션으로 간주.
-     * 길이가 50자 미만이면 정보성 부족으로 동일 폴백.
+     * LLM 출력의 수치가 <b>프롬프트에 준 수치</b>({@link NarrativeFacts}) 밖이면 할루시네이션.
+     * <ul>
+     *   <li>분/원: 제공한 수치 중 하나와 허용 오차(5분 / 1,000원) 안이면 통과 — 총합·구간·자가용 차이·이력 수치 모두 인정</li>
+     *   <li>"N건": 제공한 이력 건수를 넘는 통계 주장, 이력이 없는데 건수를 말하면 할루시네이션
+     *       (프롬프트의 예시 "3건 중 2건" 을 그대로 베끼는 소형 모델의 전형적 실패)</li>
+     *   <li>길이 50자 미만은 정보성 부족 — 별도 사유(SHORT)</li>
+     * </ul>
      */
-    static String validateAgainstRoute(String narrative, Route route) {
-        if (narrative == null || narrative.isBlank()) return "";
-        if (narrative.length() < MIN_NARRATIVE_LENGTH) {
-            log.debug("[RAG4] narrative 너무 짧음({}자) → 폴백", narrative.length());
-            return "";
+    static Validation validate(String narrative, NarrativeFacts facts) {
+        if (narrative == null || narrative.isBlank() || narrative.length() < MIN_NARRATIVE_LENGTH) {
+            return new Validation(Verdict.SHORT, "길이 부족");
         }
 
-        int expectedMinutes = route.totalMinutes();
-        int expectedCost = route.totalCostWon();
-
-        // 1) 분 검증 — 실측 0분(비정상 데이터) 이면 비교 기준이 없으므로 스킵
-        if (expectedMinutes > 0) {
-            Matcher mm = MINUTES_PATTERN.matcher(narrative);
-            while (mm.find()) {
-                try {
-                    int minutes = Integer.parseInt(mm.group(1));
-                    if (Math.abs(minutes - expectedMinutes) > ALLOWED_MINUTES_DELTA) {
-                        log.warn("[RAG4] 할루시네이션 감지 (분): 출력 {}분 vs 실제 {}분 → 폴백",
-                                minutes, expectedMinutes);
-                        return "";
-                    }
-                } catch (NumberFormatException ignored) {}
+        Matcher mm = MINUTES_PATTERN.matcher(narrative);
+        while (mm.find()) {
+            int minutes = Integer.parseInt(mm.group(1));
+            if (!isNear(minutes, facts.allowedMinutes(), ALLOWED_MINUTES_DELTA)) {
+                return new Validation(Verdict.HALLUCINATION, "출력 " + minutes + "분 — 제공 수치 " + facts.allowedMinutes());
             }
         }
 
-        // 2) 비용(원) 검증 — 0원 경로(따릉이 단독 등)에서는 스킵.
-        //    스킵 없이는 LLM 이 어떤 금액(예: 자가용 절약액)을 언급해도 |won - 0| > 1000
-        //    으로 정상 응답을 할루시네이션으로 오판한다 (false positive).
-        if (expectedCost > 0) {
-            Matcher wm = WON_PATTERN.matcher(narrative);
-            while (wm.find()) {
-                try {
-                    int won = Integer.parseInt(wm.group(1).replace(",", ""));
-                    if (Math.abs(won - expectedCost) > ALLOWED_COST_DELTA) {
-                        log.warn("[RAG4] 할루시네이션 감지 (원): 출력 {}원 vs 실제 {}원 → 폴백",
-                                won, expectedCost);
-                        return "";
-                    }
-                } catch (NumberFormatException ignored) {}
+        Matcher wm = WON_PATTERN.matcher(narrative);
+        while (wm.find()) {
+            int won;
+            try {
+                won = Integer.parseInt(wm.group(1).replace(",", ""));
+            } catch (NumberFormatException e) {
+                continue;
+            }
+            if (!isNear(won, facts.allowedWon(), ALLOWED_COST_DELTA)) {
+                return new Validation(Verdict.HALLUCINATION, "출력 " + won + "원 — 제공 수치 " + facts.allowedWon());
             }
         }
 
-        return narrative;
+        Matcher cm = COUNT_PATTERN.matcher(narrative);
+        while (cm.find()) {
+            int count = Integer.parseInt(cm.group(1));
+            if (count > facts.historyCount()) {
+                return new Validation(Verdict.HALLUCINATION, "출력 " + count + "건 — 제공 이력 " + facts.historyCount() + "건");
+            }
+        }
+
+        return Validation.ok();
+    }
+
+    private static boolean isNear(int value, java.util.Set<Integer> allowed, int tolerance) {
+        for (int candidate : allowed) {
+            if (Math.abs(value - candidate) <= tolerance) return true;
+        }
+        return false;
+    }
+
+    private static String abbreviate(String text) {
+        return text.length() <= 120 ? text : text.substring(0, 120) + "…";
     }
 
     // ─── 프롬프트 작성 ─────────────────────────────
@@ -188,12 +223,13 @@ public class OllamaNarrativeGenerator implements NarrativeGenerator {
 
         sb.append("## 현재 경로\n");
         sb.append(String.format(Locale.ROOT,
-                "- %s → %s%n- %d분, %,d원%n- 모드: %s%n- 선호도: %s%n",
+                "- %s → %s%n- %d분, %,d원%n- 모드: %s%n- 구간별 소요: %s%n- 선호도: %s%n",
                 safe(origin.name()),
                 safe(destination.name()),
                 route.totalMinutes(),
                 route.totalCostWon(),
                 mobilitySummary(route),
+                legSummary(route),
                 preference == null ? "RELIABILITY" : preference));
 
         if (originalNarrative != null && !originalNarrative.isBlank()) {
@@ -213,6 +249,30 @@ public class OllamaNarrativeGenerator implements NarrativeGenerator {
 
         sb.append("\n위 정보를 근거로 2~3 문장 한국어 설명 작성:");
         return sb.toString();
+    }
+
+    /** 구간별 소요시간 — 모델이 구간 시간을 언급할 때 참조할 수 있도록 제공 (검증 화이트리스트와 동일 출처). */
+    private static String legSummary(Route route) {
+        if (route.legs() == null || route.legs().isEmpty()) return "없음";
+        return route.legs().stream()
+                .map(leg -> legLabel(leg) + " " + leg.durationMinutes() + "분")
+                .collect(Collectors.joining(", "));
+    }
+
+    private static String legLabel(com.blackmamba.navigation.domain.route.Leg leg) {
+        if (leg.mobilityInfo() != null && leg.mobilityInfo().mobilityType() != null) {
+            return switch (leg.mobilityInfo().mobilityType()) {
+                case DDAREUNGI -> "따릉이";
+                case PERSONAL_EBIKE -> "전기자전거";
+                case PERSONAL_KICKBOARD -> "킥보드";
+                case KICKBOARD_SHARED -> "공유 킥보드";
+            };
+        }
+        return switch (leg.type()) {
+            case TRANSIT -> "대중교통";
+            case WALK -> "도보";
+            default -> leg.type().name();
+        };
     }
 
     private static String mobilitySummary(Route route) {

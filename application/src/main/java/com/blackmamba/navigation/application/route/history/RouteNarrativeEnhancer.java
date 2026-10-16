@@ -7,6 +7,7 @@ import com.blackmamba.navigation.application.route.port.ScoredRouteHistoryEntry;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Route;
 import com.blackmamba.navigation.domain.route.comparison.RouteComparison;
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.annotation.Observed;
@@ -19,6 +20,7 @@ import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 
 /**
  * RAG Phase 4 — 경로의 carComparison.narrative 를 LLM 설명으로 업그레이드.
@@ -51,6 +53,8 @@ public class RouteNarrativeEnhancer {
     private final NarrativeGenerator narrativeGenerator; // 없을 수 있음
     private final RouteHistoryPort routeHistoryPort;      // 없을 수 있음
     private final DistributionSummary similarHitSummary;
+    private final Counter timeoutCounter;
+    private final Counter enhancerErrorCounter;
 
     public RouteNarrativeEnhancer(ObjectProvider<NarrativeGenerator> generatorProvider,
                                   ObjectProvider<RouteHistoryPort> historyProvider,
@@ -60,6 +64,16 @@ public class RouteNarrativeEnhancer {
         this.similarHitSummary = DistributionSummary.builder("navigation.rag.narrative.similar_hit")
                 .description("narrative 생성 시 참고한 유사 이력 건수 분포")
                 .publishPercentiles(0.5, 0.95)
+                .register(meterRegistry);
+        // 운영에서 가장 흔한 실패(느린 Ollama → 15초 타임아웃)가 로그에만 남고 메트릭에 없었다.
+        // 생성기의 navigation.rag.narrative.fallback{reason=...} 과 같은 이름·설명으로 사유만 추가한다.
+        this.timeoutCounter = Counter.builder("navigation.rag.narrative.fallback")
+                .description("LLM narrative 폴백(원본 유지) 건수")
+                .tag("reason", "timeout")
+                .register(meterRegistry);
+        this.enhancerErrorCounter = Counter.builder("navigation.rag.narrative.fallback")
+                .description("LLM narrative 폴백(원본 유지) 건수")
+                .tag("reason", "enhancer_error")
                 .register(meterRegistry);
 
         if (narrativeGenerator == null || routeHistoryPort == null) {
@@ -105,7 +119,13 @@ public class RouteNarrativeEnhancer {
                             .subscribeOn(Schedulers.boundedElastic()))
                     .timeout(LLM_TIMEOUT)
                     .onErrorResume(e -> {
-                        log.warn("[RAG4] LLM 타임아웃/실패 → 원본 narrative 유지. err={}", e.getMessage());
+                        if (e instanceof TimeoutException) {
+                            timeoutCounter.increment();
+                            log.warn("[RAG4] LLM 타임아웃({}s) → 원본 narrative 유지. routeId={}", LLM_TIMEOUT.getSeconds(), route.routeId());
+                        } else {
+                            enhancerErrorCounter.increment();
+                            log.warn("[RAG4] narrative 생성 실패 → 원본 유지. routeId={} err={}", route.routeId(), e.getMessage());
+                        }
                         return Mono.just("");
                     })
                     .blockOptional()   // Spring MVC 동기 컨텍스트 전용 — 스트림(Flux) 경로에서 호출 금지
