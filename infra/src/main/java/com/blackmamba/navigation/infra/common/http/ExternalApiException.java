@@ -15,7 +15,7 @@ import reactor.core.publisher.Mono;
  *   <li>{@link ExternalApiClientException} 4xx — 기록만 (재시도해도 같은 답)</li>
  * </ul>
  */
-public class ExternalApiException extends RuntimeException {
+public sealed class ExternalApiException extends RuntimeException permits ExternalApiClientException, ExternalApiServerException {
 
     private final int status;
 

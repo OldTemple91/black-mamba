@@ -10,7 +10,6 @@ import com.blackmamba.navigation.domain.route.TransitInfo;
 import com.blackmamba.navigation.domain.route.history.RouteHistoryEntry;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import com.blackmamba.navigation.infra.ai.OllamaNarrativeGenerator.Validation;
-import com.blackmamba.navigation.infra.ai.OllamaNarrativeGenerator.Verdict;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -40,15 +39,15 @@ class OllamaNarrativeGeneratorValidationTest {
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
-            "총 39분이 걸리고 1,650원이 듭니다.                       | OK",
-            "약 44분 정도면 도착하고 1,650원입니다.                   | OK",            // 5분 허용 오차
-            "약 45분 정도면 도착하고 1,650원입니다.                   | HALLUCINATION", // 6분 차이
-            "지하철 구간만 36분이면 충분합니다.                       | OK",            // 구간별 수치 허용
-            "총 39분, 요금은 2,700원입니다.                           | HALLUCINATION", // 1,000원 초과 차이
-            "자가용보다 12분 빠르며 4,400원 절약됩니다.               | OK",            // 자가용 비교 원문 수치 허용
-            "자가용보다 25분 빠르며 4,400원 절약됩니다.               | HALLUCINATION", // 비교 원문에 없는 수치
+            "총 39분이 걸리고 1,650원이 듭니다.                       | Ok",
+            "약 44분 정도면 도착하고 1,650원입니다.                   | Ok",            // 5분 허용 오차
+            "약 45분 정도면 도착하고 1,650원입니다.                   | Hallucination", // 6분 차이
+            "지하철 구간만 36분이면 충분합니다.                       | Ok",            // 구간별 수치 허용
+            "총 39분, 요금은 2,700원입니다.                           | Hallucination", // 1,000원 초과 차이
+            "자가용보다 12분 빠르며 4,400원 절약됩니다.               | Ok",            // 자가용 비교 원문 수치 허용
+            "자가용보다 25분 빠르며 4,400원 절약됩니다.               | Hallucination", // 비교 원문에 없는 수치
     })
-    void 프롬프트에_준_수치_밖의_숫자만_할루시네이션으로_본다(String sentence, Verdict expected) {
+    void 프롬프트에_준_수치_밖의_숫자만_할루시네이션으로_본다(String sentence, String expected) {
         // given — 자가용 비교 원문은 프롬프트에 포함된다
         String originalNarrative = "자가용보다 12분 빠르며 4,400원 절약, 탄소 998g 감소.";
         NarrativeFacts facts = NarrativeFacts.of(route, originalNarrative, List.of());
@@ -57,7 +56,7 @@ class OllamaNarrativeGeneratorValidationTest {
         Validation validation = OllamaNarrativeGenerator.validate(sentence.trim() + PADDING, facts);
 
         // then
-        assertThat(validation.verdict()).isEqualTo(expected);
+        assertThat(validation.getClass().getSimpleName()).isEqualTo(expected);
     }
 
     @Test
@@ -70,8 +69,8 @@ class OllamaNarrativeGeneratorValidationTest {
         Validation validation = OllamaNarrativeGenerator.validate(sentence, facts);
 
         // then
-        assertThat(validation.verdict()).isEqualTo(Verdict.HALLUCINATION);
-        assertThat(validation.detail()).contains("3건");
+        assertThat(validation).isInstanceOfSatisfying(Validation.Hallucination.class,
+                hallucination -> assertThat(hallucination.detail()).contains("3건"));
     }
 
     @Test
@@ -82,7 +81,7 @@ class OllamaNarrativeGeneratorValidationTest {
         String sentence = "총 39분, 1,650원. 비슷한 구간 3건 중 2건이 이 방식을 택했습니다." + PADDING;
 
         // when & then
-        assertThat(OllamaNarrativeGenerator.validate(sentence, facts).verdict()).isEqualTo(Verdict.OK);
+        assertThat(OllamaNarrativeGenerator.validate(sentence, facts)).isInstanceOf(Validation.Ok.class);
     }
 
     @Test
@@ -98,7 +97,7 @@ class OllamaNarrativeGeneratorValidationTest {
         Validation validation = OllamaNarrativeGenerator.validate("27분이 걸리지만 자가용 대비 4,400원 절약됩니다." + PADDING, facts);
 
         // then
-        assertThat(validation.verdict()).isEqualTo(Verdict.OK);
+        assertThat(validation).isInstanceOf(Validation.Ok.class);
     }
 
     @Test
@@ -107,8 +106,8 @@ class OllamaNarrativeGeneratorValidationTest {
         NarrativeFacts facts = NarrativeFacts.of(route, null, List.of());
 
         // when & then
-        assertThat(OllamaNarrativeGenerator.validate("39분 1,650원.", facts).verdict()).isEqualTo(Verdict.SHORT);
-        assertThat(OllamaNarrativeGenerator.validate("", facts).verdict()).isEqualTo(Verdict.SHORT);
+        assertThat(OllamaNarrativeGenerator.validate("39분 1,650원.", facts)).isInstanceOf(Validation.TooShort.class);
+        assertThat(OllamaNarrativeGenerator.validate("", facts)).isInstanceOf(Validation.TooShort.class);
     }
 
     private ScoredRouteHistoryEntry historyEntry(String id, int minutes) {

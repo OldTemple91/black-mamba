@@ -100,12 +100,12 @@ final class MobilityDiagnostics {
     private Mono<Optional<GenerationDiagnostic>> summarize(Phase phase, MobilityType type, List<Hub> hubs,
                                                            List<SegmentDiagnostic> items,
                                                            Location noPickupHintAt, Location noDropoffHintAt) {
-        if (items.isEmpty() || items.stream().anyMatch(SegmentDiagnostic::isValid)) {
+        if (items.isEmpty() || items.stream().anyMatch(item -> item instanceof SegmentDiagnostic.Valid)) {
             return Mono.just(Optional.empty());
         }
-        long noPickup = items.stream().filter(item -> item.reason() == DiagnosticReason.NO_PICKUP).count();
-        long noDropoff = items.stream().filter(item -> item.reason() == DiagnosticReason.NO_DROPOFF).count();
-        long sameStation = items.stream().filter(item -> item.reason() == DiagnosticReason.SAME_STATION).count();
+        long noPickup = countReason(items, DiagnosticReason.NO_PICKUP);
+        long noDropoff = countReason(items, DiagnosticReason.NO_DROPOFF);
+        long sameStation = countReason(items, DiagnosticReason.SAME_STATION);
 
         String prefix = MobilityConfigs.labelFor(type) + " " + phase.label + " 후보 " + candidateSummary(hubs) + "를 확인했지만 ";
         int hubCount = hubs.size();
@@ -134,8 +134,8 @@ final class MobilityDiagnostics {
 
         if (type != MobilityType.DDAREUNGI) {
             return pickup.map(result -> result.isPresent()
-                    ? SegmentDiagnostic.success()
-                    : SegmentDiagnostic.of(DiagnosticReason.NO_PICKUP));
+                    ? new SegmentDiagnostic.Valid()
+                    : new SegmentDiagnostic.Invalid(DiagnosticReason.NO_PICKUP));
         }
 
         Mono<Optional<MobilityInfo>> dropoff = mobilityAvailabilityPort.findNearbyDropoff(end.lat(), end.lng(), type);
@@ -144,10 +144,10 @@ final class MobilityDiagnostics {
                     Optional<MobilityInfo> pickupInfo = tuple.getT1();
                     Optional<MobilityInfo> dropoffInfo = tuple.getT2();
                     if (pickupInfo.isEmpty()) {
-                        return SegmentDiagnostic.of(DiagnosticReason.NO_PICKUP);
+                        return new SegmentDiagnostic.Invalid(DiagnosticReason.NO_PICKUP);
                     }
                     if (dropoffInfo.isEmpty()) {
-                        return SegmentDiagnostic.of(DiagnosticReason.NO_DROPOFF);
+                        return new SegmentDiagnostic.Invalid(DiagnosticReason.NO_DROPOFF);
                     }
                     MobilityInfo enriched = pickupInfo.get().withDropoffStation(
                             dropoffInfo.get().stationId(),
@@ -156,9 +156,9 @@ final class MobilityDiagnostics {
                             dropoffInfo.get().lng()
                     );
                     if (enriched.hasSamePickupAndDropoffStation()) {
-                        return SegmentDiagnostic.of(DiagnosticReason.SAME_STATION);
+                        return new SegmentDiagnostic.Invalid(DiagnosticReason.SAME_STATION);
                     }
-                    return SegmentDiagnostic.success();
+                    return new SegmentDiagnostic.Valid();
                 });
     }
 
@@ -187,22 +187,20 @@ final class MobilityDiagnostics {
         return new GenerationDiagnostic(phase, type, reasonCode, candidateCount, message);
     }
 
-    private record SegmentDiagnostic(boolean valid, DiagnosticReason reason) {
-        private boolean isValid() {
-            return valid;
-        }
+    private static long countReason(List<SegmentDiagnostic> items, DiagnosticReason reason) {
+        return items.stream()
+                .filter(item -> item instanceof SegmentDiagnostic.Invalid(DiagnosticReason actual) && actual == reason)
+                .count();
+    }
 
-        private static SegmentDiagnostic success() {
-            return new SegmentDiagnostic(true, DiagnosticReason.VALID);
-        }
+    /** 구간 1개의 대여/반납 판정 — 사유는 불가일 때만 존재하므로 boolean+enum 대신 타입으로 구분한다. */
+    private sealed interface SegmentDiagnostic {
+        record Valid() implements SegmentDiagnostic {}
 
-        private static SegmentDiagnostic of(DiagnosticReason reason) {
-            return new SegmentDiagnostic(false, reason);
-        }
+        record Invalid(DiagnosticReason reason) implements SegmentDiagnostic {}
     }
 
     private enum DiagnosticReason {
-        VALID,
         NO_PICKUP,
         NO_DROPOFF,
         SAME_STATION

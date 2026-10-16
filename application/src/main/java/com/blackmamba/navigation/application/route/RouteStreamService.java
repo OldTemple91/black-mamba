@@ -101,30 +101,14 @@ public class RouteStreamService {
 
         Flux<StreamEventPayload> polls = Flux.interval(POLL_INTERVAL, POLL_INTERVAL)
                 .flatMap(tick -> findRoutesMono(origin, destination, mobilityTypes, searchMode, preference, access)
-                        .map(SearchOutcome::succeeded)
+                        .<SearchOutcome>map(SearchOutcome.Succeeded::new)
                         .onErrorResume(err -> {
                             log.warn("[Stream] 재탐색 실패 — search_failed heartbeat 발행, 이전 결과 유지. err={}", err.getMessage());
-                            return Mono.just(SearchOutcome.failure());
+                            return Mono.just(new SearchOutcome.Failed());
                         }))
-                .map(outcome -> {
-                    if (outcome.failed()) {
-                        heartbeatsPushedCounter.increment();
-                        return (StreamEventPayload) StreamEventPayload.Heartbeat.of(StreamEventPayload.Heartbeat.SEARCH_FAILED);
-                    }
-                    List<Route> current = outcome.routes();
-                    if (current.isEmpty()) {
-                        heartbeatsPushedCounter.increment();
-                        return (StreamEventPayload) StreamEventPayload.Heartbeat.of(StreamEventPayload.Heartbeat.NO_ROUTES);
-                    }
-                    List<Route> prev = lastRoutes.get();
-                    String reason = changeReason(prev, current);
-                    if (reason != null) {
-                        lastRoutes.set(current);
-                        updatesPushedCounter.increment();
-                        return (StreamEventPayload) new StreamEventPayload.Update(Instant.now(), current, reason);
-                    }
-                    heartbeatsPushedCounter.increment();
-                    return (StreamEventPayload) StreamEventPayload.Heartbeat.watching();
+                .map(outcome -> switch (outcome) {
+                    case SearchOutcome.Failed() -> heartbeat(StreamEventPayload.Heartbeat.SEARCH_FAILED);
+                    case SearchOutcome.Succeeded(List<Route> current) -> toPollEvent(current, lastRoutes);
                 });
 
         return Flux.concat(initial, polls)
@@ -162,15 +146,30 @@ public class RouteStreamService {
                 .timeout(SEARCH_TIMEOUT);
     }
 
-    /** 재탐색 1회의 결과 — 실패와 "성공했지만 0건" 을 구분해 전달한다. */
-    private record SearchOutcome(List<Route> routes, boolean failed) {
-        static SearchOutcome succeeded(List<Route> routes) {
-            return new SearchOutcome(routes == null ? List.of() : routes, false);
+    /** 재탐색 성공 1회를 Update 또는 Heartbeat 로 바꾼다. 의미 있는 변화가 있을 때만 lastRoutes 를 갱신한다. */
+    private StreamEventPayload toPollEvent(List<Route> current, AtomicReference<List<Route>> lastRoutes) {
+        if (current.isEmpty()) {
+            return heartbeat(StreamEventPayload.Heartbeat.NO_ROUTES);
         }
+        String reason = changeReason(lastRoutes.get(), current);
+        if (reason == null) {
+            return heartbeat(StreamEventPayload.Heartbeat.WATCHING);
+        }
+        lastRoutes.set(current);
+        updatesPushedCounter.increment();
+        return new StreamEventPayload.Update(Instant.now(), current, reason);
+    }
 
-        static SearchOutcome failure() {
-            return new SearchOutcome(List.of(), true);
-        }
+    private StreamEventPayload heartbeat(String status) {
+        heartbeatsPushedCounter.increment();
+        return StreamEventPayload.Heartbeat.of(status);
+    }
+
+    /** 재탐색 1회의 결과 — 실패와 "성공했지만 0건" 을 타입으로 구분한다 ("실패인데 경로 있음" 은 표현 불가). */
+    private sealed interface SearchOutcome {
+        record Succeeded(List<Route> routes) implements SearchOutcome {}
+
+        record Failed() implements SearchOutcome {}
     }
 
     /**

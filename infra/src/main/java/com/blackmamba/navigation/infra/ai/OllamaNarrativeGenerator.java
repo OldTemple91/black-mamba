@@ -104,26 +104,24 @@ public class OllamaNarrativeGenerator implements NarrativeGenerator {
             }
             // 할루시네이션 감지: 출력 숫자가 프롬프트에 준 수치 밖이면 폴백
             NarrativeFacts facts = NarrativeFacts.of(route, originalNarrative, similarHistory);
-            Validation validation = validate(cleaned, facts);
-            switch (validation.verdict()) {
-                case SHORT -> {
+            return switch (validate(cleaned, facts)) {
+                case Validation.TooShort() -> {
                     shortCounter.increment();
                     log.debug("[RAG4] narrative 너무 짧음 → 폴백. routeId={} len={}", route.routeId(), cleaned.length());
-                    return "";
+                    yield "";
                 }
-                case HALLUCINATION -> {
+                case Validation.Hallucination(String detail) -> {
                     hallucinationCounter.increment();
                     log.warn("[RAG4] 할루시네이션 감지 → 폴백. routeId={} 사유={} 출력=\"{}\"",
-                            route.routeId(), validation.detail(), abbreviate(cleaned));
-                    return "";
+                            route.routeId(), detail, abbreviate(cleaned));
+                    yield "";
                 }
-                case OK -> {
+                case Validation.Ok() -> {
                     successCounter.increment();
                     log.debug("[RAG4] narrative 생성: \"{}\"", cleaned);
-                    return cleaned;
+                    yield cleaned;
                 }
-            }
-            return "";
+            };
         } catch (Exception e) {
             log.warn("[RAG4] narrative 생성 실패 — 폴백(원본 유지). routeId={} err={}", route.routeId(), e.getMessage());
             errorCounter.increment();
@@ -146,12 +144,13 @@ public class OllamaNarrativeGenerator implements NarrativeGenerator {
     // "3건 중 2건" — 유사 이력 통계 주장
     private static final Pattern COUNT_PATTERN = Pattern.compile("(\\d+)\\s*건");
 
-    enum Verdict { OK, SHORT, HALLUCINATION }
+    /** 검증 결과 — 사유 문자열은 할루시네이션일 때만 존재하므로 enum+필드 대신 타입으로 구분한다. */
+    sealed interface Validation {
+        record Ok() implements Validation {}
 
-    record Validation(Verdict verdict, String detail) {
-        static Validation ok() {
-            return new Validation(Verdict.OK, "");
-        }
+        record TooShort() implements Validation {}
+
+        record Hallucination(String detail) implements Validation {}
     }
 
     /**
@@ -160,19 +159,19 @@ public class OllamaNarrativeGenerator implements NarrativeGenerator {
      *   <li>분/원: 제공한 수치 중 하나와 허용 오차(5분 / 1,000원) 안이면 통과 — 총합·구간·자가용 차이·이력 수치 모두 인정</li>
      *   <li>"N건": 제공한 이력 건수를 넘는 통계 주장, 이력이 없는데 건수를 말하면 할루시네이션
      *       (프롬프트의 예시 "3건 중 2건" 을 그대로 베끼는 소형 모델의 전형적 실패)</li>
-     *   <li>길이 50자 미만은 정보성 부족 — 별도 사유(SHORT)</li>
+     *   <li>길이 50자 미만은 정보성 부족 — 별도 사유(TooShort)</li>
      * </ul>
      */
     static Validation validate(String narrative, NarrativeFacts facts) {
         if (narrative == null || narrative.isBlank() || narrative.length() < MIN_NARRATIVE_LENGTH) {
-            return new Validation(Verdict.SHORT, "길이 부족");
+            return new Validation.TooShort();
         }
 
         Matcher mm = MINUTES_PATTERN.matcher(narrative);
         while (mm.find()) {
             int minutes = Integer.parseInt(mm.group(1));
             if (!isNear(minutes, facts.allowedMinutes(), ALLOWED_MINUTES_DELTA)) {
-                return new Validation(Verdict.HALLUCINATION, "출력 " + minutes + "분 — 제공 수치 " + facts.allowedMinutes());
+                return new Validation.Hallucination("출력 " + minutes + "분 — 제공 수치 " + facts.allowedMinutes());
             }
         }
 
@@ -185,7 +184,7 @@ public class OllamaNarrativeGenerator implements NarrativeGenerator {
                 continue;
             }
             if (!isNear(won, facts.allowedWon(), ALLOWED_COST_DELTA)) {
-                return new Validation(Verdict.HALLUCINATION, "출력 " + won + "원 — 제공 수치 " + facts.allowedWon());
+                return new Validation.Hallucination("출력 " + won + "원 — 제공 수치 " + facts.allowedWon());
             }
         }
 
@@ -193,11 +192,11 @@ public class OllamaNarrativeGenerator implements NarrativeGenerator {
         while (cm.find()) {
             int count = Integer.parseInt(cm.group(1));
             if (count > facts.historyCount()) {
-                return new Validation(Verdict.HALLUCINATION, "출력 " + count + "건 — 제공 이력 " + facts.historyCount() + "건");
+                return new Validation.Hallucination("출력 " + count + "건 — 제공 이력 " + facts.historyCount() + "건");
             }
         }
 
-        return Validation.ok();
+        return new Validation.Ok();
     }
 
     private static boolean isNear(int value, java.util.Set<Integer> allowed, int tolerance) {
