@@ -26,6 +26,7 @@ spring:
 
 odsay:
   api-key: ${ODSAY_API_KEY}
+  request-timeout-ms: 5000
 
 ddareungi:
   api-key: ${DDAREUNGI_API_KEY}
@@ -43,10 +44,12 @@ tago:
 
 tmap:
   app-key: ${TMAP_APP_KEY}
+  request-timeout-ms: 5000
 
 naver:
   client-id: ${NAVER_CLIENT_ID}
   client-secret: ${NAVER_CLIENT_SECRET}
+  request-timeout-ms: 3000
   search:
     client-id: ${NAVER_SEARCH_CLIENT_ID:}
     client-secret: ${NAVER_SEARCH_CLIENT_SECRET:}
@@ -159,9 +162,11 @@ resilience4j:
         waitDurationInOpenState: 10s     # OPEN 상태 10초 유지 후 HALF_OPEN
         permittedNumberOfCallsInHalfOpenState: 3  # HALF_OPEN 에서 3회 시도
         automaticTransitionFromOpenToHalfOpenEnabled: true
+        # 목록에 없는 예외는 '성공' 으로 집계된다 — 클라이언트가 던지는 ExternalApiException 계열을 반드시 포함
         recordExceptions:
           - java.io.IOException
           - java.util.concurrent.TimeoutException
+          - com.blackmamba.navigation.infra.common.http.ExternalApiException
           - org.springframework.web.reactive.function.client.WebClientResponseException$InternalServerError
           - org.springframework.web.reactive.function.client.WebClientResponseException$ServiceUnavailable
           - org.springframework.web.reactive.function.client.WebClientResponseException$GatewayTimeout
@@ -186,9 +191,14 @@ resilience4j:
         waitDuration: 300ms
         enableExponentialBackoff: true
         exponentialBackoffMultiplier: 2
+        # 5xx 만 재시도 — 4xx(키 오류·한도) 는 재시도해도 같은 답
         retryExceptions:
           - java.io.IOException
           - java.util.concurrent.TimeoutException
+          - com.blackmamba.navigation.infra.common.http.ExternalApiServerException
+          - org.springframework.web.reactive.function.client.WebClientResponseException$InternalServerError
+          - org.springframework.web.reactive.function.client.WebClientResponseException$ServiceUnavailable
+          - org.springframework.web.reactive.function.client.WebClientResponseException$GatewayTimeout
           - org.springframework.web.reactive.function.client.WebClientRequestException
     instances:
       odsay:

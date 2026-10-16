@@ -150,9 +150,10 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
             vectorStore.add(List.of(document));
             log.info("[RAG] 경로 이력 저장: routeId={} desc=\"{}\" ({}→{})",
                     route.routeId(), description, originGeohash, destGeohash);
-        } catch (Exception e) {
-            log.warn("[RAG] Qdrant 저장 실패 — 본 요청에는 영향 없음. routeId={}, err={}",
-                    route.routeId(), e.getMessage());
+        } catch (RuntimeException e) {
+            // 삼키지 않는다 — fire-and-forget 여부는 호출자(RouteHistoryRecorder)가 정하고, 시드·메트릭은 실제 성공만 센다
+            log.warn("[RAG] Qdrant 저장 실패. routeId={}, err={}", route.routeId(), e.getMessage());
+            throw e;
         }
     }
 
@@ -190,10 +191,10 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
                 }
             }
             return scored;
-        } catch (Exception e) {
-            log.warn("[RAG] Qdrant 검색 실패. query=\"{}\", err={}",
-                    request.query(), e.getMessage());
-            return List.of();
+        } catch (RuntimeException e) {
+            // 삼키지 않는다 — "결과 없음" 과 "저장소 장애" 를 호출자가 구분해야 한다 (API 는 503, narrative 는 빈 이력으로 진행)
+            log.warn("[RAG] Qdrant 검색 실패. query=\"{}\", err={}", request.query(), e.getMessage());
+            throw e;
         }
     }
 

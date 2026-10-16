@@ -91,7 +91,7 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                     .map(snapshot -> snapshot.stations().stream().findFirst()
                             .map(station -> ddareungiInfo(station, distanceMeters(lat, lng, station.lat(), station.lng()), snapshot.source())))
                     .onErrorResume(ex -> {
-                        log.error("[따릉이] 반납 정류소 조회 오류: {}", ex.getMessage());
+                        log.warn("[따릉이] 반납 정류소 조회 오류 → 반납 후보 없음 처리: {}", ex.getMessage());
                         ddareungiFallbackErrorCounter.increment();
                         return Mono.just(Optional.<MobilityInfo>empty());
                     });
@@ -145,7 +145,7 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                                 dropoff
                         )))
                 .onErrorResume(ex -> {
-                    log.debug("[따릉이] 최근접 정류소 힌트 조회 실패: {}", ex.getMessage());
+                    log.warn("[따릉이] 최근접 정류소 힌트 조회 실패 → 진단 문구에 힌트 생략: {}", ex.getMessage());
                     return Mono.just(Optional.empty());
                 });
     }
@@ -174,7 +174,7 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                     return result;
                 })
                 .onErrorResume(ex -> {
-                    log.error("[따릉이] API 오류: {}", ex.getMessage());
+                    log.warn("[따릉이] 대여 정류소 조회 오류 → 대여 후보 없음 처리: {}", ex.getMessage());
                     ddareungiFallbackErrorCounter.increment();
                     return Mono.just(Optional.<MobilityInfo>empty());
                 });
@@ -206,7 +206,7 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                             });
                 })
                 .onErrorResume(ex -> {
-                    log.error("[킥보드] API 오류: {} → 가상 킥보드(추정)로 폴백", ex.getMessage());
+                    log.warn("[킥보드] API 오류: {} → 가상 킥보드(추정)로 폴백", ex.getMessage());
                     kickboardFallbackErrorCounter.increment();
                     return Mono.just(Optional.of(syntheticKickboard(lat, lng)));
                 });

@@ -7,6 +7,8 @@ import com.blackmamba.navigation.domain.route.TransitSearchDistancePolicy;
 import com.blackmamba.navigation.infra.common.GeohashKeyGenerator;
 import com.blackmamba.navigation.infra.common.cache.TtlCache;
 import com.blackmamba.navigation.infra.common.cache.TtlCacheRegistry;
+import com.blackmamba.navigation.infra.common.http.ExternalApiException;
+import com.blackmamba.navigation.infra.common.http.WebClients;
 import com.blackmamba.navigation.infra.odsay.dto.OdsayRouteResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -21,6 +23,7 @@ import io.micrometer.observation.annotation.Observed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -42,6 +45,7 @@ public class OdsayRouteClient {
     private final ObjectMapper objectMapper;
     private final String apiKey;
     private final Counter transitRouteErrorFallbackCounter;
+    private final Counter transitRouteEmptyResultCounter;
     private final Counter transitTimeEstimateFallbackCounter;
     private final Counter transitRouteShortDistanceSkipCounter;
     private final Counter transitTimeShortDistanceSkipCounter;
@@ -59,6 +63,7 @@ public class OdsayRouteClient {
             @Value("${odsay.api-key}") String apiKey,
             @Value("${odsay.base-url:https://api.odsay.com/v1/api}") String baseUrl,
             @Value("${navigation.cache.odsay-route-ttl-ms:30000}") long routeCacheTtlMs,
+            @Value("${odsay.request-timeout-ms:5000}") long requestTimeoutMs,
             MeterRegistry meterRegistry,
             CircuitBreakerRegistry circuitBreakerRegistry,
             RetryRegistry retryRegistry,
@@ -68,13 +73,19 @@ public class OdsayRouteClient {
         this.objectMapper = objectMapper;
         this.apiKey = apiKey;
         this.routeCache = cacheRegistry.create("odsay_route", routeCacheTtlMs);
-        this.webClient = webClientBuilder.baseUrl(baseUrl).build();
+        this.webClient = WebClients.withTimeout(webClientBuilder, baseUrl, requestTimeoutMs);
         this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("odsay");
         this.retry = retryRegistry.retry("odsay");
         this.transitRouteErrorFallbackCounter = meterRegistry.counter(
                 "navigation.odsay.fallback.total",
                 "type", "transit_route",
                 "reason", "error"
+        );
+        // 200 응답이지만 result/path 가 비어 있음 — API 키 오류·경로 없음. 오류 카운터와 분리해 "조용한 실패" 를 보이게 한다
+        this.transitRouteEmptyResultCounter = meterRegistry.counter(
+                "navigation.odsay.fallback.total",
+                "type", "transit_route",
+                "reason", "empty_result"
         );
         this.transitTimeEstimateFallbackCounter = meterRegistry.counter(
                 "navigation.odsay.fallback.total",
@@ -120,7 +131,8 @@ public class OdsayRouteClient {
             return Mono.just(List.of());
         }
         String key = GeohashKeyGenerator.forRoute(origin, destination);
-        return routeCache.get(key, () -> requestTransitRoute(origin, destination));
+        // 빈 결과(오류 폴백·키 오류)는 캐시하지 않는다 — 일시 장애가 30초 동안 모든 경로를 추정값으로 고정하지 않게
+        return routeCache.get(key, () -> requestTransitRoute(origin, destination), legs -> !legs.isEmpty());
     }
 
     private Mono<List<Leg>> requestTransitRoute(Location origin, Location destination) {
@@ -134,24 +146,20 @@ public class OdsayRouteClient {
                         .queryParam("EY", destination.lat())
                         .build(apiKey))
                 .retrieve()
-                .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(),
-                        response -> response.bodyToMono(String.class)
-                                .flatMap(body -> {
-                                    log.error("[ODsay] HTTP 오류 {} — body: {}", response.statusCode(), body);
-                                    return Mono.error(new RuntimeException("ODsay API 오류: " + response.statusCode() + " " + body));
-                                })
-                )
+                .onStatus(HttpStatusCode::isError, response -> ExternalApiException.from("ODsay", response))
                 .bodyToMono(String.class)
                 .flatMap(rawJson -> {
-                    log.info("[ODsay] raw 응답 (첫 500자): {}", rawJson.length() > 500 ? rawJson.substring(0, 500) : rawJson);
+                    log.debug("[ODsay] raw 응답 (첫 500자): {}", rawJson.length() > 500 ? rawJson.substring(0, 500) : rawJson);
                     try {
                         OdsayRouteResponse response = objectMapper.readValue(rawJson, OdsayRouteResponse.class);
                         if (response.result() == null) {
+                            transitRouteEmptyResultCounter.increment();
                             log.warn("[ODsay] result=null — API 키 오류 또는 경로 없음. raw={}", rawJson);
                             return Mono.just(List.<Leg>of());
                         }
                         var paths = response.result().path();
                         if (paths == null || paths.isEmpty()) {
+                            transitRouteEmptyResultCounter.increment();
                             log.warn("[ODsay] 경로(path) 배열 비어있음");
                             return Mono.just(List.<Leg>of());
                         }

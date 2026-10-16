@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -125,9 +126,17 @@ public class NaturalLanguageRouteController {
         SearchMode mode = intent.hasExplicitMobility() ? SearchMode.SPECIFIC : SearchMode.OPTIMAL;
         AccessibilityContext access = AccessibilityContext.of(intent.wheelchairAccessible(), intent.walkingSpeedKmh());
 
-        List<Route> routes = routeOptimizationService
-                .findRoutes(origin, destination, intent.mobility(), mode, intent.preference(), access)
-                .block(ROUTE_SEARCH_TIMEOUT);
+        List<Route> routes;
+        try {
+            routes = routeOptimizationService
+                    .findRoutes(origin, destination, intent.mobility(), mode, intent.preference(), access)
+                    .block(ROUTE_SEARCH_TIMEOUT);
+        } catch (IllegalStateException e) {
+            // Mono.block(timeout) 의 만료 — /api/routes 와 같은 504 계약
+            log.error("[NLP] 경로 탐색 타임아웃 ({}초 초과): {} → {}", ROUTE_SEARCH_TIMEOUT.getSeconds(), intent.origin(), intent.destination());
+            return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT)
+                    .body(ErrorResponse.of("SEARCH_TIMEOUT", "경로 탐색 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요."));
+        }
 
         // RAG-4: 추천 경로의 carComparison.narrative 를 LLM 설명으로 업그레이드
         if (routes != null && !routes.isEmpty()) {

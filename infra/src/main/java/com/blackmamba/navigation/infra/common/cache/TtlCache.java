@@ -5,6 +5,8 @@ import io.micrometer.core.instrument.MeterRegistry;
 import reactor.core.publisher.Mono;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -21,6 +23,8 @@ import java.util.function.Supplier;
  *       <b>오류 신호도 재생되므로</b> 로더는 반드시 {@code onErrorResume} 으로 끝나야 한다</li>
  *   <li>로더 실행은 {@code compute} 바깥(구독 시점)에서 일어난다 — 락 안에서 I/O 없음</li>
  *   <li>만료 엔트리는 조회 시 교체되지만, 재조회 없는 키는 {@link #purgeExpired} 로 청소해야 힙에 남지 않는다</li>
+ *   <li>로더의 <b>폴백 값</b>(오류 시 빈 결과)까지 TTL 동안 재생하면 일시 장애가 30초~5분 동안 고정된다 —
+ *       {@link #get(Object, Supplier, Predicate)} 로 "캐시할 가치가 있는 값" 만 남길 수 있다</li>
  * </ul>
  */
 public final class TtlCache<K, V> {
@@ -40,6 +44,14 @@ public final class TtlCache<K, V> {
      * 유효한 엔트리가 있으면 그 Mono 를, 없으면 {@code loader} 로 새 엔트리를 만들어 반환한다.
      */
     public Mono<V> get(K key, Supplier<Mono<V>> loader) {
+        return get(key, loader, value -> true);
+    }
+
+    /**
+     * {@code cacheable} 이 거짓인 값(예: 오류 폴백으로 만든 빈 결과)은 호출자에게는 전달하되
+     * 엔트리를 즉시 비워 다음 호출이 다시 로드하게 한다.
+     */
+    public Mono<V> get(K key, Supplier<Mono<V>> loader, Predicate<V> cacheable) {
         long now = System.currentTimeMillis();
         return entries.compute(key, (ignored, existing) -> {
             if (existing != null && !existing.isExpired(now)) {
@@ -47,7 +59,17 @@ public final class TtlCache<K, V> {
                 return existing;
             }
             missCounter.increment();
-            return new Entry<>(loader.get().cache(), now + ttlMs);
+            AtomicReference<Entry<V>> self = new AtomicReference<>();
+            Mono<V> shared = loader.get()
+                    .doOnNext(value -> {
+                        if (!cacheable.test(value)) {
+                            entries.remove(key, self.get());
+                        }
+                    })
+                    .cache();
+            Entry<V> entry = new Entry<>(shared, now + ttlMs);
+            self.set(entry);
+            return entry;
         }).value();
     }
 

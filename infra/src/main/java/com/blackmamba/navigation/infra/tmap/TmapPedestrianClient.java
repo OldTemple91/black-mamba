@@ -4,6 +4,7 @@ import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.infra.common.GeohashKeyGenerator;
 import com.blackmamba.navigation.infra.common.cache.TtlCache;
 import com.blackmamba.navigation.infra.common.cache.TtlCacheRegistry;
+import com.blackmamba.navigation.infra.common.http.WebClients;
 import com.blackmamba.navigation.infra.tmap.dto.TmapPedestrianResponse;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
@@ -26,6 +27,7 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -47,6 +49,8 @@ public class TmapPedestrianClient {
     private final TtlCache<String, Optional<TmapRouteData>> routeCache;
     private final long quotaBackoffMs;
     private final AtomicLong quotaBlockedUntilMs = new AtomicLong(0L);
+    /** backoff 창마다 한 번만 WARN — 요청당 구간 수만큼 반복되면 실제 경고가 묻힌다. 집계는 quotaShortCircuitCounter 가 한다 */
+    private final AtomicBoolean quotaBackoffLogged = new AtomicBoolean(false);
     // T-3: Resilience4j
     private final CircuitBreaker circuitBreaker;
     private final Retry retry;
@@ -56,12 +60,13 @@ public class TmapPedestrianClient {
             @Value("${tmap.app-key}") String appKey,
             @Value("${navigation.cache.tmap-pedestrian-route-ttl-ms:300000}") long routeCacheTtlMs,
             @Value("${navigation.cache.tmap-rate-limit-backoff-ms:3600000}") long quotaBackoffMs,
+            @Value("${tmap.request-timeout-ms:5000}") long requestTimeoutMs,
             MeterRegistry meterRegistry,
             CircuitBreakerRegistry circuitBreakerRegistry,
             RetryRegistry retryRegistry,
             TtlCacheRegistry cacheRegistry
     ) {
-        this.webClient = webClientBuilder.baseUrl(BASE_URL).build();
+        this.webClient = WebClients.withTimeout(webClientBuilder, BASE_URL, requestTimeoutMs);
         this.appKey = appKey;
         this.routeCache = cacheRegistry.create("tmap_pedestrian_route", routeCacheTtlMs);
         this.quotaBackoffMs = quotaBackoffMs;
@@ -88,7 +93,9 @@ public class TmapPedestrianClient {
         long now = System.currentTimeMillis();
         if (blockedUntil > now) {
             quotaShortCircuitCounter.increment();
-            log.warn("[TMAP] quota backoff active -> API 호출 생략 ({}초 남음)", (blockedUntil - now) / 1000);
+            if (quotaBackoffLogged.compareAndSet(false, true)) {
+                log.warn("[TMAP] quota backoff active -> API 호출 생략 ({}초 남음, 이 창에서 1회만 기록)", (blockedUntil - now) / 1000);
+            }
             return Mono.just(Optional.empty());
         }
         String key = GeohashKeyGenerator.forRoute(origin, destination);
@@ -132,6 +139,7 @@ public class TmapPedestrianClient {
                         quotaFallbackCounter.increment();
                         long blockedUntil = System.currentTimeMillis() + quotaBackoffMs;
                         quotaBlockedUntilMs.set(blockedUntil);
+                        quotaBackoffLogged.set(false);
                         log.warn("[TMAP] 429 감지 -> {}ms 동안 외부 호출 차단 후 haversine fallback", quotaBackoffMs);
                         return Mono.just(Optional.empty());
                     }

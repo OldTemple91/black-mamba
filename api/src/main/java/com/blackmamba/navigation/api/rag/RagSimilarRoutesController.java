@@ -127,7 +127,15 @@ public class RagSimilarRoutesController {
         log.info("[RAG] similar-routes query=\"{}\" topK={} threshold={} origin={} dest={} mobility={}",
                 query, safeTopK, request.similarityThreshold(), origin, destination, mobilityFilter);
 
-        List<ScoredRouteHistoryEntry> scored = routeHistoryPort.search(request).block(SEARCH_TIMEOUT);
+        List<ScoredRouteHistoryEntry> scored;
+        try {
+            scored = routeHistoryPort.search(request).block(SEARCH_TIMEOUT);
+        } catch (RuntimeException e) {
+            // "결과 없음"(200, hitCount 0) 과 "벡터 DB 장애" 를 구분한다 — 장애를 빈 결과로 포장하면 운영자도 사용자도 모른다
+            log.warn("[RAG] similar-routes 저장소 오류 → 503. query=\"{}\" err={}", query, e.toString());
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(ErrorResponse.of("VECTOR_STORE_ERROR", "유사 경로 검색에 일시적으로 실패했습니다. 잠시 후 다시 시도해 주세요."));
+        }
         List<SimilarRouteResponse> items = (scored == null ? List.<ScoredRouteHistoryEntry>of() : scored).stream()
                 .map(SimilarRouteResponse::from)
                 .toList();

@@ -1,6 +1,7 @@
 package com.blackmamba.navigation.infra.ddareungi;
 
 import com.blackmamba.navigation.domain.route.mobility.AvailabilitySource;
+import com.blackmamba.navigation.infra.common.http.ExternalApiException;
 import com.blackmamba.navigation.infra.ddareungi.dto.DdareungiStation;
 import com.blackmamba.navigation.infra.ddareungi.dto.DdareungiStationResponse;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -16,6 +17,7 @@ import io.netty.channel.ChannelOption;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -188,12 +190,7 @@ public class DdareungiApiClient {
             Mono<StationSnapshot> loader = webClient.get()
                     .uri("/{apiKey}/json/bikeList/1/1000/", apiKey)
                     .retrieve()
-                    .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(),
-                            response -> response.bodyToMono(String.class)
-                                    .flatMap(body -> Mono.error(
-                                            new RuntimeException("따릉이 API 오류: " + response.statusCode() + " " + body)
-                                    ))
-                    )
+                    .onStatus(HttpStatusCode::isError, response -> ExternalApiException.from("따릉이", response))
                     .bodyToMono(DdareungiStationResponse.class)
                     .timeout(Duration.ofMillis(requestTimeoutMs))
                     .map(DdareungiStationResponse::toStations)

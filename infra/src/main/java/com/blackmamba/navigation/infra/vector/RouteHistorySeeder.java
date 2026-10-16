@@ -80,14 +80,19 @@ public class RouteHistorySeeder {
                 }
             }
         }
-        // 임베딩 서버 과부하 방지 — 순차 실행 (기존 동기 루프와 같은 부하 특성)
-        Flux.fromIterable(saves)
-                .concatMap(save -> save)
-                .then()
+        // 임베딩 서버 과부하 방지 — 순차 실행. 실패 건은 건너뛰고 실제 성공 건수만 센다
+        Integer saved = Flux.fromIterable(saves)
+                .concatMap(save -> save.thenReturn(1)
+                        .onErrorResume(e -> {
+                            log.warn("[RAG] Seed 1건 실패 → 건너뜀. err={}", e.getMessage());
+                            return Mono.just(0);
+                        }))
+                .reduce(0, Integer::sum)
                 .block();
-        log.info("[RAG] Seed 완료 — OD {}개 × 시간대 {}개 × 선호도 {}개 = {}건 저장",
-                odPool.size(), timeSlots.size(), preferences.length, saves.size());
-        return saves.size();
+        int savedCount = saved == null ? 0 : saved;
+        log.info("[RAG] Seed 완료 — OD {}개 × 시간대 {}개 × 선호도 {}개 = {}건 시도, {}건 저장",
+                odPool.size(), timeSlots.size(), preferences.length, saves.size(), savedCount);
+        return savedCount;
     }
 
     // ─── OD 풀 (서울 주요 생활권 20개) ───────────────

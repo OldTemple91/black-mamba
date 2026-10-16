@@ -1,5 +1,7 @@
 package com.blackmamba.navigation.infra.naver;
 
+import com.blackmamba.navigation.infra.common.http.ExternalApiException;
+import com.blackmamba.navigation.infra.common.http.WebClients;
 import com.blackmamba.navigation.infra.naver.dto.NaverGeocodingResponse;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
@@ -7,7 +9,12 @@ import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOper
 import io.github.resilience4j.reactor.retry.RetryOperator;
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryRegistry;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -15,12 +22,22 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * NCP 지오코딩 클라이언트.
+ * <p>
+ * 실패는 빈 결과로 정규화하되 <b>조용히</b> 하지 않는다 — 로그와 카운터를 남긴다.
+ * 예전엔 {@code onErrorReturn} 만 있어 시크릿 회전·5xx 가 전부 "장소를 못 찾았습니다"(400) 로 사용자 탓이 됐다.
+ */
 @Component
 public class NaverGeocodingClient {
 
+    private static final Logger log = LoggerFactory.getLogger(NaverGeocodingClient.class);
     private static final String BASE_URL = "https://naveropenapi.apigw.ntruss.com";
+    private static final String API_NAME = "Naver Geocoding";
 
     private final WebClient webClient;
+    private final Counter geocodeErrorCounter;
+    private final Counter suggestErrorCounter;
     // T-3: Resilience4j
     private final CircuitBreaker circuitBreaker;
     private final Retry retry;
@@ -29,16 +46,19 @@ public class NaverGeocodingClient {
             WebClient.Builder builder,
             @Value("${naver.client-id}") String clientId,
             @Value("${naver.client-secret}") String clientSecret,
+            @Value("${naver.request-timeout-ms:3000}") long requestTimeoutMs,
+            MeterRegistry meterRegistry,
             CircuitBreakerRegistry circuitBreakerRegistry,
             RetryRegistry retryRegistry
     ) {
-        this.webClient = builder
-                .baseUrl(BASE_URL)
-                .defaultHeader("X-NCP-APIGW-API-KEY-ID", clientId)
-                .defaultHeader("X-NCP-APIGW-API-KEY", clientSecret)
-                .build();
+        this.webClient = WebClients.withTimeout(
+                builder.defaultHeader("X-NCP-APIGW-API-KEY-ID", clientId)
+                        .defaultHeader("X-NCP-APIGW-API-KEY", clientSecret),
+                BASE_URL, requestTimeoutMs);
         this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("naver-geocoding");
         this.retry = retryRegistry.retry("naver-geocoding");
+        this.geocodeErrorCounter = meterRegistry.counter("navigation.naver.fallback.total", "api", "geocode", "reason", "error");
+        this.suggestErrorCounter = meterRegistry.counter("navigation.naver.fallback.total", "api", "suggest", "reason", "error");
     }
 
     /**
@@ -53,12 +73,7 @@ public class NaverGeocodingClient {
                         .queryParam("query", query)
                         .build())
                 .retrieve()
-                .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(),
-                        response -> response.bodyToMono(String.class)
-                                .flatMap(body -> Mono.error(
-                                        new RuntimeException("Naver Geocoding API 오류: " + response.statusCode() + " " + body)
-                                ))
-                )
+                .onStatus(HttpStatusCode::isError, response -> ExternalApiException.from(API_NAME, response))
                 .bodyToMono(NaverGeocodingResponse.class)
                 .map(response -> {
                     if (!"OK".equals(response.status())
@@ -71,7 +86,11 @@ public class NaverGeocodingClient {
                 })
                 .transformDeferred(RetryOperator.of(retry))
                 .transformDeferred(CircuitBreakerOperator.of(circuitBreaker))
-                .onErrorReturn(Optional.empty());
+                .onErrorResume(e -> {
+                    geocodeErrorCounter.increment();
+                    log.warn("[Naver] 지오코딩 실패(최종) → 빈 결과. query=\"{}\" err={}", query, e.toString());
+                    return Mono.just(Optional.empty());
+                });
     }
 
     /**
@@ -86,8 +105,7 @@ public class NaverGeocodingClient {
                         .queryParam("count", 5)
                         .build())
                 .retrieve()
-                .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(),
-                        response -> Mono.error(new RuntimeException("Geocode suggest 오류")))
+                .onStatus(HttpStatusCode::isError, response -> ExternalApiException.from(API_NAME, response))
                 .bodyToMono(NaverGeocodingResponse.class)
                 .map(response -> {
                     if (!"OK".equals(response.status())
@@ -105,7 +123,11 @@ public class NaverGeocodingClient {
                 })
                 .transformDeferred(RetryOperator.of(retry))
                 .transformDeferred(CircuitBreakerOperator.of(circuitBreaker))
-                .onErrorReturn(List.of());
+                .onErrorResume(e -> {
+                    suggestErrorCounter.increment();
+                    log.warn("[Naver] 자동완성 실패(최종) → 빈 결과. query=\"{}\" err={}", query, e.toString());
+                    return Mono.just(List.of());
+                });
     }
 
     public record SuggestItem(String name, double lat, double lng) {}

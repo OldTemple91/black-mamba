@@ -43,6 +43,24 @@ class TtlCacheTest {
     }
 
     @Test
+    void 캐시_불가_판정된_값은_다음_호출에서_다시_로드된다() {
+        // given — 첫 로드는 폴백(빈 값, 캐시 불가), 두 번째 로드는 정상
+        TtlCache<String, Integer> cache = registry.create("fallback", 60_000L);
+        AtomicInteger loads = new AtomicInteger();
+
+        // when
+        Integer first = cache.get("k", () -> Mono.fromSupplier(loads::incrementAndGet), v -> v > 1).block();
+        Integer second = cache.get("k", () -> Mono.fromSupplier(loads::incrementAndGet), v -> v > 1).block();
+        Integer third = cache.get("k", () -> Mono.fromSupplier(loads::incrementAndGet), v -> v > 1).block();
+
+        // then — 1(폴백)은 캐시되지 않아 재로드, 2 부터는 캐시 재생
+        assertThat(first).isEqualTo(1);
+        assertThat(second).isEqualTo(2);
+        assertThat(third).isEqualTo(2);
+        assertThat(loads).hasValue(2);
+    }
+
+    @Test
     void 만료_엔트리는_purge_로_제거되고_유효_엔트리는_남는다() {
         // given
         TtlCache<String, Integer> expiring = registry.create("expiring", 0L);

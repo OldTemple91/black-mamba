@@ -145,7 +145,9 @@ public class OllamaRouteIntentParser implements RouteIntentParser {
         int start = raw.indexOf('{');
         int end = raw.lastIndexOf('}');
         if (start < 0 || end <= start) {
-            throw new IllegalStateException("LLM 응답에서 JSON을 찾을 수 없습니다: " + raw);
+            // 모델 원문은 로그에만 — 예외 메시지는 400 본문으로 사용자에게 나간다
+            log.warn("[NLP] LLM 응답에 JSON 없음. raw={}", raw);
+            throw new IllegalStateException("자연어 요청을 이해하지 못했습니다. 더 명확히 입력해 주세요.");
         }
         return raw.substring(start, end + 1);
     }

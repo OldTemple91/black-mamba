@@ -1,5 +1,7 @@
 package com.blackmamba.navigation.infra.naver;
 
+import com.blackmamba.navigation.infra.common.http.ExternalApiException;
+import com.blackmamba.navigation.infra.common.http.WebClients;
 import com.blackmamba.navigation.infra.naver.dto.NaverLocalSearchResponse;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
@@ -7,7 +9,12 @@ import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOper
 import io.github.resilience4j.reactor.retry.RetryOperator;
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryRegistry;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -25,10 +32,13 @@ import java.util.List;
 @Component
 public class NaverLocalSearchClient {
 
+    private static final Logger log = LoggerFactory.getLogger(NaverLocalSearchClient.class);
     private static final String BASE_URL = "https://openapi.naver.com";
+    private static final String API_NAME = "Naver Local Search";
 
     private final WebClient webClient;
     private final boolean enabled;
+    private final Counter errorCounter;
     // T-3: Resilience4j
     private final CircuitBreaker circuitBreaker;
     private final Retry retry;
@@ -37,17 +47,19 @@ public class NaverLocalSearchClient {
             WebClient.Builder builder,
             @Value("${naver.search.client-id:}") String clientId,
             @Value("${naver.search.client-secret:}") String clientSecret,
+            @Value("${naver.request-timeout-ms:3000}") long requestTimeoutMs,
+            MeterRegistry meterRegistry,
             CircuitBreakerRegistry circuitBreakerRegistry,
             RetryRegistry retryRegistry
     ) {
         this.enabled = clientId != null && !clientId.isBlank();
-        this.webClient = builder
-                .baseUrl(BASE_URL)
-                .defaultHeader("X-Naver-Client-Id", clientId != null ? clientId : "")
-                .defaultHeader("X-Naver-Client-Secret", clientSecret != null ? clientSecret : "")
-                .build();
+        this.webClient = WebClients.withTimeout(
+                builder.defaultHeader("X-Naver-Client-Id", clientId != null ? clientId : "")
+                        .defaultHeader("X-Naver-Client-Secret", clientSecret != null ? clientSecret : ""),
+                BASE_URL, requestTimeoutMs);
         this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("naver-local");
         this.retry = retryRegistry.retry("naver-local");
+        this.errorCounter = meterRegistry.counter("navigation.naver.fallback.total", "api", "local_search", "reason", "error");
     }
 
     /**
@@ -70,10 +82,7 @@ public class NaverLocalSearchClient {
                         .queryParam("sort", "random")
                         .build())
                 .retrieve()
-                .onStatus(
-                        status -> status.is4xxClientError() || status.is5xxServerError(),
-                        response -> Mono.error(new RuntimeException("Naver Local Search API 오류: " + response.statusCode()))
-                )
+                .onStatus(HttpStatusCode::isError, response -> ExternalApiException.from(API_NAME, response))
                 .bodyToMono(NaverLocalSearchResponse.class)
                 .map(response -> {
                     if (response == null || response.items() == null) return List.<PlaceItem>of();
@@ -84,7 +93,8 @@ public class NaverLocalSearchClient {
                                     double lat = parseCoord(item.mapy());
                                     if (!isValidKoreaCoord(lat, lng)) return null;
                                     return new PlaceItem(item.cleanTitle(), lat, lng);
-                                } catch (Exception e) {
+                                } catch (RuntimeException e) {
+                                    log.debug("[Naver] 장소 좌표 파싱 실패 → 항목 제외. title={} err={}", item.cleanTitle(), e.toString());
                                     return null;
                                 }
                             })
@@ -93,7 +103,11 @@ public class NaverLocalSearchClient {
                 })
                 .transformDeferred(RetryOperator.of(retry))
                 .transformDeferred(CircuitBreakerOperator.of(circuitBreaker))
-                .onErrorReturn(List.of());
+                .onErrorResume(e -> {
+                    errorCounter.increment();
+                    log.warn("[Naver] 장소 검색 실패(최종) → 빈 결과. query=\"{}\" err={}", query, e.toString());
+                    return Mono.just(List.of());
+                });
     }
 
     /**

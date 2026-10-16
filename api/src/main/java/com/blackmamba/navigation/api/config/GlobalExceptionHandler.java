@@ -41,9 +41,22 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(e.getStatusCode().toString(), message));
     }
 
-    /** 나머지 예외는 500 */
+    /** 입력 검증 실패(컨트롤러·SSE 가 던지는 IllegalArgumentException) 는 400 — 사용자 입력이지 서버 장애가 아니다 */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleBadRequest(IllegalArgumentException e) {
+        log.warn("[400] {}", e.getMessage());
+        return ResponseEntity.badRequest()
+                .body(ErrorResponse.of("BAD_REQUEST", e.getMessage() != null ? e.getMessage() : "잘못된 요청입니다."));
+    }
+
+    /** 나머지 예외는 500 — 단, Spring 이 상태 코드를 들고 던진 예외(파라미터 누락·타입 불일치 등)는 그 상태를 유지 */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnhandled(Exception e) {
+        if (e instanceof org.springframework.web.ErrorResponse withStatus) {
+            log.warn("[{}] {}: {}", withStatus.getStatusCode(), e.getClass().getSimpleName(), e.getMessage());
+            return ResponseEntity.status(withStatus.getStatusCode())
+                    .body(ErrorResponse.of(withStatus.getStatusCode().toString(), "요청 형식이 올바르지 않습니다."));
+        }
         // e를 인자로 넘겨야 SLF4J가 stackTrace를 event.throwable에 저장 → structuredMetadata 의 %xException 에서 사용
         // line 자체에는 예외 타입 + 메시지만 출력 (스택트레이스는 분리)
         log.error("[전역 예외] {}: {}", e.getClass().getSimpleName(), e.getMessage(), e);

@@ -14,7 +14,8 @@ import java.util.List;
  * <h3>이벤트 4종</h3>
  * <ul>
  *   <li>{@link Initial} — 구독 직후 1회, 초기 경로 리스트</li>
- *   <li>{@link Heartbeat} — 30초 간격, 변화 없음을 알림</li>
+ *   <li>{@link Heartbeat} — 30초 간격. status: {@code watching}(변화 없음) / {@code search_failed}(재탐색 실패, 이전 결과 유지) /
+ *       {@code no_routes}(재탐색은 됐지만 경로 0건) — 클라이언트가 "조용한 정상" 과 "조용한 장애" 를 구분할 수 있어야 한다</li>
  *   <li>{@link Update} — 추천 경로 변경 감지, 새 경로 + 사유</li>
  *   <li>{@link Complete} — 종료 (timeout / disconnect / error)</li>
  * </ul>
@@ -26,8 +27,16 @@ public sealed interface StreamEventPayload {
     record Initial(Instant timestamp, List<Route> routes) implements StreamEventPayload {}
 
     record Heartbeat(Instant timestamp, String status) implements StreamEventPayload {
+        public static final String WATCHING = "watching";
+        public static final String SEARCH_FAILED = "search_failed";
+        public static final String NO_ROUTES = "no_routes";
+
         public static Heartbeat watching() {
-            return new Heartbeat(Instant.now(), "watching");
+            return of(WATCHING);
+        }
+
+        public static Heartbeat of(String status) {
+            return new Heartbeat(Instant.now(), status);
         }
     }
 

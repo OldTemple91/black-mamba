@@ -99,6 +99,7 @@ class OdsayRouteClientResilienceTest {
                 "test-api-key",
                 wireMock.baseUrl(),        // odsay.base-url 을 WireMock 으로 오버라이드
                 0L,                         // cache TTL = 0 → 매 테스트마다 실제 호출
+                5_000L,                     // request timeout
                 meterRegistry,
                 cbRegistry,
                 retryRegistry,

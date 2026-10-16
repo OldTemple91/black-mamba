@@ -101,11 +101,21 @@ public class RouteStreamService {
 
         Flux<StreamEventPayload> polls = Flux.interval(POLL_INTERVAL, POLL_INTERVAL)
                 .flatMap(tick -> findRoutesMono(origin, destination, mobilityTypes, searchMode, preference, access)
+                        .map(SearchOutcome::succeeded)
                         .onErrorResume(err -> {
-                            log.warn("[Stream] 재탐색 실패 — heartbeat 로 대체. err={}", err.getMessage());
-                            return Mono.empty();
+                            log.warn("[Stream] 재탐색 실패 — search_failed heartbeat 발행, 이전 결과 유지. err={}", err.getMessage());
+                            return Mono.just(SearchOutcome.failure());
                         }))
-                .map(current -> {
+                .map(outcome -> {
+                    if (outcome.failed()) {
+                        heartbeatsPushedCounter.increment();
+                        return (StreamEventPayload) StreamEventPayload.Heartbeat.of(StreamEventPayload.Heartbeat.SEARCH_FAILED);
+                    }
+                    List<Route> current = outcome.routes();
+                    if (current.isEmpty()) {
+                        heartbeatsPushedCounter.increment();
+                        return (StreamEventPayload) StreamEventPayload.Heartbeat.of(StreamEventPayload.Heartbeat.NO_ROUTES);
+                    }
                     List<Route> prev = lastRoutes.get();
                     String reason = changeReason(prev, current);
                     if (reason != null) {
@@ -123,6 +133,12 @@ public class RouteStreamService {
                     long seconds = Duration.between(startedAt, Instant.now()).toSeconds();
                     return Flux.just(new StreamEventPayload.Complete(Instant.now(), "timeout", seconds));
                 }))
+                // 초기 탐색 실패 등 복구 불가 오류: 연결을 끊지 말고 COMPLETE(error) 로 명시 종료
+                .onErrorResume(err -> {
+                    long seconds = Duration.between(startedAt, Instant.now()).toSeconds();
+                    log.warn("[Stream] 스트림 오류 종료. err={}", err.getMessage());
+                    return Flux.just(new StreamEventPayload.Complete(Instant.now(), "error", seconds));
+                })
                 .doOnSubscribe(sub -> {
                     streamsOpenedCounter.increment();
                     activeStreams.incrementAndGet();
@@ -144,6 +160,17 @@ public class RouteStreamService {
         return routeOptimizationService
                 .findRoutes(origin, destination, mobilityTypes, searchMode, preference, access)
                 .timeout(SEARCH_TIMEOUT);
+    }
+
+    /** 재탐색 1회의 결과 — 실패와 "성공했지만 0건" 을 구분해 전달한다. */
+    private record SearchOutcome(List<Route> routes, boolean failed) {
+        static SearchOutcome succeeded(List<Route> routes) {
+            return new SearchOutcome(routes == null ? List.of() : routes, false);
+        }
+
+        static SearchOutcome failure() {
+            return new SearchOutcome(List.of(), true);
+        }
     }
 
     /**
