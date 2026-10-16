@@ -6,6 +6,7 @@ import com.blackmamba.navigation.domain.route.LegType;
 import com.blackmamba.navigation.domain.route.Route;
 import com.blackmamba.navigation.domain.route.RouteType;
 import com.blackmamba.navigation.domain.route.TransitInfo;
+import com.blackmamba.navigation.domain.route.mobility.AvailabilitySource;
 import com.blackmamba.navigation.domain.route.mobility.MobilityInfo;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import org.junit.jupiter.api.Test;
@@ -75,16 +76,34 @@ class RouteReliabilityMetricsTest {
     }
 
     @Test
-    void 개인이동수단은_공유가_아님() {
+    void 개인이동수단은_운영사명과_무관하게_공유가_아님() {
+        // given — 어댑터가 실제로 넣는 운영사명 ("개인 킥보드")
         MobilityInfo personalInfo = new MobilityInfo(
-                MobilityType.PERSONAL_KICKBOARD, "개인", "device-2", 90,
-                "내킥보드", 37.5, 127.0, 1, 0
+                MobilityType.PERSONAL_KICKBOARD, "개인 킥보드", null, 100,
+                null, 37.5, 127.0, 1, 0
         );
         Leg kickboard = new Leg(LegType.KICKBOARD, "PERSONAL_KICKBOARD", 15, 3000, A, B, null, personalInfo, null);
-
         Route route = Route.of(List.of(kickboard), RouteType.MOBILITY_ONLY);
 
+        // when & then
         assertThat(RouteReliabilityMetrics.hasSharedMobility(route)).isFalse();
+        assertThat(RouteReliabilityMetrics.hasHealthyKickboard(route)).isFalse();   // 읽은 적 없는 배터리로 근거를 만들지 않는다
+        assertThat(RouteReliabilityMetrics.hasLowBattery(route)).isFalse();
+    }
+
+    @Test
+    void 추정_가용성_킥보드는_대여여유_부족으로_본다() {
+        // given — TAGO 미제공 시 어댑터가 만드는 synthetic 킥보드 (ESTIMATED)
+        MobilityInfo estimated = new MobilityInfo(
+                MobilityType.KICKBOARD_SHARED, "공유 킥보드(추정)", null, 50,
+                null, null, 0, 37.5, 127.0, 1, 0, null, null, 0.0, 0.0, AvailabilitySource.ESTIMATED
+        );
+        Leg kickboard = new Leg(LegType.KICKBOARD, "KICKBOARD_SHARED", 10, 2000, A, B, null, estimated, null);
+        Route route = Route.of(List.of(kickboard), RouteType.MOBILITY_ONLY);
+
+        // when & then
+        assertThat(RouteReliabilityMetrics.hasLowAvailability(route)).isTrue();
+        assertThat(RouteReliabilityMetrics.hasSharedMobility(route)).isTrue();
     }
 
     @Test

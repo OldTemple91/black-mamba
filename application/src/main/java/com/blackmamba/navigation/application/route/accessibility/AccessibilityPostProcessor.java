@@ -5,6 +5,7 @@ import com.blackmamba.navigation.domain.route.Leg;
 import com.blackmamba.navigation.domain.route.LegType;
 import com.blackmamba.navigation.domain.route.Route;
 import com.blackmamba.navigation.domain.route.TransitInfo;
+import com.blackmamba.navigation.domain.route.evaluation.Comparison;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -21,9 +22,10 @@ import java.util.List;
  *
  * <h3>처리 내용</h3>
  * <ol>
- *   <li>휠체어 접근성: 엘리베이터 없는 환승역이 포함된 경로 제거</li>
- *   <li>보행 속도 조정: WALK leg의 durationMinutes를 사용자 속도로 재계산 → 총시간 업데이트</li>
+ *   <li>휠체어 접근성: 엘리베이터 없는 환승역이 포함된 경로, 자전거·킥보드 탑승이 포함된 경로 제거</li>
+ *   <li>보행 속도 조정: WALK leg의 durationMinutes를 사용자 속도로 재계산 → 총시간·대중교통 대비 절감 시간 업데이트</li>
  * </ol>
+ * 제거로 추천 경로가 빠질 수 있다 — 추천 플래그는 파이프라인이 최종 순서 기준으로 다시 매긴다.
  */
 @Component
 public class AccessibilityPostProcessor {
@@ -44,6 +46,10 @@ public class AccessibilityPostProcessor {
 
         List<Route> result = new ArrayList<>();
         for (Route route : routes) {
+            if (ctx.wheelchairAccessible() && containsRidingLeg(route)) {
+                log.info("[접근성] 자전거·킥보드 탑승 포함 경로 제외 (휠체어): routeId={}", route.routeId());
+                continue;
+            }
             if (ctx.wheelchairAccessible() && containsInaccessibleStation(route)) {
                 log.info("[접근성] 엘리베이터 미지원 역 포함 경로 제외: routeId={}", route.routeId());
                 continue;
@@ -54,6 +60,11 @@ public class AccessibilityPostProcessor {
             result.add(adjusted);
         }
         return result;
+    }
+
+    private boolean containsRidingLeg(Route route) {
+        return route.legs().stream()
+                .anyMatch(leg -> leg.type() == LegType.BIKE || leg.type() == LegType.KICKBOARD);
     }
 
     private boolean containsInaccessibleStation(Route route) {
@@ -109,7 +120,13 @@ public class AccessibilityPostProcessor {
                 route.routeId(), route.type(), newTotal, route.totalCostWon(),
                 route.costBreakdown(), route.selectedHubs(), route.evaluation(),
                 route.score(), route.recommended(), recomputedLegs,
-                route.comparison(), route.insights(), route.carComparison(), route.carbon()
+                recomputeComparison(route.comparison(), newTotal), route.insights(), route.carComparison(), route.carbon()
         );
+    }
+
+    /** 총 소요시간이 바뀌면 "대중교통 대비 N분 단축" 근거도 같은 값으로 맞춘다. */
+    private static Comparison recomputeComparison(Comparison comparison, int newTotalMinutes) {
+        if (comparison == null) return null;
+        return new Comparison(comparison.originalMinutes(), Math.max(comparison.originalMinutes() - newTotalMinutes, 0));
     }
 }

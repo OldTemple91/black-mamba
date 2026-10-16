@@ -132,6 +132,11 @@ public class RouteInsightFactory {
             diagnostics.add("일부 이동수단 구간은 TMAP 대신 직선거리 기반 추정으로 계산되었습니다.");
         }
 
+        boolean transitEstimated = route.legs().stream().anyMatch(Leg::isEstimatedTransit);
+        if (transitEstimated) {
+            diagnostics.add("일부 대중교통 구간은 실시간 경로 조회 대신 기준 경로 기반 추정값(소요시간·요금)입니다.");
+        }
+
         List<MobilityInfo> mobilityInfos = route.legs().stream()
                 .map(Leg::mobilityInfo)
                 .filter(Objects::nonNull)

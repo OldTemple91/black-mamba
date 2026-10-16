@@ -26,6 +26,23 @@ class DdareungiStationFilterTest {
     }
 
     @Test
+    void 반경_내_대여소는_가까운_순으로_정렬된다() {
+        // given — API 응답 순서는 먼 정류소가 먼저
+        List<DdareungiStation> stations = List.of(
+                new DdareungiStation("먼 정류소", 37.5090, 127.0050, 5),     // 약 550m
+                new DdareungiStation("가까운 정류소", 37.5047, 127.0050, 5), // 약 80m
+                new DdareungiStation("중간 정류소", 37.5065, 127.0050, 5)    // 약 280m
+        );
+
+        // when
+        List<DdareungiStation> nearby = filter.filterNearby(stations, 37.5040, 127.0050, 700);
+
+        // then
+        assertThat(nearby).extracting(DdareungiStation::stationName)
+                .containsExactly("가까운 정류소", "중간 정류소", "먼 정류소");
+    }
+
+    @Test
     void 잔여대수가_0인_대여소는_제외한다() {
         List<DdareungiStation> stations = List.of(
                 new DdareungiStation("반포역", 37.5038, 127.0048, 0),

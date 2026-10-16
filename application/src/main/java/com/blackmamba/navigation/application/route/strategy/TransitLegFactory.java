@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
  */
 final class TransitLegFactory {
 
-    private static final String TRANSIT_MODE = "대중교통";
+    private static final String TRANSIT_MODE = Leg.ESTIMATED_TRANSIT_MODE;
     private static final int MAX_LINE_NAMES = 3;
     private static final int MIN_STATIONS = 2;
 
@@ -30,8 +30,9 @@ final class TransitLegFactory {
     }
 
     /**
-     * baseLegs 에서 노선명·색상을 추출해 TransitInfo 를 채운 Leg.
-     * baseLegs 가 비어있거나 TRANSIT 정보가 없으면 transitInfo=null.
+     * baseLegs 에서 노선명·색상·요금을 추출해 TransitInfo 를 채운 Leg.
+     * baseLegs 가 비어있거나 TRANSIT 정보가 없으면 transitInfo=null (요금은 추정 정책이 기본요금을 매긴다).
+     * 요금을 0으로 두면 조회에 실패한 후보가 비용 점수 만점을 받는다 — 기준 경로의 요금을 상한 근사로 쓴다.
      */
     static Leg approximate(int minutes, Location from, Location to, List<Leg> baseLegs) {
         List<Leg> transitLegs = baseLegs.stream()
@@ -70,8 +71,10 @@ final class TransitLegFactory {
                 .flatMap(l -> l.transitInfo().passThroughStations().stream())
                 .toList();
 
+        int baseFareWon = transitLegs.stream().mapToInt(l -> l.transitInfo().fareWon()).sum();
+
         TransitInfo transitInfo = lineName.isBlank() ? null
-                : new TransitInfo(lineName, lineColor, approxStations, 0, passThroughStations);
+                : new TransitInfo(lineName, lineColor, approxStations, baseFareWon, passThroughStations);
 
         return new Leg(LegType.TRANSIT, TRANSIT_MODE, minutes, 0, from, to, transitInfo, null, null);
     }

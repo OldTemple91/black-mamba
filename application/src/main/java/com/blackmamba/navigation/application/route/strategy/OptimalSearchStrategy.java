@@ -200,8 +200,9 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                             .flatMapMany(lastMile -> {
                                 if (firstMile.isEmpty() || lastMile.isEmpty()) return Flux.empty();
 
+                                // 우선순위화된 목록은 "대여 가능성이 높은 순" — 가운데가 아니라 1순위를 쓴다
                                 Hub startHub = firstMile.get(0);
-                                Hub endHub = lastMile.get(lastMile.size() / 2);
+                                Hub endHub = lastMile.get(0);
                                 Location transitStart = startHub.location();
                                 Location transitEnd   = endHub.location();
 
@@ -280,15 +281,18 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                 .map(list -> list.isEmpty() ? List.of(MobilityDiagnostics.noMixedRoute()) : list);
     }
 
+    /** 진단은 생성 때 실제로 시도한 허브 집합(라스트마일은 우선순위화된 상위 N, 퍼스트마일은 선택 상위 N)에 대해 수행한다. */
     private Flux<GenerationDiagnostic> diagnosticsForType(Location origin, Location destination, List<Leg> baseLegs, MobilityType type) {
         MobilityConfig config = MobilityConfigs.forType(type);
-        List<Hub> lastMileHubs = hubSelector.selectLastMileHubs(baseLegs, destination, config).stream()
-                .limit(MAX_CANDIDATE_HUBS)
-                .toList();
         List<Hub> firstMileHubs = hubSelector.selectFirstMileHubs(origin, baseLegs, config).stream()
                 .limit(MAX_CANDIDATE_HUBS)
                 .toList();
+        return hubPrioritizer.prioritize(baseLegs, destination, type, config)
+                .flatMapMany(lastMileHubs -> diagnosticsForHubs(origin, destination, type, config, firstMileHubs, lastMileHubs));
+    }
 
+    private Flux<GenerationDiagnostic> diagnosticsForHubs(Location origin, Location destination, MobilityType type, MobilityConfig config,
+                                                          List<Hub> firstMileHubs, List<Hub> lastMileHubs) {
         List<GenerationDiagnostic> immediateReasons = new ArrayList<>();
         if (firstMileHubs.isEmpty()) immediateReasons.add(MobilityDiagnostics.noCandidateHub(Phase.FIRST_MILE, type));
         if (lastMileHubs.isEmpty()) immediateReasons.add(MobilityDiagnostics.noCandidateHub(Phase.LAST_MILE, type));

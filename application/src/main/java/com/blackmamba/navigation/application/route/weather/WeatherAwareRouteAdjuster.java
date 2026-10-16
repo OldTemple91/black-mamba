@@ -14,21 +14,22 @@ import java.util.List;
 /**
  * A-4: 날씨에 따라 경로 점수를 재조정하고 순위를 다시 매긴다.
  *
- * <p>설계 원칙 — {@link AccessibilityPostProcessor} 와 동일:
+ * <p>설계 원칙 — 접근성 후처리와 동일:
  * <ul>
  *   <li>탐색 알고리즘에 침투하지 않고 <b>결과 집합을 후처리</b></li>
  *   <li>옵션 추가/제거가 다른 로직에 0 영향</li>
  *   <li>WeatherContext 가 CLEAR 이면 원본 그대로 통과</li>
+ *   <li>추천 플래그는 여기서 건드리지 않는다 — 파이프라인이 최종 순서 기준으로 다시 매긴다</li>
  * </ul>
  *
  * <h3>페널티 정책</h3>
  * <pre>
  *   RAIN / SNOW (악천후):
- *     - 공유 자전거/킥보드 포함 경로: score × 0.85 (RAIN), × 0.70 (SNOW)
+ *     - 자전거/킥보드 탑승 포함 경로: score × 0.85 (RAIN), × 0.70 (SNOW)
  *     - 장거리 도보 (300m+): score × 0.90
  *
  *   HEAT (35℃+) / COLD (-5℃-):
- *     - 장거리 도보/자전거: score × 0.92
+ *     - 장거리 도보 또는 자전거/킥보드 탑승: score × 0.92
  *     - 대중교통: 무변화
  * </pre>
  */
@@ -39,6 +40,10 @@ public class WeatherAwareRouteAdjuster {
 
     /** 장거리 도보 기준 (이 이상이면 날씨 페널티 대상). */
     private static final int LONG_WALK_THRESHOLD_METERS = 300;
+    private static final double RAIN_RIDING_FACTOR = 0.85;
+    private static final double SNOW_RIDING_FACTOR = 0.70;
+    private static final double SEVERE_WEATHER_WALK_FACTOR = 0.90;
+    private static final double EXTREME_TEMPERATURE_FACTOR = 0.92;
 
     public List<Route> apply(List<Route> routes, WeatherContext weather) {
         if (routes == null || routes.isEmpty()) return routes;
@@ -61,7 +66,6 @@ public class WeatherAwareRouteAdjuster {
         log.debug("[Weather] routeId={} score {} → {} (×{})",
                 route.routeId(), route.score(), newScore, penaltyFactor);
 
-        // recommended flag 는 이후 re-sort 에서 top1 만 유지되는 계약은 아님 — 점수만 재조정하고 정렬.
         return route.withScore(newScore, route.recommended());
     }
 
@@ -71,21 +75,30 @@ public class WeatherAwareRouteAdjuster {
      */
     private double computePenaltyFactor(Route route, WeatherCondition condition) {
         double factor = 1.0;
+        boolean hasRiding = hasRidingLeg(route);
+        boolean hasLongWalk = hasLongWalk(route);
 
-        boolean hasSharedMobility = route.legs().stream()
-                .anyMatch(leg -> leg.type() == LegType.BIKE || leg.type() == LegType.KICKBOARD);
-
-        // 악천후 — 공유 이동수단 감점
-        if (condition.penalizesSharedMobility() && hasSharedMobility) {
-            factor *= (condition == WeatherCondition.SNOW) ? 0.70 : 0.85;
+        if (condition.penalizesSharedMobility()) {
+            // 악천후 — 노면이 미끄러운 자전거/킥보드 탑승 감점, 장거리 도보 감점
+            if (hasRiding) {
+                factor *= (condition == WeatherCondition.SNOW) ? SNOW_RIDING_FACTOR : RAIN_RIDING_FACTOR;
+            }
+            if (hasLongWalk) {
+                factor *= SEVERE_WEATHER_WALK_FACTOR;
+            }
+            return factor;
         }
 
-        // 장거리 도보 감점 (악천후 + 극한 기온)
-        if (condition.penalizesWalking() && hasLongWalk(route)) {
-            factor *= 0.92;
+        if (condition.penalizesWalking() && (hasLongWalk || hasRiding)) {
+            // 극한 기온 — 야외 노출 시간이 긴 도보·탑승 감점
+            factor *= EXTREME_TEMPERATURE_FACTOR;
         }
-
         return factor;
+    }
+
+    private boolean hasRidingLeg(Route route) {
+        return route.legs().stream()
+                .anyMatch(leg -> leg.type() == LegType.BIKE || leg.type() == LegType.KICKBOARD);
     }
 
     private boolean hasLongWalk(Route route) {

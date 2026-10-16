@@ -101,15 +101,27 @@ class WeatherAwareRouteAdjusterTest {
     }
 
     @Test
-    void RAIN_에서_자전거_경로는_공유_페널티와_도보_페널티가_모두_적용된다() {
+    void RAIN_에서_자전거_경로는_탑승_페널티와_도보_페널티가_모두_적용된다() {
         Leg walk = new Leg(LegType.WALK, "WALK", 6, 400, A, B, null, null, null);
         Leg bike = new Leg(LegType.BIKE, "DDAREUNGI", 15, 3_000, A, B, null, null, null);
         Route route = Route.of(List.of(walk, bike), RouteType.TRANSIT_WITH_BIKE).withScore(0.8, true);
 
         List<Route> after = adjuster.apply(List.of(route), WeatherContext.of(WeatherCondition.RAIN));
 
-        // 0.8 × 0.85 (공유) × 0.92 (도보) = 0.6256
-        assertThat(after.get(0).score()).isCloseTo(0.6256, within(0.001));
+        // 0.8 × 0.85 (탑승) × 0.90 (악천후 도보) = 0.612
+        assertThat(after.get(0).score()).isCloseTo(0.612, within(0.001));
+    }
+
+    @Test
+    void COLD_에서는_자전거_탑승_경로도_감점된다() {
+        // given — 도보는 짧지만 -5℃ 에서 15분 자전거 탑승
+        Route bike = routeWith(LegType.BIKE, "DDAREUNGI", 0.8);
+
+        // when
+        List<Route> after = adjuster.apply(List.of(bike), WeatherContext.of(WeatherCondition.COLD));
+
+        // then — 0.8 × 0.92
+        assertThat(after.get(0).score()).isCloseTo(0.736, within(0.001));
     }
 
     @Test

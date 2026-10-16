@@ -2,6 +2,7 @@ package com.blackmamba.navigation.application.route.accessibility;
 
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.*;
+import com.blackmamba.navigation.domain.route.evaluation.Comparison;
 import com.blackmamba.navigation.domain.route.pricing.CostComponent;
 import com.blackmamba.navigation.domain.route.pricing.RouteCostBreakdown;
 import org.junit.jupiter.api.Test;
@@ -65,6 +66,44 @@ class AccessibilityPostProcessorTest {
         assertThat(adjustedWalk.durationMinutes()).isEqualTo(15);   // 10 * 1.5
         // 총시간 = 40 + 5 = 45분
         assertThat(adjusted.totalMinutes()).isEqualTo(45);
+    }
+
+    @Test
+    void 휠체어_요청시_자전거_탑승_경로는_제외된다() {
+        // given
+        Leg bike = new Leg(LegType.BIKE, "DDAREUNGI", 15, 3_000,
+                new Location("강남", 37.5, 127.0), new Location("홍대", 37.6, 127.0), null, null, null);
+        Route bikeRoute = new Route(
+                "rt_bike", RouteType.MOBILITY_ONLY, 15, 1_000,
+                new RouteCostBreakdown(List.of(new CostComponent("따릉이", 1_000)), 1_000),
+                List.of(), null, 0.9, true, List.of(bike), null, null, null, null
+        );
+        Route transitRoute = routeOf(40, 1_000, "강남", "홍대");
+
+        // when
+        List<Route> result = processor.apply(List.of(bikeRoute, transitRoute), AccessibilityContext.of(true, null));
+
+        // then
+        assertThat(result).extracting(Route::routeId).containsExactly("rt_test_홍대");
+    }
+
+    @Test
+    void 도보_속도_변경시_대중교통_대비_절감시간도_다시_계산된다() {
+        // given — 기준 45분, 현재 40분(절감 5분)인 경로의 도보 10분이 15분으로
+        Leg walk = new Leg(LegType.WALK, "WALK", 10, 800, new Location("출발", 0, 0), new Location("역", 0, 0), null, null, null);
+        Leg transit = new Leg(LegType.TRANSIT, "지하철", 30, 10_000, new Location("역", 0, 0), new Location("목적지", 0, 0), null, null, null);
+        Route route = new Route(
+                "rt_cmp", RouteType.TRANSIT_ONLY, 40, 1_000,
+                new RouteCostBreakdown(List.of(new CostComponent("대중교통", 1_000)), 1_000),
+                List.of(), null, 0, false, List.of(walk, transit), new Comparison(45, 5), null, null, null
+        );
+
+        // when
+        Route adjusted = processor.apply(List.of(route), AccessibilityContext.of(false, 3.0)).getFirst();
+
+        // then — 45분이 되어 절감 0분
+        assertThat(adjusted.totalMinutes()).isEqualTo(45);
+        assertThat(adjusted.comparison().savedMinutes()).isZero();
     }
 
     @Test

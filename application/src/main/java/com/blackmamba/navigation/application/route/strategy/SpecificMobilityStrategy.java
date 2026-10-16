@@ -10,6 +10,7 @@ import com.blackmamba.navigation.application.route.port.TransitRoutePort;
 import com.blackmamba.navigation.application.route.segment.MobilitySegmentBuilder;
 import com.blackmamba.navigation.application.route.strategy.MobilityDiagnostics.Phase;
 import com.blackmamba.navigation.domain.hub.Hub;
+import com.blackmamba.navigation.domain.location.GeoDistance;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Leg;
 import com.blackmamba.navigation.domain.route.Route;
@@ -95,7 +96,7 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                     return hubPrioritizer.prioritize(baseLegs, destination, type, config)
                             .flatMapMany(candidateHubs -> {
                                 if (candidateHubs.isEmpty()) {
-                                    return buildDirectRoute(origin, destination, type).flux();
+                                    return buildDirectRoute(origin, destination, type, config).flux();
                                 }
                                 return Flux.fromIterable(candidateHubs)
                                         .flatMap(candidateHub -> buildRoute(origin, candidateHub, destination, type, baseLegs));
@@ -125,8 +126,11 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                 }));
     }
 
-    /** 대중교통 없이 출발지→목적지 직접 이동수단 경로 */
-    private Mono<Route> buildDirectRoute(Location origin, Location destination, MobilityType type) {
+    /** 대중교통 없이 출발지→목적지 직접 이동수단 경로. 수단의 최대 범위를 넘으면 만들지 않는다 (OPTIMAL 패턴 E 와 동일 규칙). */
+    private Mono<Route> buildDirectRoute(Location origin, Location destination, MobilityType type, MobilityConfig config) {
+        if (GeoDistance.meters(origin, destination) > config.maxRangeMeters()) {
+            return Mono.empty();
+        }
         return mobilityInfoForSegment(origin, destination, type)
                 .flatMap(info -> mobilitySegmentBuilder.build(origin, destination, type, info)
                         .map(legs -> Route.of(legs, RouteType.MOBILITY_ONLY)));
@@ -145,16 +149,22 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                 .map(list -> list.isEmpty() ? List.of(MobilityDiagnostics.noMixedRoute()) : list);
     }
 
+    /** 진단은 생성 때 실제로 시도한 허브 집합(우선순위화된 상위 N)에 대해 수행한다. */
     private Flux<GenerationDiagnostic> diagnosticsForType(List<Leg> baseLegs, Location origin, Location destination, MobilityType type) {
         MobilityConfig config = MobilityConfigs.forType(type);
-        List<Hub> candidateHubs = hubSelector.selectLastMileHubs(baseLegs, destination, config).stream()
-                .limit(MAX_CANDIDATE_HUBS)
-                .toList();
-
-        if (candidateHubs.isEmpty()) {
-            return Flux.just(MobilityDiagnostics.noCandidateHub(Phase.LAST_MILE, type));
-        }
-        return diagnostics.diagnosePhase(Phase.LAST_MILE, type, candidateHubs, origin, destination)
-                .flatMapMany(reason -> Mono.justOrEmpty(reason).flux());
+        return hubPrioritizer.prioritize(baseLegs, destination, type, config)
+                .flatMapMany(candidateHubs -> {
+                    if (candidateHubs.isEmpty()) {
+                        List<GenerationDiagnostic> reasons = new ArrayList<>();
+                        reasons.add(MobilityDiagnostics.noCandidateHub(Phase.LAST_MILE, type));
+                        double directDistance = GeoDistance.meters(origin, destination);
+                        if (directDistance > config.maxRangeMeters()) {
+                            reasons.add(MobilityDiagnostics.directDistanceExceeded(type, config.maxRangeMeters(), directDistance));
+                        }
+                        return Flux.fromIterable(reasons);
+                    }
+                    return diagnostics.diagnosePhase(Phase.LAST_MILE, type, candidateHubs, origin, destination)
+                            .flatMapMany(reason -> Mono.justOrEmpty(reason).flux());
+                });
     }
 }

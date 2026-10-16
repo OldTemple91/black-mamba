@@ -13,13 +13,17 @@ import com.blackmamba.navigation.domain.route.comparison.CarbonFootprintCalculat
 import com.blackmamba.navigation.domain.route.comparison.CarbonSummary;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
  * 전략이 만든 경로 목록에 적용되는 후처리 파이프라인 — 순서가 의미를 가진다.
  * <ol>
  *   <li>접근성 (휠체어/보행 속도) — 경로 필터·조정</li>
- *   <li>날씨 — 공유 모빌리티·장거리 도보 페널티 (A-4)</li>
+ *   <li>날씨 — 자전거·킥보드 탑승/장거리 도보 페널티 (A-4)</li>
+ *   <li>추천 재정렬 — 위 두 단계가 순위를 바꾸거나 추천 경로를 제거할 수 있으므로,
+ *       최종 점수 순 1위에만 추천 플래그를 둔다 (추천 배지·LLM narrative·SSE 변화 감지가 이 플래그를 따른다)</li>
  *   <li>탄소 (C-2) → 자가용 비교 (F-1): 비교 narrative 가 정확한 CO₂ 값을 쓰려면
  *       탄소가 먼저 계산돼 있어야 한다</li>
  * </ol>
@@ -56,10 +60,28 @@ public class RouteEnrichmentPipeline {
                               WeatherContext weatherContext) {
         List<Route> accessible = accessibilityPostProcessor.apply(routes, accessibilityContext);
         List<Route> weatherAdjusted = weatherAwareRouteAdjuster.apply(accessible, weatherContext);
-        return weatherAdjusted.stream()
+        return reconcileRecommendation(weatherAdjusted).stream()
                 .map(route -> route.withCarbon(computeCarbon(route, origin, destination)))
                 .map(route -> route.withCarComparison(carReferenceCalculator.compareWithRoute(route, origin, destination)))
                 .toList();
+    }
+
+    /**
+     * 점수 내림차순으로 정렬하고 1위에만 recommended=true 를 둔다.
+     * 전략이 매긴 플래그는 날씨 감점·접근성 필터 이전 기준이라 그대로 두면
+     * 2위가 추천 배지를 달거나 추천 경로가 아예 없는 응답이 나간다.
+     */
+    private static List<Route> reconcileRecommendation(List<Route> routes) {
+        if (routes.isEmpty()) return routes;
+        List<Route> sorted = new ArrayList<>(routes);
+        sorted.sort(Comparator.comparingDouble(Route::score).reversed());
+        List<Route> reconciled = new ArrayList<>(sorted.size());
+        for (int i = 0; i < sorted.size(); i++) {
+            Route route = sorted.get(i);
+            boolean recommended = i == 0;
+            reconciled.add(route.recommended() == recommended ? route : route.withScore(route.score(), recommended));
+        }
+        return reconciled;
     }
 
     /**
