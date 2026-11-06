@@ -2,6 +2,7 @@ package com.blackmamba.navigation.api.route;
 
 import com.blackmamba.navigation.api.config.ErrorResponse;
 import com.blackmamba.navigation.api.support.MobilityTypes;
+import com.blackmamba.navigation.api.support.ReactorTimeouts;
 import com.blackmamba.navigation.application.route.RouteOptimizationService;
 import com.blackmamba.navigation.application.route.SearchMode;
 import com.blackmamba.navigation.application.route.accessibility.AccessibilityContext;
@@ -112,7 +113,8 @@ public class RouteController {
         try {
             List<Route> routes = routeOptimizationService
                     .findRoutes(origin, destination, mobilityTypes, searchMode, recommendationPreference, accessibilityContext, weatherContext)
-                    .block(ROUTE_SEARCH_TIMEOUT);
+                    .timeout(ROUTE_SEARCH_TIMEOUT)
+                    .block();
 
             // RAG-4: 추천 경로의 carComparison.narrative 를 LLM 설명으로 업그레이드
             // (N개 경로 중 recommended=true 인 것만 LLM 호출 → 지연 제어)
@@ -131,7 +133,10 @@ public class RouteController {
                     "preference", recommendationPreference.name()).increment(count);
 
             return ResponseEntity.ok(RoutesResponse.from(routes));
-        } catch (IllegalStateException e) {
+        } catch (RuntimeException e) {
+            if (!ReactorTimeouts.isTimeout(e)) {
+                throw e;  // 타임아웃이 아닌 오류는 전역 핸들러가 500 + 스택과 함께 기록한다
+            }
             sample.stop(meterRegistry.timer("navigation.route.duration",
                     "mode", searchMode.name(),
                     "preference", recommendationPreference.name(),

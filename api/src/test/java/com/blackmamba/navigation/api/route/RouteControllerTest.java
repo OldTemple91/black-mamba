@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -141,6 +142,34 @@ class RouteControllerTest {
                         .param("recommendationPreference", "TIME_PRIORITY"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.routes[0].routeId").value("rt_pref"));
+    }
+
+    @Test
+    void 경로_탐색이_시간_내_끝나지_않으면_504를_반환한다() throws Exception {
+        when(routeOptimizationService.findRoutes(any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(Mono.error(new TimeoutException("경로 탐색 30초 초과")));
+
+        mockMvc.perform(get("/api/routes")
+                        .param("originLat", "37.5547")
+                        .param("originLng", "126.9706")
+                        .param("destLat", "37.4979")
+                        .param("destLng", "127.0276"))
+                .andExpect(status().isGatewayTimeout())
+                .andExpect(jsonPath("$.code").value("SEARCH_TIMEOUT"));
+    }
+
+    @Test
+    void 타임아웃이_아닌_오류는_504로_위장하지_않고_500을_반환한다() throws Exception {
+        when(routeOptimizationService.findRoutes(any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(Mono.error(new IllegalStateException("전략 조립 버그")));
+
+        mockMvc.perform(get("/api/routes")
+                        .param("originLat", "37.5547")
+                        .param("originLng", "126.9706")
+                        .param("destLat", "37.4979")
+                        .param("destLng", "127.0276"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("INTERNAL_SERVER_ERROR"));
     }
 
     @Test

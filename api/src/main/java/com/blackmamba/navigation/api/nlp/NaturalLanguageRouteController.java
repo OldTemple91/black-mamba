@@ -2,6 +2,7 @@ package com.blackmamba.navigation.api.nlp;
 
 import com.blackmamba.navigation.api.config.ErrorResponse;
 import com.blackmamba.navigation.api.place.PlaceResponse;
+import com.blackmamba.navigation.api.support.ReactorTimeouts;
 import com.blackmamba.navigation.application.route.RouteIntent;
 import com.blackmamba.navigation.application.route.RouteOptimizationService;
 import com.blackmamba.navigation.application.route.SearchMode;
@@ -108,10 +109,21 @@ public class NaturalLanguageRouteController {
         }
 
         // Step 2: 장소명 → 좌표 — origin/destination 병렬 (직렬 시 최악 2배 지연)
-        Tuple2<Optional<Location>, Optional<Location>> resolved = Mono.zip(
-                        placeResolver.resolve(intent.origin()),
-                        placeResolver.resolve(intent.destination()))
-                .block(PLACE_RESOLVE_TIMEOUT);
+        Tuple2<Optional<Location>, Optional<Location>> resolved;
+        try {
+            resolved = Mono.zip(
+                            placeResolver.resolve(intent.origin()),
+                            placeResolver.resolve(intent.destination()))
+                    .timeout(PLACE_RESOLVE_TIMEOUT)
+                    .block();
+        } catch (RuntimeException e) {
+            if (!ReactorTimeouts.isTimeout(e)) {
+                throw e;
+            }
+            log.error("[NLP] 장소 해석 타임아웃 ({}초 초과): {} → {}", PLACE_RESOLVE_TIMEOUT.getSeconds(), intent.origin(), intent.destination());
+            return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT)
+                    .body(ErrorResponse.of("GEOCODING_TIMEOUT", "장소 해석 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요."));
+        }
 
         Location origin = resolved == null ? null : resolved.getT1().orElse(null);
         Location destination = resolved == null ? null : resolved.getT2().orElse(null);
@@ -130,9 +142,13 @@ public class NaturalLanguageRouteController {
         try {
             routes = routeOptimizationService
                     .findRoutes(origin, destination, intent.mobility(), mode, intent.preference(), access)
-                    .block(ROUTE_SEARCH_TIMEOUT);
-        } catch (IllegalStateException e) {
-            // Mono.block(timeout) 의 만료 — /api/routes 와 같은 504 계약
+                    .timeout(ROUTE_SEARCH_TIMEOUT)
+                    .block();
+        } catch (RuntimeException e) {
+            if (!ReactorTimeouts.isTimeout(e)) {
+                throw e;  // 타임아웃이 아닌 오류는 전역 핸들러가 500 + 스택과 함께 기록한다
+            }
+            // /api/routes 와 같은 504 계약
             log.error("[NLP] 경로 탐색 타임아웃 ({}초 초과): {} → {}", ROUTE_SEARCH_TIMEOUT.getSeconds(), intent.origin(), intent.destination());
             return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT)
                     .body(ErrorResponse.of("SEARCH_TIMEOUT", "경로 탐색 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요."));
