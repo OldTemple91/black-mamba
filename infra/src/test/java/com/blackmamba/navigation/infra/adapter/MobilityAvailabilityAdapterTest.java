@@ -20,12 +20,14 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -51,6 +53,45 @@ class MobilityAvailabilityAdapterTest {
         SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
         adapter = new MobilityAvailabilityAdapter(ddareungiClient, kickboardClient, RADIUS, 0L, false,
                 meterRegistry, new TtlCacheRegistry(meterRegistry));
+    }
+
+    /** 기본 어댑터는 TTL 0 이라 캐시 동작을 못 본다 — 캐시 규칙 테스트용 */
+    private MobilityAvailabilityAdapter cachingAdapter() {
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        return new MobilityAvailabilityAdapter(ddareungiClient, kickboardClient, RADIUS, 60_000L, false,
+                meterRegistry, new TtlCacheRegistry(meterRegistry));
+    }
+
+    @Test
+    void 따릉이_조회_오류는_후보_없음으로_답하되_캐시하지_않는다() {
+        // given — TTL 이 있는 어댑터, 첫 호출은 오류·두 번째는 정상
+        MobilityAvailabilityAdapter cachingAdapter = cachingAdapter();
+        when(ddareungiClient.getNearbyStations(HUB_LAT, HUB_LNG, RADIUS))
+                .thenReturn(Mono.error(new IllegalStateException("snapshot 조회 실패")),
+                        Mono.just(live(station("S-142", "142. 아현역 4번출구 앞", HUB_LAT, HUB_LNG, 5))));
+
+        // when
+        Optional<MobilityInfo> first = cachingAdapter.findNearbyMobility(HUB_LAT, HUB_LNG, MobilityType.DDAREUNGI).block();
+        Optional<MobilityInfo> second = cachingAdapter.findNearbyMobility(HUB_LAT, HUB_LNG, MobilityType.DDAREUNGI).block();
+
+        // then
+        assertThat(first).isEmpty();
+        assertThat(second).isPresent();
+    }
+
+    @Test
+    void 따릉이_정상_결과는_TTL_동안_캐시된다() {
+        // given
+        MobilityAvailabilityAdapter cachingAdapter = cachingAdapter();
+        when(ddareungiClient.getNearbyStations(HUB_LAT, HUB_LNG, RADIUS))
+                .thenReturn(Mono.just(live(station("S-142", "142. 아현역 4번출구 앞", HUB_LAT, HUB_LNG, 5))));
+
+        // when
+        cachingAdapter.findNearbyMobility(HUB_LAT, HUB_LNG, MobilityType.DDAREUNGI).block();
+        cachingAdapter.findNearbyMobility(HUB_LAT, HUB_LNG, MobilityType.DDAREUNGI).block();
+
+        // then
+        verify(ddareungiClient, times(1)).getNearbyStations(HUB_LAT, HUB_LNG, RADIUS);
     }
 
     @Test

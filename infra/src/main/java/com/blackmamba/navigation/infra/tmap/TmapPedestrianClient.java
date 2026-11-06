@@ -4,6 +4,8 @@ import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.infra.common.GeohashKeyGenerator;
 import com.blackmamba.navigation.infra.common.cache.TtlCache;
 import com.blackmamba.navigation.infra.common.cache.TtlCacheRegistry;
+import com.blackmamba.navigation.infra.common.http.ExternalApiClientException;
+import com.blackmamba.navigation.infra.common.http.ExternalApiException;
 import com.blackmamba.navigation.infra.common.http.WebClients;
 import com.blackmamba.navigation.infra.tmap.dto.TmapPedestrianResponse;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -18,9 +20,10 @@ import io.micrometer.observation.annotation.Observed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
@@ -34,11 +37,13 @@ import java.util.concurrent.atomic.AtomicLong;
  * TMAP 보행자 경로 API 클라이언트.
  * 실제 도로 거리(m)와 경로 좌표(GeoJSON LineString)를 함께 반환.
  * 실패 시 Optional.empty() 반환 → MobilityTimeAdapter에서 haversine fallback.
+ * <p>
+ * 실패 폴백은 캐시하지 않는다 — 한 번의 오류가 TTL(5분) 동안 그 구간을 직선 추정으로 고정하지 않게.
+ * HTTP 오류는 {@link ExternalApiException} 으로 바꿔 회로 차단기가 실패로 집계한다(401·502 포함).
  */
 @Component
 public class TmapPedestrianClient {
 
-    private static final String BASE_URL = "https://apis.openapi.sk.com";
     private static final Logger log = LoggerFactory.getLogger(TmapPedestrianClient.class);
     private final WebClient webClient;
     private final String appKey;
@@ -58,6 +63,7 @@ public class TmapPedestrianClient {
     public TmapPedestrianClient(
             WebClient.Builder webClientBuilder,
             @Value("${tmap.app-key}") String appKey,
+            @Value("${tmap.base-url:https://apis.openapi.sk.com}") String baseUrl,
             @Value("${navigation.cache.tmap-pedestrian-route-ttl-ms:300000}") long routeCacheTtlMs,
             @Value("${navigation.cache.tmap-rate-limit-backoff-ms:3600000}") long quotaBackoffMs,
             @Value("${tmap.request-timeout-ms:5000}") long requestTimeoutMs,
@@ -66,7 +72,7 @@ public class TmapPedestrianClient {
             RetryRegistry retryRegistry,
             TtlCacheRegistry cacheRegistry
     ) {
-        this.webClient = WebClients.withTimeout(webClientBuilder, BASE_URL, requestTimeoutMs);
+        this.webClient = WebClients.withTimeout(webClientBuilder, baseUrl, requestTimeoutMs);
         this.appKey = appKey;
         this.routeCache = cacheRegistry.create("tmap_pedestrian_route", routeCacheTtlMs);
         this.quotaBackoffMs = quotaBackoffMs;
@@ -99,7 +105,7 @@ public class TmapPedestrianClient {
             return Mono.just(Optional.empty());
         }
         String key = GeohashKeyGenerator.forRoute(origin, destination);
-        return routeCache.get(key, () -> requestRoute(origin, destination));
+        return routeCache.get(key, () -> requestRoute(origin, destination), Optional::isPresent);
     }
 
     private Mono<Optional<TmapRouteData>> requestRoute(Location origin, Location destination) {
@@ -118,6 +124,7 @@ public class TmapPedestrianClient {
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(body)
                 .retrieve()
+                .onStatus(HttpStatusCode::isError, response -> ExternalApiException.from("TMAP", response))
                 .bodyToMono(TmapPedestrianResponse.class)
                 .map(response -> {
                     int dist = response.totalDistanceMeters();
@@ -150,9 +157,7 @@ public class TmapPedestrianClient {
     }
 
     private boolean isTooManyRequests(Throwable throwable) {
-        return throwable instanceof WebClientResponseException.TooManyRequests
-                || (throwable instanceof WebClientResponseException responseException
-                && responseException.getStatusCode().value() == 429);
+        return throwable instanceof ExternalApiClientException client && client.status() == HttpStatus.TOO_MANY_REQUESTS.value();
     }
 
     public record TmapRouteData(int distanceMeters, List<Location> coordinates) {}

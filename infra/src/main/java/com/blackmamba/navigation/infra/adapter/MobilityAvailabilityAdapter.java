@@ -20,6 +20,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
+import java.util.EnumMap;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -35,10 +38,10 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
 
     private final DdareungiApiClient ddareungiClient;
     private final KickboardApiClient kickboardClient;
-    private final Counter ddareungiFallbackErrorCounter;
+    private final Map<MobilityType, Counter> typeToFallbackErrorCounter = new EnumMap<>(MobilityType.class);
     private final Counter kickboardFallbackErrorCounter;
     private final Counter kickboardFallbackEmptyCounter;
-    private final TtlCache<AvailabilityKey, Optional<MobilityInfo>> availabilityCache;
+    private final TtlCache<AvailabilityKey, Lookup> availabilityCache;
     private final TtlCache<SegmentAvailabilityKey, MobilityInfo> segmentAvailabilityCache;
     private final int searchRadiusMeters;
     private final boolean tagoEnabled;
@@ -57,11 +60,13 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
         this.availabilityCache = cacheRegistry.create("mobility_availability", availabilityCacheTtlMs);
         // (start × end × type) 조합 키라 경우의 수가 특히 많다 — registry 의 주기 청소가 힙 잠식을 막는다
         this.segmentAvailabilityCache = cacheRegistry.create("mobility_segment", availabilityCacheTtlMs);
-        this.ddareungiFallbackErrorCounter = meterRegistry.counter(
-                "navigation.mobility.fallback.total",
-                "mobility", "ddareungi",
-                "reason", "error"
-        );
+        for (MobilityType type : MobilityType.values()) {
+            typeToFallbackErrorCounter.put(type, meterRegistry.counter(
+                    "navigation.mobility.fallback.total",
+                    "mobility", type.name().toLowerCase(Locale.ROOT),
+                    "reason", "error"
+            ));
+        }
         this.kickboardFallbackErrorCounter = meterRegistry.counter(
                 "navigation.mobility.fallback.total",
                 "mobility", "kickboard_shared",
@@ -89,12 +94,7 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
         return cachedLookup(lat, lng, type, true, () -> switch (type) {
             case DDAREUNGI -> ddareungiClient.getNearbyStations(lat, lng, searchRadiusMeters, false)
                     .map(snapshot -> snapshot.stations().stream().findFirst()
-                            .map(station -> ddareungiInfo(station, distanceMeters(lat, lng, station.lat(), station.lng()), snapshot.source())))
-                    .onErrorResume(ex -> {
-                        log.warn("[따릉이] 반납 정류소 조회 오류 → 반납 후보 없음 처리: {}", ex.getMessage());
-                        ddareungiFallbackErrorCounter.increment();
-                        return Mono.just(Optional.<MobilityInfo>empty());
-                    });
+                            .map(station -> ddareungiInfo(station, distanceMeters(lat, lng, station.lat(), station.lng()), snapshot.source())));
             case KICKBOARD_SHARED, PERSONAL_EBIKE, PERSONAL_KICKBOARD -> findNearbyMobility(lat, lng, type);
         });
     }
@@ -150,10 +150,37 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                 });
     }
 
+    /**
+     * 조회 오류는 호출자에게 "후보 없음" 으로 답하되 캐시에는 남기지 않는다 —
+     * 일시 장애 한 번이 TTL 동안 그 좌표의 모든 허브를 NO_PICKUP 으로 고정하지 않게.
+     */
     private Mono<Optional<MobilityInfo>> cachedLookup(double lat, double lng, MobilityType type, boolean dropoff,
                                                       Supplier<Mono<Optional<MobilityInfo>>> loaderSupplier) {
         AvailabilityKey key = AvailabilityKey.of(lat, lng, type, dropoff);
-        return availabilityCache.get(key, loaderSupplier);
+        Supplier<Mono<Lookup>> loader = () -> loaderSupplier.get()
+                .map(Lookup::found)
+                .onErrorResume(ex -> {
+                    log.warn("[가용성] {} 조회 오류 → 후보 없음 처리(캐시 제외): {}", type, ex.getMessage());
+                    typeToFallbackErrorCounter.get(type).increment();
+                    return Mono.just(Lookup.failure());
+                });
+        return availabilityCache.get(key, loader, Lookup::isCacheable)
+                .map(Lookup::info);
+    }
+
+    /** 캐시 단위 조회 결과 — 오류 폴백은 값은 비었지만 캐시 자격이 없다. */
+    private record Lookup(Optional<MobilityInfo> info, boolean failed) {
+        private static Lookup found(Optional<MobilityInfo> info) {
+            return new Lookup(info, false);
+        }
+
+        private static Lookup failure() {
+            return new Lookup(Optional.empty(), true);
+        }
+
+        private boolean isCacheable() {
+            return !failed;
+        }
     }
 
     private Mono<Optional<MobilityInfo>> findNearbyDdareungi(double lat, double lng) {
@@ -172,11 +199,6 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                         log.info("[따릉이] 반경 내 대여 가능한 정류소 없음");
                     }
                     return result;
-                })
-                .onErrorResume(ex -> {
-                    log.warn("[따릉이] 대여 정류소 조회 오류 → 대여 후보 없음 처리: {}", ex.getMessage());
-                    ddareungiFallbackErrorCounter.increment();
-                    return Mono.just(Optional.<MobilityInfo>empty());
                 });
     }
 
