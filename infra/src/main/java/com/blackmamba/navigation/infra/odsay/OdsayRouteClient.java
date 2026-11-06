@@ -10,6 +10,7 @@ import com.blackmamba.navigation.infra.common.cache.TtlCacheRegistry;
 import com.blackmamba.navigation.infra.common.http.ExternalApiException;
 import com.blackmamba.navigation.infra.common.http.WebClients;
 import com.blackmamba.navigation.infra.odsay.dto.OdsayRouteResponse;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
@@ -150,13 +151,31 @@ public class OdsayRouteClient {
                 .bodyToMono(String.class)
                 .flatMap(rawJson -> {
                     log.debug("[ODsay] raw 응답 (첫 500자): {}", rawJson.length() > 500 ? rawJson.substring(0, 500) : rawJson);
+                    OdsayRouteResponse response;
                     try {
-                        OdsayRouteResponse response = objectMapper.readValue(rawJson, OdsayRouteResponse.class);
-                        if (response.result() == null) {
+                        response = objectMapper.readValue(rawJson, OdsayRouteResponse.class);
+                    } catch (JsonProcessingException ex) {
+                        // 응답이 JSON 이 아니면 상대 쪽 문제 — 예외로 올려야 재시도·회로가 반응한다
+                        log.error("[ODsay] JSON 파싱 실패: {} — raw={}", ex.getOriginalMessage(), rawJson);
+                        return Mono.error(ExternalApiException.of("ODsay", 500, "JSON 파싱 실패: " + ex.getOriginalMessage()));
+                    }
+                    var apiError = response.findApiError();
+                    if (apiError.isPresent()) {
+                        OdsayRouteResponse.ApiError error = apiError.get();
+                        if (error.isSearchResult()) {
                             transitRouteEmptyResultCounter.increment();
-                            log.warn("[ODsay] result=null — API 키 오류 또는 경로 없음. raw={}", rawJson);
+                            log.info("[ODsay] 경로 없음 응답 (code={} {})", error.code(), error.message());
                             return Mono.just(List.<Leg>of());
                         }
+                        // 200 OK 로 내려오는 키·한도·서버 오류 — 예외여야 회로 차단기가 실패로 집계하고 조용한 추정 경로 대체가 멈춘다
+                        return Mono.error(ExternalApiException.of("ODsay", 400, "HTTP 200 오류 봉투 code=" + error.code() + " " + error.message()));
+                    }
+                    if (response.result() == null) {
+                        transitRouteEmptyResultCounter.increment();
+                        log.warn("[ODsay] result 없음 — 경로 없음으로 처리. raw={}", rawJson);
+                        return Mono.just(List.<Leg>of());
+                    }
+                    {
                         var paths = response.result().path();
                         if (paths == null || paths.isEmpty()) {
                             transitRouteEmptyResultCounter.increment();
@@ -172,10 +191,6 @@ public class OdsayRouteClient {
                                         + " start=" + (l.start() != null ? l.start().name() : "null") + ")"
                                 ).toList());
                         return Mono.just(legs);
-                    } catch (Exception ex) {
-                        log.error("[ODsay] JSON 파싱 실패: {} — raw={}", ex.getMessage(), rawJson);
-                        transitRouteErrorFallbackCounter.increment();
-                        return Mono.just(List.<Leg>of());
                     }
                 })
                 // T-3: Retry (안쪽) + CircuitBreaker (바깥) → 최종 onErrorResume 으로 폴백

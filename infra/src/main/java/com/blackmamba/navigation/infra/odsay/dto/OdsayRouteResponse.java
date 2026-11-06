@@ -2,10 +2,43 @@ package com.blackmamba.navigation.infra.odsay.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.List;
+import com.fasterxml.jackson.databind.JsonNode;
 
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * ODsay 응답. 키 오류·일일 한도 초과·서버 오류는 HTTP 200 + {@code error} 봉투로 내려온다
+ * ({@code {"error":{"code":"500","msg":"ApiKeyAuthFailed"}}} 또는 {@code {"error":[{"code":"-8","message":"..."}]}}).
+ * 두 꼴이 모두 관찰되어 {@link JsonNode} 로 받아 {@link #findApiError()} 가 정규화한다.
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record OdsayRouteResponse(Result result) {
+public record OdsayRouteResponse(Result result, JsonNode error) {
+
+    public Optional<ApiError> findApiError() {
+        if (error == null || error.isNull() || error.isMissingNode()) {
+            return Optional.empty();
+        }
+        JsonNode node = error;
+        if (node.isArray()) {
+            if (node.isEmpty()) {
+                return Optional.empty();
+            }
+            node = node.get(0);
+        }
+        String message = node.path("msg").asText("");
+        if (node.hasNonNull("message")) {
+            message = node.path("message").asText();
+        }
+        return Optional.of(new ApiError(node.path("code").asText(""), message));
+    }
+
+    /** 음수 코드는 "이 출발/도착 조합에 경로 없음" 류의 검색 결과이고, 양수(500 등)는 키·한도·서버 오류다. */
+    public record ApiError(String code, String message) {
+        public boolean isSearchResult() {
+            return code.startsWith("-");
+        }
+    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Result(List<Path> path) {}

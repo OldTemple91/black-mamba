@@ -145,6 +145,48 @@ class OdsayRouteClientResilienceTest {
     }
 
     @Test
+    void 오류_봉투_200_응답은_실패로_집계되어_Retry_후_빈리스트_fallback() {
+        // given — ODsay 는 키 오류·일일 한도 초과를 HTTP 200 으로 돌려준다
+        wireMock.stubFor(get(urlPathEqualTo(PATH))
+                .willReturn(aResponse().withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"error":{"code":"500","msg":"ApiKeyAuthFailed"}}
+                                """)));
+
+        // when & then
+        StepVerifier.create(client.getTransitRoute(ORIGIN, DESTINATION))
+                .assertNext(legs -> {
+                    assertThat(legs).isEmpty();
+                    wireMock.verify(3, getRequestedFor(urlPathEqualTo(PATH)));
+                    assertThat(fallbackCount("error")).isEqualTo(1.0);
+                    assertThat(fallbackCount("empty_result")).isZero();
+                })
+                .verifyComplete();
+    }
+
+    @Test
+    void 음수_코드_오류_봉투는_경로_없음으로_본다() {
+        // given — 검색 결과 없음은 장애가 아니라 빈 결과
+        wireMock.stubFor(get(urlPathEqualTo(PATH))
+                .willReturn(aResponse().withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"error":[{"code":"-98","message":"출발지와 도착지가 너무 가깝습니다."}]}
+                                """)));
+
+        // when & then
+        StepVerifier.create(client.getTransitRoute(ORIGIN, DESTINATION))
+                .assertNext(legs -> {
+                    assertThat(legs).isEmpty();
+                    wireMock.verify(1, getRequestedFor(urlPathEqualTo(PATH)));
+                    assertThat(fallbackCount("empty_result")).isEqualTo(1.0);
+                    assertThat(fallbackCount("error")).isZero();
+                })
+                .verifyComplete();
+    }
+
+    @Test
     void timeout_시에도_Retry_후_fallback() {
         // WireMock 에서 fixedDelay 로 응답 지연을 흉내내어 정상 완료 확인
         wireMock.stubFor(get(urlPathEqualTo(PATH))
@@ -159,6 +201,13 @@ class OdsayRouteClientResilienceTest {
     }
 
     // ─── 헬퍼: 최소한의 ODsay 샘플 응답 ───
+
+    private double fallbackCount(String reason) {
+        return meterRegistry.get("navigation.odsay.fallback.total")
+                .tags("type", "transit_route", "reason", reason)
+                .counter()
+                .count();
+    }
 
     /**
      * 실제 ODsay 응답 구조를 단순화한 JSON.
