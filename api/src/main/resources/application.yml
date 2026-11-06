@@ -32,6 +32,8 @@ ddareungi:
   api-key: ${DDAREUNGI_API_KEY}
   request-timeout-ms: 5000
   refresh-backoff-ms: 30000
+  # 갱신 실패 시 이전 snapshot 을 재사용하는 상한 — 이보다 오래된 재고는 "대여 가능" 근거로 쓰지 않는다
+  max-stale-age-ms: 900000
 
 tago:
   api-key: ${TAGO_API_KEY}
