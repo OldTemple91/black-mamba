@@ -82,11 +82,98 @@ groups:
           service: navigation
           mobility: ddareungi
         annotations:
-          summary: "🚲 따릉이 API fallback 빈도 상승 (>0.2/s)"
+          summary: "🚲 따릉이 가용성 조회 실패 빈도 상승 (>0.2/s)"
           description: |
-            따릉이 API 호출 실패로 합성 응답 반환이 늘어나는 중입니다.
-            응답 품질 저하 (실시간 재고 정보 없음). 서울시 공공데이터 API 상태 확인.
+            따릉이 snapshot 을 확보하지 못해 "대여 후보 없음" 으로 답하는 조회가 늘고 있습니다.
+            (어댑터가 출처 EMPTY 인 snapshot 을 오류로 집계 — 혼합 경로가 만들어지지 않음)
+            서울시 공공데이터 API 상태 확인.
           runbook: "External APIs 대시보드 → 따릉이 패널 → Loki 최근 에러 확인"
+
+      # ───────────────────────────────────────────────
+      # ④-b 따릉이 snapshot 갱신 실패 (stale 재사용 / 재사용 한도 초과)
+      #     갱신이 실패해도 15분까지는 이전 snapshot 으로 버틴다 — 그 사이에 알아채기 위한 경보
+      # ───────────────────────────────────────────────
+      - alert: DdareungiSnapshotRefreshFailing
+        expr: |
+          sum(increase(navigation_ddareungi_fallback_total{reason="refresh_backoff"}[10m])) >= 5
+        for: 5m
+        labels:
+          severity: warning
+          service: navigation
+          mobility: ddareungi
+        annotations:
+          summary: "🚲 따릉이 snapshot 갱신이 계속 실패 중 (10분간 5회 이상)"
+          description: |
+            오류 봉투(HTTP 200 + RESULT)·인증키 오류(XML)·0개 응답·타임아웃 중 하나입니다.
+            지금은 이전 snapshot(STALE)으로 응답 중이며, 15분이 지나면 따릉이 경로가 사라집니다.
+          runbook: "Loki 에서 '[따릉이 API] snapshot 조회 실패' 원인 확인 → 인증키·서울시 API 상태 점검"
+
+      - alert: DdareungiSnapshotExpired
+        expr: |
+          sum(increase(navigation_ddareungi_fallback_total{reason=~"stale_expired|empty_snapshot"}[5m])) > 0
+        for: 2m
+        labels:
+          severity: critical
+          service: navigation
+          mobility: ddareungi
+        annotations:
+          summary: "🚲 따릉이 데이터 없음 — 재사용 한도를 넘겼거나 한 번도 받지 못함"
+          description: |
+            쓸 수 있는 따릉이 snapshot 이 없습니다. 따릉이 혼합 경로가 전부 빠진 응답이 나가고 있습니다.
+          runbook: "Loki 에서 'stale snapshot 이 ... 재사용 한도' 또는 '사용 가능한 snapshot 없음' 확인"
+
+      # ───────────────────────────────────────────────
+      # ④-c ODsay 오류 폴백 — 추정 경로로 대체되는 비율
+      #     HTTP 200 오류 봉투(키·한도·서버 오류)도 여기 집계된다
+      # ───────────────────────────────────────────────
+      - alert: OdsayErrorFallbackSpike
+        expr: |
+          sum(rate(navigation_odsay_fallback_total{type="transit_route",reason="error"}[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: navigation
+        annotations:
+          summary: "🚇 ODsay 호출 실패로 대중교통 구간이 추정값으로 대체되는 중 (>0.1/s)"
+          description: |
+            실패한 구간은 직선거리 기반 추정(소요시간·요금)으로 대체됩니다. 일일 한도 초과·API 키·ODsay 장애를 확인하세요.
+          runbook: "Loki 에서 '[ODsay] 호출 실패(최종)' 의 원인 코드 확인"
+
+      # ───────────────────────────────────────────────
+      # ④-d 경로 탐색 오류율 (타임아웃이 아닌 실패)
+      # ───────────────────────────────────────────────
+      - alert: RouteSearchErrorRateHigh
+        expr: |
+          sum(rate(navigation_route_duration_seconds_count{outcome="error"}[5m]))
+          /
+          sum(rate(navigation_route_duration_seconds_count[5m]))
+          > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: navigation
+          slo: availability
+        annotations:
+          summary: "🧭 경로 탐색 오류율 5% 초과"
+          description: |
+            타임아웃이 아닌 예외로 실패한 /api/routes 요청 비율입니다. 스택은 '[전역 예외]' 로그에 있습니다.
+          runbook: "Loki 에서 '[전역 예외]' 검색 → traceId 로 Tempo 추적"
+
+      # ───────────────────────────────────────────────
+      # ④-e RAG 이력 저장 실패 — 사용자 요청에는 영향 없지만 이력이 쌓이지 않는다
+      # ───────────────────────────────────────────────
+      - alert: RagHistorySaveFailing
+        expr: |
+          sum(increase(navigation_rag_history_failed_total[15m])) >= 3
+        for: 5m
+        labels:
+          severity: warning
+          service: navigation
+        annotations:
+          summary: "🧠 경로 이력(RAG) 저장 실패 반복"
+          description: |
+            임베딩(Ollama bge-m3) 또는 Qdrant 저장이 실패·타임아웃하고 있습니다. 유사 이력 근거가 갱신되지 않습니다.
+          runbook: "Ollama·Qdrant 상태 확인 → Loki 에서 '[RAG] 비동기 저장 실패' 확인"
 
       # ───────────────────────────────────────────────
       # ⑤ JVM Heap 사용률 높음 (운영 환경 조기 경보)
