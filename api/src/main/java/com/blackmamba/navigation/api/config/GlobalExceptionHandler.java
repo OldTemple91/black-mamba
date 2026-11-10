@@ -1,5 +1,6 @@
 package com.blackmamba.navigation.api.config;
 
+import com.blackmamba.navigation.application.route.InvalidRouteSearchException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -39,6 +40,14 @@ public class GlobalExceptionHandler {
         String message = e.getMessage() != null ? e.getMessage() : "요청 처리 실패";
         return ResponseEntity.status(e.getStatusCode())
                 .body(ErrorResponse.of(e.getStatusCode().toString(), message));
+    }
+
+    /** 탐색을 시작할 수 없는 요청(좌표 범위·최소 거리) — 사유 코드를 그대로 오류 코드로 내보낸다 */
+    @ExceptionHandler(InvalidRouteSearchException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidRouteSearch(InvalidRouteSearchException e) {
+        log.warn("[400] {}: {}", e.code(), e.getMessage());
+        return ResponseEntity.badRequest()
+                .body(ErrorResponse.of(e.code(), e.getMessage()));
     }
 
     /** 입력 검증 실패(컨트롤러·SSE 가 던지는 IllegalArgumentException) 는 400 — 사용자 입력이지 서버 장애가 아니다 */

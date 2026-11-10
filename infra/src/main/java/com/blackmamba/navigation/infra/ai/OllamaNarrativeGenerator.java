@@ -4,7 +4,6 @@ import com.blackmamba.navigation.application.route.port.NarrativeGenerator;
 import com.blackmamba.navigation.application.route.port.ScoredRouteHistoryEntry;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Route;
-import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;

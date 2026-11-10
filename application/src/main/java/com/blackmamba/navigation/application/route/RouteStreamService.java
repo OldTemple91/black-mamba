@@ -1,10 +1,6 @@
 package com.blackmamba.navigation.application.route;
 
-import com.blackmamba.navigation.application.route.accessibility.AccessibilityContext;
-import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Route;
-import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
-import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -85,22 +81,17 @@ public class RouteStreamService {
 
     @Observed(name = "navigation.route.stream",
             contextualName = "실시간 경로 스트림")
-    public Flux<StreamEventPayload> stream(Location origin,
-                                           Location destination,
-                                           List<MobilityType> mobilityTypes,
-                                           SearchMode searchMode,
-                                           RecommendationPreference preference,
-                                           AccessibilityContext access) {
+    public Flux<StreamEventPayload> stream(RouteSearchQuery query) {
         Instant startedAt = Instant.now();
         AtomicReference<List<Route>> lastRoutes = new AtomicReference<>();
 
-        Flux<StreamEventPayload> initial = findRoutesMono(origin, destination, mobilityTypes, searchMode, preference, access)
+        Flux<StreamEventPayload> initial = findRoutesMono(query)
                 .doOnNext(lastRoutes::set)
                 .map(routes -> (StreamEventPayload) new StreamEventPayload.Initial(Instant.now(), routes))
                 .flux();
 
         Flux<StreamEventPayload> polls = Flux.interval(POLL_INTERVAL, POLL_INTERVAL)
-                .flatMap(tick -> findRoutesMono(origin, destination, mobilityTypes, searchMode, preference, access)
+                .flatMap(tick -> findRoutesMono(query)
                         .<SearchOutcome>map(SearchOutcome.Succeeded::new)
                         .onErrorResume(err -> {
                             log.warn("[Stream] 재탐색 실패 — search_failed heartbeat 발행, 이전 결과 유지. err={}", err.getMessage());
@@ -135,14 +126,9 @@ public class RouteStreamService {
                 });
     }
 
-    private Mono<List<Route>> findRoutesMono(Location origin,
-                                             Location destination,
-                                             List<MobilityType> mobilityTypes,
-                                             SearchMode searchMode,
-                                             RecommendationPreference preference,
-                                             AccessibilityContext access) {
+    private Mono<List<Route>> findRoutesMono(RouteSearchQuery query) {
         return routeOptimizationService
-                .findRoutes(origin, destination, mobilityTypes, searchMode, preference, access)
+                .findRoutes(query)
                 .timeout(SEARCH_TIMEOUT);
     }
 

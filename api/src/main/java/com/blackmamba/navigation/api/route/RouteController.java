@@ -4,13 +4,13 @@ import com.blackmamba.navigation.api.config.ErrorResponse;
 import com.blackmamba.navigation.api.support.MobilityTypes;
 import com.blackmamba.navigation.api.support.ReactorTimeouts;
 import com.blackmamba.navigation.application.route.RouteOptimizationService;
+import com.blackmamba.navigation.application.route.RouteSearchQuery;
 import com.blackmamba.navigation.application.route.SearchMode;
 import com.blackmamba.navigation.application.route.accessibility.AccessibilityContext;
 import com.blackmamba.navigation.application.route.history.RouteNarrativeEnhancer;
 import com.blackmamba.navigation.application.route.weather.WeatherContext;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Route;
-import com.blackmamba.navigation.domain.route.TransitSearchDistancePolicy;
 import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import com.blackmamba.navigation.domain.weather.WeatherCondition;
@@ -80,22 +80,8 @@ public class RouteController {
             @Parameter(description = "도보 속도 km/h (노인/유아 기본 3.0, 미지정 시 기본 4.5)", example = "3.0") @RequestParam(required = false) Double walkingSpeedKmh,
             @Parameter(description = "날씨 힌트 (CLEAR/RAIN/SNOW/HEAT/COLD) — 공유 모빌리티 · 장거리 도보에 페널티 반영") @RequestParam(required = false) String weather
     ) {
-        // 입력값 검증
-        if (originLat < -90 || originLat > 90 || destLat < -90 || destLat > 90) {
-            return badRequest("INVALID_LATITUDE", "위도는 -90 ~ 90 범위여야 합니다.");
-        }
-        if (originLng < -180 || originLng > 180 || destLng < -180 || destLng > 180) {
-            return badRequest("INVALID_LONGITUDE", "경도는 -180 ~ 180 범위여야 합니다.");
-        }
-
         Location origin      = new Location("출발지", originLat, originLng);
         Location destination = new Location("목적지", destLat, destLng);
-
-        if (TransitSearchDistancePolicy.isTooCloseForTransit(origin, destination)) {
-            return badRequest("SHORT_DISTANCE",
-                    "출발지와 목적지가 " + (int) TransitSearchDistancePolicy.MIN_TRANSIT_DISTANCE_METERS
-                            + "m 이내라 현재 대중교통/복합 경로 탐색을 지원하지 않습니다. 도보 이동을 이용하거나 더 먼 목적지를 검색해 주세요.");
-        }
 
         List<MobilityType> mobilityTypes;
         try {
@@ -106,14 +92,15 @@ public class RouteController {
                     "지원하지 않는 이동수단 타입입니다. 허용 값: " + MobilityTypes.allowedValues());
         }
 
-        AccessibilityContext accessibilityContext = AccessibilityContext.of(wheelchairAccessible, walkingSpeedKmh);
-        WeatherContext weatherContext = WeatherContext.of(WeatherCondition.parse(weather));
+        // 좌표 범위·최소 거리 검증은 쿼리 생성자가 한다 — 위반 시 InvalidRouteSearchException → 전역 핸들러가 400 + 사유 코드
+        RouteSearchQuery query = new RouteSearchQuery(origin, destination, mobilityTypes, searchMode, recommendationPreference,
+                AccessibilityContext.of(wheelchairAccessible, walkingSpeedKmh), WeatherContext.of(WeatherCondition.parse(weather)));
 
         Timer.Sample sample = Timer.start(meterRegistry);
         long startedAtNanos = System.nanoTime();
         try {
             List<Route> routes = routeOptimizationService
-                    .findRoutes(origin, destination, mobilityTypes, searchMode, recommendationPreference, accessibilityContext, weatherContext)
+                    .findRoutes(query)
                     .timeout(ROUTE_SEARCH_TIMEOUT)
                     .block();
 

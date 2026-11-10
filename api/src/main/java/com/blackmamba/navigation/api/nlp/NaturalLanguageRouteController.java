@@ -5,14 +5,15 @@ import com.blackmamba.navigation.api.place.PlaceResponse;
 import com.blackmamba.navigation.api.support.ReactorTimeouts;
 import com.blackmamba.navigation.application.route.RouteIntent;
 import com.blackmamba.navigation.application.route.RouteOptimizationService;
+import com.blackmamba.navigation.application.route.RouteSearchQuery;
 import com.blackmamba.navigation.application.route.SearchMode;
 import com.blackmamba.navigation.application.route.accessibility.AccessibilityContext;
 import com.blackmamba.navigation.application.route.history.RouteNarrativeEnhancer;
+import com.blackmamba.navigation.application.route.weather.WeatherContext;
 import com.blackmamba.navigation.application.route.port.PlaceResolverPort;
 import com.blackmamba.navigation.application.route.port.RouteIntentParser;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Route;
-import com.blackmamba.navigation.domain.route.TransitSearchDistancePolicy;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -140,23 +141,16 @@ public class NaturalLanguageRouteController {
                             Map.of("parsed", intent)));
         }
 
-        // /api/routes·/stream 과 같은 거리 하한 — 입력 경로가 달라도 규칙은 하나다
-        if (TransitSearchDistancePolicy.isTooCloseForTransit(origin, destination)) {
-            return ResponseEntity.badRequest()
-                    .body(ErrorResponse.of("SHORT_DISTANCE",
-                            "출발지와 목적지가 " + (int) TransitSearchDistancePolicy.MIN_TRANSIT_DISTANCE_METERS
-                                    + "m 이내라 현재 대중교통/복합 경로 탐색을 지원하지 않습니다. 도보 이동을 이용하거나 더 먼 목적지를 검색해 주세요.",
-                            Map.of("parsed", intent)));
-        }
-
         // Step 3: 기존 경로 탐색 엔진 호출
         SearchMode mode = intent.hasExplicitMobility() ? SearchMode.SPECIFIC : SearchMode.OPTIMAL;
-        AccessibilityContext access = AccessibilityContext.of(intent.wheelchairAccessible(), intent.walkingSpeedKmh());
+        // /api/routes·/stream 과 같은 검증 규칙(좌표 범위·최소 거리) — 쿼리 생성자가 본다. 위반 시 400 + 사유 코드
+        RouteSearchQuery searchQuery = new RouteSearchQuery(origin, destination, intent.mobility(), mode, intent.preference(),
+                AccessibilityContext.of(intent.wheelchairAccessible(), intent.walkingSpeedKmh()), WeatherContext.DEFAULT);
 
         List<Route> routes;
         try {
             routes = routeOptimizationService
-                    .findRoutes(origin, destination, intent.mobility(), mode, intent.preference(), access)
+                    .findRoutes(searchQuery)
                     .timeout(ROUTE_SEARCH_TIMEOUT)
                     .block();
         } catch (RuntimeException e) {

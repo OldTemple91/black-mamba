@@ -83,7 +83,7 @@ class RouteOptimizationServiceTest {
             return route.withScore(0.5, true);
         });
 
-        List<Route> routes = service.findRoutes(origin, dest, List.of(), SearchMode.SPECIFIC).block();
+        List<Route> routes = service.findRoutes(RouteSearchQuery.of(origin, dest, List.of(), SearchMode.SPECIFIC, RecommendationPreference.RELIABILITY)).block();
 
         assertThat(routes).hasSize(1);
         assertThat(routes.get(0).type()).isEqualTo(RouteType.TRANSIT_ONLY);
@@ -105,7 +105,7 @@ class RouteOptimizationServiceTest {
                 });
         when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of());
         when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of());
-        List<Route> routes = service.findRoutes(origin, dest, List.of(), SearchMode.OPTIMAL).block();
+        List<Route> routes = service.findRoutes(RouteSearchQuery.of(origin, dest, List.of(), SearchMode.OPTIMAL, RecommendationPreference.RELIABILITY)).block();
 
         assertThat(routes).isNotEmpty();
         assertThat(routes.stream().anyMatch(r -> r.type() == RouteType.TRANSIT_ONLY)).isTrue();
@@ -128,7 +128,7 @@ class RouteOptimizationServiceTest {
         when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of());
         when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of());
 
-        List<Route> routes = service.findRoutes(origin, dest, List.of(), SearchMode.OPTIMAL, RecommendationPreference.TIME_PRIORITY).block();
+        List<Route> routes = service.findRoutes(RouteSearchQuery.of(origin, dest, List.of(), SearchMode.OPTIMAL, RecommendationPreference.TIME_PRIORITY)).block();
 
         assertThat(routes).isNotEmpty();
         assertThat(routes.getFirst().recommended()).isTrue();

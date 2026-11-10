@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -63,7 +63,7 @@ class RouteControllerTest {
         Route route = new Route("rt_001", RouteType.TRANSIT_ONLY, 45, 1250,
                 breakdown, List.of(), evaluation, 0.5, true, List.of(), new Comparison(45, 0), null, null, null);
 
-        when(routeOptimizationService.findRoutes(any(), any(), any(), any(), any(), any(), any()))
+        when(routeOptimizationService.findRoutes(any()))
                 .thenReturn(Mono.just(List.of(route)));
 
         mockMvc.perform(get("/api/routes")
@@ -86,7 +86,7 @@ class RouteControllerTest {
         Route route = new Route("rt_002", RouteType.TRANSIT_ONLY, 30, 1250,
                 breakdown, List.of(), null, 0.6, true, List.of(), new Comparison(30, 0), null, null, null);
 
-        when(routeOptimizationService.findRoutes(any(), any(), any(), any(), any(), any(), any()))
+        when(routeOptimizationService.findRoutes(any()))
                 .thenReturn(Mono.just(List.of(route)));
 
         mockMvc.perform(get("/api/routes")
@@ -104,7 +104,7 @@ class RouteControllerTest {
         Route route = new Route("rt_opt", RouteType.MOBILITY_ONLY, 20, 0,
                 breakdown, List.of(), null, 0.9, true, List.of(), null, null, null, null);
 
-        when(routeOptimizationService.findRoutes(any(), any(), any(), eq(SearchMode.OPTIMAL), eq(RecommendationPreference.RELIABILITY), any(), any()))
+        when(routeOptimizationService.findRoutes(argThat(query -> query.searchMode() == SearchMode.OPTIMAL && query.preference() == RecommendationPreference.RELIABILITY)))
                 .thenReturn(Mono.just(List.of(route)));
 
         mockMvc.perform(get("/api/routes")
@@ -123,7 +123,7 @@ class RouteControllerTest {
         Route route = new Route("rt_pref", RouteType.TRANSIT_WITH_BIKE, 18, 1000,
                 breakdown, List.of(), null, 0.91, true, List.of(), null, null, null, null);
 
-        when(routeOptimizationService.findRoutes(any(), any(), any(), eq(SearchMode.OPTIMAL), eq(RecommendationPreference.TIME_PRIORITY), any(), any()))
+        when(routeOptimizationService.findRoutes(argThat(query -> query.searchMode() == SearchMode.OPTIMAL && query.preference() == RecommendationPreference.TIME_PRIORITY)))
                 .thenReturn(Mono.just(List.of(route)));
 
         mockMvc.perform(get("/api/routes")
@@ -139,7 +139,7 @@ class RouteControllerTest {
 
     @Test
     void 경로_탐색이_시간_내_끝나지_않으면_504를_반환한다() throws Exception {
-        when(routeOptimizationService.findRoutes(any(), any(), any(), any(), any(), any(), any()))
+        when(routeOptimizationService.findRoutes(any()))
                 .thenReturn(Mono.error(new TimeoutException("경로 탐색 30초 초과")));
 
         mockMvc.perform(get("/api/routes")
@@ -153,7 +153,7 @@ class RouteControllerTest {
 
     @Test
     void 타임아웃이_아닌_오류는_504로_위장하지_않고_500을_반환한다() throws Exception {
-        when(routeOptimizationService.findRoutes(any(), any(), any(), any(), any(), any(), any()))
+        when(routeOptimizationService.findRoutes(any()))
                 .thenReturn(Mono.error(new IllegalStateException("전략 조립 버그")));
 
         mockMvc.perform(get("/api/routes")

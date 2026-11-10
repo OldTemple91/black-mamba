@@ -1,12 +1,13 @@
 package com.blackmamba.navigation.api.route;
 
 import com.blackmamba.navigation.api.support.MobilityTypes;
+import com.blackmamba.navigation.application.route.RouteSearchQuery;
 import com.blackmamba.navigation.application.route.RouteStreamService;
+import com.blackmamba.navigation.application.route.weather.WeatherContext;
 import com.blackmamba.navigation.application.route.SearchMode;
 import com.blackmamba.navigation.application.route.StreamEventPayload;
 import com.blackmamba.navigation.application.route.accessibility.AccessibilityContext;
 import com.blackmamba.navigation.domain.location.Location;
-import com.blackmamba.navigation.domain.route.TransitSearchDistancePolicy;
 import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import io.swagger.v3.oas.annotations.Operation;
@@ -94,22 +95,8 @@ public class RouteStreamController {
             @RequestParam(required = false) Boolean wheelchairAccessible,
             @RequestParam(required = false) Double walkingSpeedKmh
     ) {
-        // 단순 검증 — 범위 벗어나면 Flux.error 로 즉시 종료
-        if (originLat < -90 || originLat > 90 || destLat < -90 || destLat > 90) {
-            return Flux.error(new IllegalArgumentException("위도는 -90 ~ 90 범위여야 합니다."));
-        }
-        if (originLng < -180 || originLng > 180 || destLng < -180 || destLng > 180) {
-            return Flux.error(new IllegalArgumentException("경도는 -180 ~ 180 범위여야 합니다."));
-        }
-
         Location origin = new Location("출발지", originLat, originLng);
         Location destination = new Location("목적지", destLat, destLng);
-
-        if (TransitSearchDistancePolicy.isTooCloseForTransit(origin, destination)) {
-            return Flux.error(new IllegalArgumentException(
-                    "출발지와 목적지가 " + (int) TransitSearchDistancePolicy.MIN_TRANSIT_DISTANCE_METERS
-                            + "m 이내는 스트리밍 탐색을 지원하지 않습니다."));
-        }
 
         List<MobilityType> mobilityTypes;
         try {
@@ -119,13 +106,15 @@ public class RouteStreamController {
                     "지원하지 않는 이동수단 타입입니다. 허용 값: " + MobilityTypes.allowedValues()));
         }
 
-        AccessibilityContext accessibility = AccessibilityContext.of(wheelchairAccessible, walkingSpeedKmh);
+        // /api/routes 와 같은 검증 규칙 — 쿼리 생성자가 좌표 범위·최소 거리를 본다 (위반 시 400 + 사유 코드)
+        RouteSearchQuery query = new RouteSearchQuery(origin, destination, mobilityTypes, searchMode, recommendationPreference,
+                AccessibilityContext.of(wheelchairAccessible, walkingSpeedKmh), WeatherContext.DEFAULT);
 
         log.info("[Stream] 새 스트림 시작 — ({},{}) → ({},{}) pref={}",
                 originLat, originLng, destLat, destLng, recommendationPreference);
 
         return routeStreamService
-                .stream(origin, destination, mobilityTypes, searchMode, recommendationPreference, accessibility)
+                .stream(query)
                 .map(RouteStreamController::toSse);
     }
 

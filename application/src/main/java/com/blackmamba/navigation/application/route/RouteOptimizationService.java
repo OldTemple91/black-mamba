@@ -1,13 +1,10 @@
 package com.blackmamba.navigation.application.route;
 
-import com.blackmamba.navigation.application.route.accessibility.AccessibilityContext;
 import com.blackmamba.navigation.application.route.history.RouteHistoryRecorder;
 import com.blackmamba.navigation.application.route.strategy.RouteSearchStrategy;
-import com.blackmamba.navigation.application.route.weather.WeatherContext;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Route;
 import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
-import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import io.micrometer.observation.annotation.Observed;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
@@ -37,45 +34,17 @@ public class RouteOptimizationService {
         this.routeHistoryRecorder = routeHistoryRecorder;
     }
 
-    public Mono<List<Route>> findRoutes(Location origin, Location destination,
-                                         List<MobilityType> mobilityTypes,
-                                         SearchMode searchMode) {
-        return findRoutes(origin, destination, mobilityTypes, searchMode,
-                RecommendationPreference.RELIABILITY, AccessibilityContext.DEFAULT, WeatherContext.DEFAULT);
-    }
-
-    public Mono<List<Route>> findRoutes(Location origin, Location destination,
-                                        List<MobilityType> mobilityTypes,
-                                        SearchMode searchMode,
-                                        RecommendationPreference recommendationPreference) {
-        return findRoutes(origin, destination, mobilityTypes, searchMode,
-                recommendationPreference, AccessibilityContext.DEFAULT, WeatherContext.DEFAULT);
-    }
-
-    public Mono<List<Route>> findRoutes(Location origin, Location destination,
-                                        List<MobilityType> mobilityTypes,
-                                        SearchMode searchMode,
-                                        RecommendationPreference recommendationPreference,
-                                        AccessibilityContext accessibilityContext) {
-        return findRoutes(origin, destination, mobilityTypes, searchMode,
-                recommendationPreference, accessibilityContext, WeatherContext.DEFAULT);
-    }
-
     @Observed(name = "navigation.route.search",
             contextualName = "경로 탐색",
             lowCardinalityKeyValues = {"component", "RouteOptimizationService"})
-    public Mono<List<Route>> findRoutes(Location origin, Location destination,
-                                        List<MobilityType> mobilityTypes,
-                                        SearchMode searchMode,
-                                        RecommendationPreference recommendationPreference,
-                                        AccessibilityContext accessibilityContext,
-                                        WeatherContext weatherContext) {
-        RouteSearchStrategy strategy = strategyRegistry.strategyFor(searchMode);
-        RecommendationPreference preference = recommendationPreference == null
-                ? RecommendationPreference.RELIABILITY : recommendationPreference;
+    public Mono<List<Route>> findRoutes(RouteSearchQuery query) {
+        RouteSearchStrategy strategy = strategyRegistry.strategyFor(query.searchMode());
+        Location origin = query.origin();
+        Location destination = query.destination();
+        RecommendationPreference preference = query.preference();
 
-        return strategy.search(origin, destination, mobilityTypes, preference)
-                .map(routes -> enrichmentPipeline.enrich(routes, origin, destination, preference, accessibilityContext, weatherContext))
+        return strategy.search(origin, destination, query.mobilityTypes(), preference)
+                .map(routes -> enrichmentPipeline.enrich(routes, origin, destination, preference, query.accessibility(), query.weather()))
                 // RAG Phase 2: 추천 경로를 벡터 DB 에 비동기 저장 (fire-and-forget, 본 요청에 영향 없음)
                 .doOnNext(routes -> routeHistoryRecorder.recordAsync(routes, origin, destination, preference));
     }

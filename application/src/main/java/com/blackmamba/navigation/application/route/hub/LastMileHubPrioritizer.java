@@ -4,16 +4,12 @@ import com.blackmamba.navigation.application.route.port.MobilityAvailabilityPort
 import com.blackmamba.navigation.domain.hub.Hub;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Leg;
-import com.blackmamba.navigation.domain.route.mobility.MobilitySearchHint;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 /**
  * 라스트마일 허브 후보를 "픽업 가능성" 기준으로 우선순위화한다.

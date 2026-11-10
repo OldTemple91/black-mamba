@@ -4,7 +4,6 @@ import com.blackmamba.navigation.application.route.accessibility.AccessibilityCo
 import com.blackmamba.navigation.application.route.accessibility.AccessibilityPostProcessor;
 import com.blackmamba.navigation.application.route.weather.WeatherAwareRouteAdjuster;
 import com.blackmamba.navigation.application.route.weather.WeatherContext;
-import com.blackmamba.navigation.domain.location.GeoDistance;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Leg;
 import com.blackmamba.navigation.domain.route.Route;
