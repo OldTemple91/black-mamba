@@ -125,7 +125,7 @@ public class OdsayRouteClient {
     }
 
     private Mono<List<Leg>> requestTransitRoute(Location origin, Location destination) {
-        return rateLimit().then(webClient.get()
+        return Mono.defer(() -> rateLimit().then(webClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/searchPubTransPathT")
                         .queryParam("apiKey", "{apiKey}")
@@ -180,8 +180,9 @@ public class OdsayRouteClient {
                     List<Leg> legs = normalizeWalkLegs(mapper.toLegs(paths.get(0)), origin, destination);
                     log.debug("[ODsay] 파싱 성공 — leg {}개", legs.size());
                     return Mono.just(legs);
-                })
-                // T-3: Retry (안쪽) + CircuitBreaker (바깥) → 최종 onErrorResume 으로 폴백
+                })))
+                // 호출 간격 제한은 Retry 안쪽에 둔다 — 재시도도 간격을 지키고, 회로가 열려 있으면 대기 없이 바로 거절된다.
+                // (예전엔 limiter 가 바깥이라 재시도는 간격 없이 나가고, 열린 회로도 대기를 다 채운 뒤에야 거절했다)
                 .as(guard::protect)
                 .onErrorResume(ex -> {
                     transitRouteErrorFallbackCounter.increment();
@@ -192,7 +193,7 @@ public class OdsayRouteClient {
                         log.error("[ODsay] 응답 처리 중 예기치 못한 오류 → 빈 리스트 반환", ex);
                     }
                     return Mono.just(List.of());
-                }));
+                });
     }
 
     private List<Leg> normalizeWalkLegs(List<Leg> legs, Location origin, Location destination) {
