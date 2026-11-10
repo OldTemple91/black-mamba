@@ -18,6 +18,8 @@ import com.blackmamba.navigation.domain.route.evaluation.GenerationDiagnostic;
 import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import com.blackmamba.navigation.application.route.strategy.CandidateRouteBuilder.SearchContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -31,6 +33,7 @@ import java.util.List;
  */
 public class SpecificMobilityStrategy implements RouteSearchStrategy {
 
+    private static final Logger log = LoggerFactory.getLogger(SpecificMobilityStrategy.class);
     private static final int MAX_CANDIDATE_HUBS = LastMileHubPrioritizer.MAX_CANDIDATE_HUBS;
 
     private final TransitRoutePort transitRoutePort;
@@ -77,11 +80,16 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                     if (mobilityTypes.isEmpty()) {
                         return Mono.just(List.of(routeEvaluator.evaluate(baseRoute, true, preference)));
                     }
-                    return generateCombinedRoutes(new SearchContext(origin, destination, baseLegs), mobilityTypes)
+                    // 조회 예산이 줄면 후보 허브 수를 줄인다 — 생성과 진단이 같은 허브 수를 본다
+                    int hubLimit = transitBudgetPort.level().candidateHubLimit(MAX_CANDIDATE_HUBS);
+                    if (hubLimit < MAX_CANDIDATE_HUBS) {
+                        log.info("[SPECIFIC] 대중교통 조회 예산 부족 → 후보 허브 {}개", hubLimit);
+                    }
+                    return generateCombinedRoutes(new SearchContext(origin, destination, baseLegs), mobilityTypes, hubLimit)
                             .collectList()
                             .flatMap(combined -> {
                                 if (combined.isEmpty()) {
-                                    return buildNoMixedDiagnostics(baseLegs, origin, destination, mobilityTypes)
+                                    return buildNoMixedDiagnostics(baseLegs, origin, destination, mobilityTypes, hubLimit)
                                             .map(reasons -> {
                                                 Route enrichedBaseRoute = RouteRanker.withDiagnostics(baseRoute, reasons);
                                                 return ranker.rank(List.of(enrichedBaseRoute), enrichedBaseRoute, baseMinutes, preference);
@@ -95,11 +103,10 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
     }
 
     /** 선택한 수단별로 라스트마일(패턴 C) 후보를 만든다. 후보 허브가 없으면 이동수단만으로 가는 경로(패턴 E)로 대체한다. */
-    private Flux<Route> generateCombinedRoutes(SearchContext context, List<MobilityType> mobilityTypes) {
+    private Flux<Route> generateCombinedRoutes(SearchContext context, List<MobilityType> mobilityTypes, int hubLimit) {
         return Flux.fromIterable(mobilityTypes)
                 .flatMap(type -> {
                     MobilityConfig config = MobilityConfigs.forType(type);
-                    int hubLimit = transitBudgetPort.level().candidateHubLimit(MAX_CANDIDATE_HUBS);
                     return hubPrioritizer.prioritize(context.baseLegs(), context.destination(), type, config, hubLimit)
                             .flatMapMany(candidateHubs -> {
                                 if (candidateHubs.isEmpty()) {
@@ -112,18 +119,18 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
     }
 
     private Mono<List<GenerationDiagnostic>> buildNoMixedDiagnostics(List<Leg> baseLegs, Location origin, Location destination,
-                                                                     List<MobilityType> mobilityTypes) {
+                                                                     List<MobilityType> mobilityTypes, int hubLimit) {
         return Flux.fromIterable(mobilityTypes)
-                .flatMap(type -> diagnosticsForType(baseLegs, origin, destination, type))
+                .flatMap(type -> diagnosticsForType(baseLegs, origin, destination, type, hubLimit))
                 .distinct()
                 .collectList()
                 .map(list -> list.isEmpty() ? List.of(MobilityDiagnostics.noMixedRoute()) : list);
     }
 
     /** 진단은 생성 때 실제로 시도한 허브 집합(우선순위화된 상위 N)에 대해 수행한다. */
-    private Flux<GenerationDiagnostic> diagnosticsForType(List<Leg> baseLegs, Location origin, Location destination, MobilityType type) {
+    private Flux<GenerationDiagnostic> diagnosticsForType(List<Leg> baseLegs, Location origin, Location destination, MobilityType type, int hubLimit) {
         MobilityConfig config = MobilityConfigs.forType(type);
-        return hubPrioritizer.prioritize(baseLegs, destination, type, config)
+        return hubPrioritizer.prioritize(baseLegs, destination, type, config, hubLimit)
                 .flatMapMany(candidateHubs -> {
                     if (candidateHubs.isEmpty()) {
                         List<GenerationDiagnostic> reasons = new ArrayList<>();

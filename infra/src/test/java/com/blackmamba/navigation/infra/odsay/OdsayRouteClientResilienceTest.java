@@ -59,6 +59,7 @@ class OdsayRouteClientResilienceTest {
 
     private OdsayRouteClient client;
     private SimpleMeterRegistry meterRegistry;
+    private ExternalApiResilience resilience;
 
     private static final String PATH = "/searchPubTransPathT";
     private static final int DAILY_LIMIT = 4;
@@ -98,20 +99,25 @@ class OdsayRouteClientResilienceTest {
                         // application.yml 의 retryExceptions 와 같은 구성 — 4xx 계열(ExternalApiClientException)은 재시도하지 않는다
                         .retryExceptions(IOException.class, TimeoutException.class, ExternalApiServerException.class, WebClientRequestException.class)
                         .build());
-        this.meterRegistry = new SimpleMeterRegistry();
-        OdsayRouteMapper mapper = new OdsayRouteMapper();
+        this.resilience = new ExternalApiResilience(cbRegistry, retryRegistry);
+        // cache TTL = 0 → 매 테스트마다 실제 호출
+        this.client = createClient(0L, DAILY_LIMIT);
+    }
 
-        this.client = new OdsayRouteClient(
+    /** 지표 저장소도 새로 만든다 — 같은 이름의 예산 게이지는 먼저 등록한 클라이언트에 묶인다. */
+    private OdsayRouteClient createClient(long cacheTtlMs, int dailyLimit) {
+        this.meterRegistry = new SimpleMeterRegistry();
+        return new OdsayRouteClient(
                 WebClient.builder(),
-                mapper,
+                new OdsayRouteMapper(),
                 "test-api-key",
                 wireMock.baseUrl(),        // odsay.base-url 을 WireMock 으로 오버라이드
-                0L,                         // cache TTL = 0 → 매 테스트마다 실제 호출
+                cacheTtlMs,
                 5_000L,                     // request timeout
-                DAILY_LIMIT,                // 일일 예산
+                dailyLimit,
                 0.3,                        // 절약 수준 기준(남은 비율)
                 meterRegistry,
-                new ExternalApiResilience(cbRegistry, retryRegistry),
+                resilience,
                 new TtlCacheRegistry(meterRegistry)
         );
     }
@@ -207,12 +213,9 @@ class OdsayRouteClientResilienceTest {
     }
 
     @Test
-    void 일일_예산을_다_쓰면_호출을_보내지_않고_캐시된_구간은_예산을_쓰지_않는다() {
+    void 일일_예산을_다_쓰면_호출을_보내지_않는다() {
         // given — 한도 4건. 캐시 TTL 0 이라 매 호출이 실제 요청이다
-        wireMock.stubFor(get(urlPathEqualTo(PATH))
-                .willReturn(aResponse().withStatus(200)
-                        .withHeader("Content-Type", "application/json")
-                        .withBody(sampleSubwayResponseJson())));
+        stubOk();
 
         // when — 6번 조회
         for (int i = 0; i < 6; i++) {
@@ -222,6 +225,40 @@ class OdsayRouteClientResilienceTest {
         // then — 4건만 나가고 2건은 보내지 않았다
         wireMock.verify(DAILY_LIMIT, getRequestedFor(urlPathEqualTo(PATH)));
         assertThat(fallbackCount("budget_exhausted")).isEqualTo(2.0);
+    }
+
+    @Test
+    void 캐시된_구간은_예산을_쓰지_않는다() {
+        // given — 캐시가 켜진 클라이언트
+        OdsayRouteClient cachingClient = createClient(60_000L, DAILY_LIMIT);
+        stubOk();
+
+        // when — 같은 구간을 6번 조회
+        for (int i = 0; i < 6; i++) {
+            cachingClient.getTransitRoute(ORIGIN, DESTINATION).block();
+        }
+
+        // then — 요청도 예산도 1건만
+        wireMock.verify(1, getRequestedFor(urlPathEqualTo(PATH)));
+        assertThat(remainingBudget()).isEqualTo(DAILY_LIMIT - 1);
+    }
+
+    @Test
+    void 재시도로_나간_요청도_예산을_쓰고_회로가_열려_나가지_않은_호출은_쓰지_않는다() {
+        // given — 한도 20건, ODsay 는 계속 503
+        OdsayRouteClient failingClient = createClient(0L, 20);
+        wireMock.stubFor(get(urlPathEqualTo(PATH))
+                .willReturn(aResponse().withStatus(503)));
+
+        // when — 2번은 3회씩 시도하고 실패해 회로가 열린다. 이어지는 8번은 회로가 바로 거절한다
+        for (int i = 0; i < 10; i++) {
+            failingClient.getTransitRoute(ORIGIN, DESTINATION).block();
+        }
+
+        // then — 실제로 나간 6건만 예산에서 빠졌다
+        wireMock.verify(6, getRequestedFor(urlPathEqualTo(PATH)));
+        assertThat(remainingBudget()).isEqualTo(14);
+        assertThat(failingClient.budgetLevel()).isEqualTo(BudgetLevel.NORMAL);
     }
 
     @Test
@@ -301,6 +338,20 @@ class OdsayRouteClientResilienceTest {
                 .willReturn(aResponse().withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody(body)));
+    }
+
+    private void stubOk() {
+        wireMock.stubFor(get(urlPathEqualTo(PATH))
+                .willReturn(aResponse().withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(sampleSubwayResponseJson())));
+    }
+
+    private double remainingBudget() {
+        return meterRegistry.get("navigation.api.budget.remaining")
+                .tag("api", "odsay")
+                .gauge()
+                .value();
     }
 
     private double fallbackCount(String reason) {

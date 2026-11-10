@@ -133,7 +133,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                             .collectList()
                             .flatMap(candidates -> {
                                 if (hasOnlyTransitCandidate(candidates)) {
-                                    return buildNoMixedDiagnostics(origin, destination, baseLegs, lastMileHubsByType)
+                                    return buildNoMixedDiagnostics(origin, destination, baseLegs, lastMileHubsByType, hubLimit)
                                             .map(reasons -> {
                                                 Route enrichedBaseRoute = RouteRanker.withDiagnostics(baseRoute, reasons);
                                                 return ranker.rank(List.of(enrichedBaseRoute), enrichedBaseRoute, baseMinutes, preference);
@@ -194,20 +194,20 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     }
 
     private Mono<List<GenerationDiagnostic>> buildNoMixedDiagnostics(Location origin, Location destination, List<Leg> baseLegs,
-                                                                     Map<MobilityType, Mono<List<Hub>>> lastMileHubsByType) {
+                                                                     Map<MobilityType, Mono<List<Hub>>> lastMileHubsByType, int hubLimit) {
         return Flux.fromIterable(ALL_TYPES)
-                .flatMap(type -> diagnosticsForType(origin, destination, baseLegs, type, lastMileHubsByType.get(type)))
+                .flatMap(type -> diagnosticsForType(origin, destination, baseLegs, type, lastMileHubsByType.get(type), hubLimit))
                 .distinct()
                 .collectList()
                 .map(list -> list.isEmpty() ? List.of(MobilityDiagnostics.noMixedRoute()) : list);
     }
 
-    /** 진단은 생성 때 실제로 시도한 허브 집합(라스트마일은 우선순위화된 상위 N, 퍼스트마일은 선택 상위 N)에 대해 수행한다. */
+    /** 진단은 생성 때 실제로 시도한 허브 집합(라스트마일은 우선순위화된 상위 N, 퍼스트마일은 선택 상위 N)에 대해 수행한다. N 은 생성과 같은 예산 기준 허브 수다. */
     private Flux<GenerationDiagnostic> diagnosticsForType(Location origin, Location destination, List<Leg> baseLegs, MobilityType type,
-                                                          Mono<List<Hub>> lastMileHubsMono) {
+                                                          Mono<List<Hub>> lastMileHubsMono, int hubLimit) {
         MobilityConfig config = MobilityConfigs.forType(type);
         List<Hub> firstMileHubs = hubSelector.selectFirstMileHubs(origin, baseLegs, config).stream()
-                .limit(MAX_CANDIDATE_HUBS)
+                .limit(hubLimit)
                 .toList();
         return lastMileHubsMono
                 .flatMapMany(lastMileHubs -> diagnosticsForHubs(origin, destination, type, config, firstMileHubs, lastMileHubs));

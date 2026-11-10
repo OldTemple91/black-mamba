@@ -143,14 +143,16 @@ groups:
       # ④-c2 외부 API 일일 예산 — 소진되면 그날 남은 요청의 대중교통 구간이 전부 추정값이 된다
       # ───────────────────────────────────────────────
       - alert: ApiBudgetLow
+        # 기준은 코드와 같은 값을 쓴다(saving-remaining-ratio 를 여기 따로 적지 않는다). 소진은 아래 규칙이 맡는다
         expr: |
-          navigation_api_budget_remaining / navigation_api_budget_limit < 0.3
+          navigation_api_budget_remaining <= navigation_api_budget_saving_threshold
+          and navigation_api_budget_remaining > 0
         for: 1m
         labels:
           severity: warning
           service: navigation
         annotations:
-          summary: "💸 {{ $labels.api }} 일일 호출 예산 30% 미만"
+          summary: "💸 {{ $labels.api }} 일일 호출 예산이 절약 수준"
           description: |
             절약 수준에 들어가 후보 허브 수가 줄고 패턴 D 가 생략됩니다(추천 폭 감소).
           runbook: "External APIs 대시보드에서 호출량 추이 확인 → 한도 상향 또는 캐시 TTL 조정 검토"
@@ -165,7 +167,7 @@ groups:
         annotations:
           summary: "💸 {{ $labels.api }} 일일 호출 예산 소진"
           description: |
-            내일까지 이 API 를 호출하지 않습니다. 대중교통 구간은 기준 경로·직선거리 기반 추정값으로 응답 중입니다.
+            집계한 예산을 다 썼거나(내일까지) API 가 한도 초과로 답했습니다(15분마다 다시 확인). 그동안 대중교통 구간은 기준 경로·직선거리 기반 추정값으로 응답 중입니다.
           runbook: "요금제 한도 확인(ODSAY_DAILY_LIMIT) → 필요 시 상향 후 재기동"
 
       # ───────────────────────────────────────────────

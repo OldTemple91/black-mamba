@@ -144,23 +144,47 @@ public class OdsayRouteClient {
 
     /** 전략이 탐색 폭을 정할 때 읽는 남은 예산 수준. */
     public BudgetLevel budgetLevel() {
-        return budget.level();
+        if (budget.isExhausted()) {
+            return BudgetLevel.EXHAUSTED;
+        }
+        if (budget.isSaving()) {
+            return BudgetLevel.SAVING;
+        }
+        return BudgetLevel.NORMAL;
     }
 
+    /**
+     * 예산은 "실제로 나가는 요청" 마다 1건씩 쓴다 — 그래서 차감은 Retry·회로 안쪽, 송신 직전이다.
+     * 바깥에서 차감하면 회로가 열려 한 건도 나가지 않는 동안에도 예산이 줄고(장애가 끝나도 그날은 호출을 못 한다),
+     * 재시도로 나간 요청은 세지 못한다.
+     * 예산이 없으면 어차피 거절될 요청을 보내지 않는다 — 호출자는 빈 결과를 받아 기준 경로 기반 근사로 대체한다.
+     * 거절은 오류가 아니라 빈 결과라 재시도·회로 실패 집계 대상이 아니다.
+     */
     private Mono<List<Leg>> requestTransitRoute(Location origin, Location destination) {
         return Mono.defer(() -> {
-            // 캐시에 없는 실제 호출만 예산을 쓴다. 예산이 없으면 어차피 거절될 요청을 보내지 않는다 —
-            // 호출자는 빈 결과를 받아 기준 경로 기반 근사로 대체한다(재시도·회로 집계 대상 아님)
             if (!budget.tryAcquire()) {
                 transitRouteBudgetExhaustedCounter.increment();
                 return Mono.just(List.<Leg>of());
             }
-            return callTransitRoute(origin, destination);
-        });
+            return rateLimit().then(sendTransitRoute(origin, destination));
+        })
+                // 호출 간격 제한은 Retry 안쪽에 둔다 — 재시도도 간격을 지키고, 회로가 열려 있으면 대기 없이 바로 거절된다.
+                // (예전엔 limiter 가 바깥이라 재시도는 간격 없이 나가고, 열린 회로도 대기를 다 채운 뒤에야 거절했다)
+                .as(guard::protect)
+                .onErrorResume(ex -> {
+                    transitRouteErrorFallbackCounter.increment();
+                    if (isExpectedFailure(ex)) {
+                        log.warn("[ODsay] 호출 실패(최종) → 빈 리스트 반환. 원인: {}", ex.toString());
+                    } else {
+                        // 매퍼 NPE 같은 우리 쪽 버그 — 스택 없이 WARN 한 줄로 묻지 않는다
+                        log.error("[ODsay] 응답 처리 중 예기치 못한 오류 → 빈 리스트 반환", ex);
+                    }
+                    return Mono.just(List.of());
+                });
     }
 
-    private Mono<List<Leg>> callTransitRoute(Location origin, Location destination) {
-        return Mono.defer(() -> rateLimit().then(webClient.get()
+    private Mono<List<Leg>> sendTransitRoute(Location origin, Location destination) {
+        return webClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/searchPubTransPathT")
                         .queryParam("apiKey", "{apiKey}")
@@ -191,7 +215,7 @@ public class OdsayRouteClient {
                             return Mono.just(List.<Leg>of());
                         }
                         if (error.isQuotaExceeded()) {
-                            // 집계가 재기동으로 초기화됐어도 실제 한도는 찼다 — 오늘은 더 보내지 않는다
+                            // 집계가 재기동으로 초기화됐어도 실제 한도는 찼다 — 한동안 보내지 않고, 나중에 풀렸는지 다시 확인한다
                             budget.markExhausted();
                         }
                         if (error.isBadRequest()) {
@@ -219,19 +243,6 @@ public class OdsayRouteClient {
                     List<Leg> legs = normalizeWalkLegs(mapper.toLegs(paths.get(0)), origin, destination);
                     log.debug("[ODsay] 파싱 성공 — leg {}개", legs.size());
                     return Mono.just(legs);
-                })))
-                // 호출 간격 제한은 Retry 안쪽에 둔다 — 재시도도 간격을 지키고, 회로가 열려 있으면 대기 없이 바로 거절된다.
-                // (예전엔 limiter 가 바깥이라 재시도는 간격 없이 나가고, 열린 회로도 대기를 다 채운 뒤에야 거절했다)
-                .as(guard::protect)
-                .onErrorResume(ex -> {
-                    transitRouteErrorFallbackCounter.increment();
-                    if (isExpectedFailure(ex)) {
-                        log.warn("[ODsay] 호출 실패(최종) → 빈 리스트 반환. 원인: {}", ex.toString());
-                    } else {
-                        // 매퍼 NPE 같은 우리 쪽 버그 — 스택 없이 WARN 한 줄로 묻지 않는다
-                        log.error("[ODsay] 응답 처리 중 예기치 못한 오류 → 빈 리스트 반환", ex);
-                    }
-                    return Mono.just(List.of());
                 });
     }
 

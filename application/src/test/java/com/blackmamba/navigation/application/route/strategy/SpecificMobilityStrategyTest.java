@@ -3,25 +3,28 @@ package com.blackmamba.navigation.application.route.strategy;
 import com.blackmamba.navigation.application.route.*;
 import com.blackmamba.navigation.application.route.hub.HubSelector;
 import com.blackmamba.navigation.application.route.port.*;
+import com.blackmamba.navigation.application.route.port.BudgetLevel;
 import com.blackmamba.navigation.domain.hub.Hub;
 import com.blackmamba.navigation.domain.hub.HubType;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.*;
+import com.blackmamba.navigation.domain.route.evaluation.GenerationDiagnostic;
 import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
 import com.blackmamba.navigation.domain.route.mobility.MobilityInfo;
 import com.blackmamba.navigation.domain.route.mobility.MobilityRouteResult;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import reactor.core.publisher.Mono;
-
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -218,6 +221,37 @@ class SpecificMobilityStrategyTest {
         assertThat(routes.getFirst().insights().generationDiagnostics())
                 .extracting(d -> d.reasonCode())
                 .contains("DIRECT_DISTANCE_EXCEEDED");
+    }
+
+    @ParameterizedTest
+    @CsvSource({"NORMAL, 3", "SAVING, 2", "EXHAUSTED, 1"})
+    void 미생성_사유는_예산에_맞춰_줄인_실제_시도_허브_수만큼만_본다(BudgetLevel level, int expectedCandidateCount) {
+        // given — 후보 허브 3곳 모두 대여할 수단이 없다
+        Location origin = new Location("서울역", 37.5547, 126.9706);
+        Location dest = new Location("강남역", 37.4979, 127.0276);
+        Leg leg = new Leg(LegType.TRANSIT, "BUS", 45, 10000, origin, dest, null, null, null);
+        List<Hub> hubs = List.of(
+                hub(new Location("허브1", 37.51, 127.01)),
+                hub(new Location("허브2", 37.52, 127.02)),
+                hub(new Location("허브3", 37.53, 127.03)));
+        when(transitRoutePort.getTransitRoute(any(), any())).thenReturn(Mono.just(List.of(leg)));
+        when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(hubs);
+        when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), any())).thenReturn(Mono.empty());
+        when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any())).thenReturn(Mono.just(Optional.empty()));
+        when(mobilityAvailabilityPort.findNearbyDropoff(anyDouble(), anyDouble(), any())).thenReturn(Mono.just(Optional.empty()));
+        when(mobilityAvailabilityPort.findNearestMobilityHint(anyDouble(), anyDouble(), any(), anyBoolean())).thenReturn(Mono.just(Optional.empty()));
+        when(routeEvaluator.evaluate(any(Route.class), any(Route.class), anyInt(), anyBoolean(), eq(RecommendationPreference.RELIABILITY)))
+                .thenAnswer(invocation -> invocation.<Route>getArgument(0).withScore(0.5, invocation.getArgument(3)));
+        SpecificMobilityStrategy strategy = new SpecificMobilityStrategy(
+                transitRoutePort, mobilityTimePort, mobilityAvailabilityPort, hubSelector, routeEvaluator, () -> level);
+
+        // when
+        List<Route> routes = strategy.search(origin, dest, List.of(MobilityType.PERSONAL_KICKBOARD), RecommendationPreference.RELIABILITY).block();
+
+        // then
+        assertThat(routes.getFirst().insights().generationDiagnostics())
+                .extracting(GenerationDiagnostic::candidateCount)
+                .containsExactly(expectedCandidateCount);
     }
 
     private Hub hub(Location location) {
