@@ -126,7 +126,7 @@ cd frontend && npm install && npm run dev
 - **@SpringBootTest 금지** — 단위 테스트만 (MockitoExtension 또는 직접 객체 생성)
 - **WebClient.Builder** — 생성자 주입
 - **필터 로직** — 별도 클래스 분리 (`DdareungiStationFilter`, `KickboardDeviceFilter`)
-- **캐시** — API별 ConcurrentHashMap + TTL + Micrometer 메트릭
+- **캐시** — `TtlCache`(Caffeine 저장소, TTL + 캐시당 10,000 엔트리 상한, Micrometer hit/miss). 오류 폴백 값은 캐시하지 않는다. 따릉이 snapshot 은 stale 재사용(나이 상한) + 백그라운드 갱신
 - **Port-Adapter** — application 인터페이스 → infra 구현
 
 ## 문서 구조

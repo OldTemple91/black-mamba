@@ -75,13 +75,14 @@ public final class TtlCache<K, V> {
             CompletableFuture<V> future = cache.get(key, (_, _) -> loader.get()
                     .contextWrite(context)
                     .toFuture());
-            future.thenAccept(value -> {
-                if (value != null && !cacheable.test(value)) {
-                    cache.asMap().remove(key, future);
-                }
-            });
-            // 구독자 한 명의 취소가 공유 중인 로드를 취소하지 않게 한다
-            return Mono.fromFuture(future, true);
+            // 구독자 한 명의 취소가 공유 중인 로드를 취소하지 않게 한다(suppressCancel).
+            // 캐시 불가 값은 구독자에게 전달하기 "전에" 엔트리를 지운다 — 값을 받은 호출자의 다음 호출이 그 값을 다시 받지 않게
+            return Mono.fromFuture(future, true)
+                    .doOnNext(value -> {
+                        if (!cacheable.test(value)) {
+                            cache.asMap().remove(key, future);
+                        }
+                    });
         });
     }
 

@@ -18,6 +18,8 @@ import java.time.Duration;
  */
 public final class WebClients {
 
+    private static final int MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
+
     private WebClients() {
     }
 
@@ -29,7 +31,11 @@ public final class WebClients {
                 .baseUrl(baseUrl)
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
                 // 응답 디코딩은 컨텍스트 설정과 무관하게 외부 API 용 매퍼로 고정
-                .codecs(configurer -> configurer.defaultCodecs().jacksonJsonDecoder(new JacksonJsonDecoder(ExternalApiJson.MAPPER)))
+                .codecs(configurer -> {
+                    configurer.defaultCodecs().jacksonJsonDecoder(new JacksonJsonDecoder(ExternalApiJson.MAPPER));
+                    // 기본 버퍼 256KB 는 따릉이 1,000행 페이지(약 200KB)에 바짝 붙어 있다. 넘으면 응답 전체가 실패한다
+                    configurer.defaultCodecs().maxInMemorySize(MAX_RESPONSE_BYTES);
+                })
                 .build();
     }
 }

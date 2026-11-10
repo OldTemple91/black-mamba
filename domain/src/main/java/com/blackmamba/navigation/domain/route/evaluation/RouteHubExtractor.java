@@ -4,7 +4,6 @@ import com.blackmamba.navigation.domain.hub.Hub;
 import com.blackmamba.navigation.domain.hub.HubType;
 import com.blackmamba.navigation.domain.route.Leg;
 import com.blackmamba.navigation.domain.route.Route;
-import com.blackmamba.navigation.domain.route.TransitMode;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -25,8 +24,8 @@ public final class RouteHubExtractor {
 
         for (Leg leg : route.legs()) {
             if (leg.isTransit()) {
-                addHub(hubs, leg.start() != null ? leg.start().name() : null, transitHubType(leg.transitMode()), "TRANSIT_BOARDING", "actual", Map.of());
-                addHub(hubs, leg.end() != null ? leg.end().name() : null, transitHubType(leg.transitMode()), "TRANSIT_ALIGHTING", "actual", Map.of());
+                addHub(hubs, leg.start() != null ? leg.start().name() : null, HubType.from(leg.transitMode()), "TRANSIT_BOARDING", "actual", Map.of());
+                addHub(hubs, leg.end() != null ? leg.end().name() : null, HubType.from(leg.transitMode()), "TRANSIT_ALIGHTING", "actual", Map.of());
                 continue;
             }
 
@@ -65,15 +64,5 @@ public final class RouteHubExtractor {
 
     private static String keyOf(RouteHub hub) {
         return hub.role() + ":" + hub.name();
-    }
-
-    private static HubType transitHubType(TransitMode mode) {
-        if (mode.isSubway()) {
-            return HubType.SUBWAY_STATION;
-        }
-        if (mode.isBus()) {
-            return HubType.BUS_STOP;
-        }
-        return HubType.MOBILITY_TRANSFER_POINT;
     }
 }

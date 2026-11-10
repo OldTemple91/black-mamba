@@ -22,6 +22,7 @@ import reactor.core.scheduler.Schedulers;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * RAG Phase 4 — 경로의 carComparison.narrative 를 LLM 설명으로 업그레이드.
@@ -52,11 +53,18 @@ public class RouteNarrativeEnhancer {
     private static final Duration LLM_TIMEOUT = Duration.ofSeconds(15);
     /** 이보다 적게 남았으면 LLM 을 시도하지 않는다 — 로컬 모델은 그 안에 답하지 못한다 */
     private static final Duration MIN_LLM_BUDGET = Duration.ofSeconds(2);
+    /**
+     * LLM 이 타임아웃·오류를 낸 뒤 다시 시도하기까지 쉬는 시간.
+     * 없으면 Ollama 가 멈춰 있는 동안 모든 경로 탐색이 타임아웃(15초)만큼 느려진다 — 설명 문장은 부가 기능이지 탐색을 붙잡을 이유가 아니다.
+     */
+    private static final Duration LLM_COOLDOWN = Duration.ofSeconds(60);
 
     private final NarrativeGenerator narrativeGenerator; // 없을 수 있음
     private final RouteHistoryPort routeHistoryPort;      // 없을 수 있음
     private final DistributionSummary similarHitSummary;
     private final Counter timeoutCounter;
+    private final Counter cooldownSkipCounter;
+    private final AtomicLong llmBlockedUntilMs = new AtomicLong(0L);
     private final Counter enhancerErrorCounter;
 
     public RouteNarrativeEnhancer(ObjectProvider<NarrativeGenerator> generatorProvider,
@@ -73,6 +81,10 @@ public class RouteNarrativeEnhancer {
         this.timeoutCounter = Counter.builder("navigation.rag.narrative.fallback")
                 .description("LLM narrative 폴백(원본 유지) 건수")
                 .tag("reason", "timeout")
+                .register(meterRegistry);
+        this.cooldownSkipCounter = Counter.builder("navigation.rag.narrative.fallback")
+                .description("LLM narrative 폴백(원본 유지) 건수")
+                .tag("reason", "cooldown")
                 .register(meterRegistry);
         this.enhancerErrorCounter = Counter.builder("navigation.rag.narrative.fallback")
                 .description("LLM narrative 폴백(원본 유지) 건수")
@@ -113,6 +125,10 @@ public class RouteNarrativeEnhancer {
                                            Duration budget) {
         if (routes == null || routes.isEmpty()) return routes;
         if (narrativeGenerator == null) return routes; // 비활성화 상태
+        if (System.currentTimeMillis() < llmBlockedUntilMs.get()) {
+            cooldownSkipCounter.increment();
+            return routes;
+        }
         if (budget.compareTo(MIN_LLM_BUDGET) < 0) {
             timeoutCounter.increment();
             log.warn("[RAG4] 남은 시간 {}ms < {}ms → LLM 생략, 원본 narrative 유지", budget.toMillis(), MIN_LLM_BUDGET.toMillis());
@@ -144,6 +160,7 @@ public class RouteNarrativeEnhancer {
                             .subscribeOn(Schedulers.boundedElastic()))
                     .timeout(llmTimeout)
                     .onErrorResume(e -> {
+                        startCooldown();
                         if (e instanceof TimeoutException) {
                             timeoutCounter.increment();
                             log.warn("[RAG4] LLM 타임아웃({}ms) → 원본 narrative 유지. routeId={}", llmTimeout.toMillis(), route.routeId());
@@ -165,6 +182,11 @@ public class RouteNarrativeEnhancer {
                     route.routeId(), e.getMessage());
             return route;
         }
+    }
+
+    private void startCooldown() {
+        llmBlockedUntilMs.set(System.currentTimeMillis() + LLM_COOLDOWN.toMillis());
+        log.warn("[RAG4] LLM 실패 → {}초 동안 설명 생성을 건너뛴다", LLM_COOLDOWN.getSeconds());
     }
 
     private Mono<List<ScoredRouteHistoryEntry>> fetchSimilar(Route route,

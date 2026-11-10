@@ -23,7 +23,7 @@ import static com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Tmap 실패 폴백(직선거리) 은 캐시되면 안 된다 — 지난 라운드에 ODsay 만 고치고 Tmap 은 빠져 있었다.
+ * Tmap 실패 폴백(직선거리)은 캐시되면 안 된다 — 한 번의 오류가 TTL 동안 그 구간을 추정값으로 고정한다.
  */
 class TmapPedestrianClientTest {
 

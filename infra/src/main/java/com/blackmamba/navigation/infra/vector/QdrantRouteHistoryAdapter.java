@@ -124,7 +124,7 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
 
     @Override
     public String describe(Route route, Location origin, Location destination, RecommendationPreference preference) {
-        return RouteHistoryDescriber.describeAt(route, origin, destination, preference, Instant.now());
+        return RouteHistoryDescriber.describe(route, origin, destination, preference);
     }
 
     private void saveBlocking(Route route, Location origin, Location destination, RecommendationPreference preference, Instant timestamp) {

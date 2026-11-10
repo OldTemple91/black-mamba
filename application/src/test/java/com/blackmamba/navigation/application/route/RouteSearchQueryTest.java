@@ -33,6 +33,13 @@ class RouteSearchQueryTest {
     }
 
     @Test
+    void 목적지_좌표도_같은_규칙으로_검증한다() {
+        // when & then
+        assertThatThrownBy(() -> RouteSearchQuery.of(seoulStation, new Location("목적지", 37.5, 200.0), null, SearchMode.OPTIMAL, null))
+                .isInstanceOfSatisfying(InvalidRouteSearchException.class, e -> assertThat(e.code()).isEqualTo("INVALID_LONGITUDE"));
+    }
+
+    @Test
     void 출발지와_목적지가_700m_이내면_거절한다() {
         // given — 약 170m
         Location nearby = new Location("근처", 37.5562, 126.9711);

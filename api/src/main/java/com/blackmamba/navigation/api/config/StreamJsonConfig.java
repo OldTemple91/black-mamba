@@ -9,11 +9,13 @@ import tools.jackson.databind.SerializationContext;
 import tools.jackson.databind.module.SimpleModule;
 import tools.jackson.databind.ser.std.StdSerializer;
 
+import java.util.Locale;
+
 /**
  * SSE 이벤트의 전송 형식.
  * <p>
  * application 의 {@link HeartbeatStatus} 는 enum 이고, 클라이언트 계약은 소문자 코드("watching")다.
- * 그 변환은 전송 계층의 일이라 여기서 Jackson 모듈로 등록한다 — application 이 직렬화 라이브러리를 알 필요가 없다.
+ * 코드값을 정하는 것(enum 이름의 소문자)까지 전송 계층인 여기서 한다 — application 은 전송 형식도 직렬화 라이브러리도 모른다.
  */
 @Configuration
 public class StreamJsonConfig {
@@ -33,7 +35,7 @@ public class StreamJsonConfig {
 
         @Override
         public void serialize(HeartbeatStatus value, JsonGenerator generator, SerializationContext context) {
-            generator.writeString(value.code());
+            generator.writeString(value.name().toLowerCase(Locale.ROOT));
         }
     }
 }

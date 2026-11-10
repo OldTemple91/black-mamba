@@ -4,7 +4,7 @@
 [![Java 25](https://img.shields.io/badge/Java-25-orange)](https://openjdk.org/projects/jdk/25/)
 [![Spring Boot 4.1](https://img.shields.io/badge/Spring%20Boot-4.1.2-brightgreen)](https://spring.io/projects/spring-boot)
 [![Spring AI 2.0](https://img.shields.io/badge/Spring%20AI-2.0.2-0081CB)](https://docs.spring.io/spring-ai/reference/)
-[![Resilience4j](https://img.shields.io/badge/Resilience4j-2.2-green)](https://resilience4j.readme.io/)
+[![Resilience4j](https://img.shields.io/badge/Resilience4j-2.4-green)](https://resilience4j.readme.io/)
 [![Observability](https://img.shields.io/badge/Observability-Loki%20%7C%20Tempo%20%7C%20Prometheus-F46800)](docs/monitoring/observability-stack.md)
 
 대중교통 + 공유 모빌리티(따릉이·킥보드) + 개인 PM(전기자전거/킥보드)을 결합한 멀티모달 경로 엔진에,
@@ -341,7 +341,7 @@ Docker Compose 로 전체 스택 기동 후 실측 트래픽 발생 상태에서
 - **Qdrant v1.13.6** — 벡터 DB (gRPC, HNSW 인덱스, Cosine 유사도, 3축 하이브리드 필터)
 
 ### 장애 대응
-- **Resilience4j 2.2** — CircuitBreaker + Retry + Fallback (Reactor Operator)
+- **Resilience4j 2.4** — CircuitBreaker + Retry + Fallback (Reactor Operator)
 - 외부 API 5개 (ODsay / Tmap / 따릉이 / Naver Geocoding / Naver Local) 3층 방어선
 - **TAGO 킬 스위치** (`tago.enabled` env 토글)
 - **RAG 킬 스위치** (`SPRING_AUTOCONFIGURE_EXCLUDE` + `@ConditionalOnBean`)

@@ -36,21 +36,11 @@ public sealed interface StreamEventPayload {
     /** 변화가 없을 때 스트림이 살아 있음을 알리는 신호의 종류. 전송 형식(소문자 코드)은 api 계층이 정한다. */
     enum HeartbeatStatus {
         /** 재탐색했고 의미 있는 변화가 없다 */
-        WATCHING("watching"),
+        WATCHING,
         /** 재탐색 자체가 실패했다 — 이전 결과를 유지한다 */
-        SEARCH_FAILED("search_failed"),
+        SEARCH_FAILED,
         /** 재탐색은 성공했지만 경로가 0건이다 */
-        NO_ROUTES("no_routes");
-
-        private final String code;
-
-        HeartbeatStatus(String code) {
-            this.code = code;
-        }
-
-        public String code() {
-            return code;
-        }
+        NO_ROUTES
     }
 
     record Update(Instant timestamp, List<Route> routes, String changeReason) implements StreamEventPayload {}

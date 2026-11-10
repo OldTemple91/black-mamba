@@ -16,6 +16,9 @@ public class RouteInsightFactory {
     private static final int ACCESS_WALK_WARNING_METERS_TIME_PRIORITY = 420;
     private static final int TOTAL_WALK_WARNING_METERS = 800;
 
+    /** 다른 리스크가 없을 때 붙는 배지 — 외부 사유(날씨 등)로 리스크 배지가 추가되면 함께 있을 수 없다 */
+    public static final String BADGE_STABLE = "안정적";
+
     public Route enrich(Route route, Route baselineRoute) {
         return enrich(route, baselineRoute, RecommendationPreference.RELIABILITY);
     }
@@ -106,7 +109,7 @@ public class RouteInsightFactory {
         }
 
         if (badges.isEmpty()) {
-            badges.add("안정적");
+            badges.add(BADGE_STABLE);
         }
 
         return badges.stream().limit(3).toList();

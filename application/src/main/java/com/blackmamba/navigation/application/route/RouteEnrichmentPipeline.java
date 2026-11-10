@@ -104,10 +104,8 @@ public class RouteEnrichmentPipeline {
     private List<Route> reEvaluate(List<Route> routes, RecommendationPreference preference) {
         Route baseline = baselineOf(routes);
         return routes.stream()
-                .map(route -> {
-                    Route base = baselineOr(baseline, route);
-                    return routeEvaluator.evaluate(route, base, base.totalMinutes(), route.recommended(), preference);
-                })
+                .map(route -> routeEvaluator.evaluate(route, baselineOr(baseline, route), baselineMinutes(baseline, route),
+                        route.recommended(), preference))
                 .toList();
     }
 
@@ -117,6 +115,20 @@ public class RouteEnrichmentPipeline {
                 .filter(route -> route.type() == RouteType.TRANSIT_ONLY)
                 .findFirst()
                 .orElse(null);
+    }
+
+    /**
+     * 비교 기준 소요시간. 기준 경로가 목록에 없으면(상위 N 에서 밀렸거나 필터로 빠짐) 전략이 계산해 둔 기준 시간을 그대로 쓴다 —
+     * 자기 자신과 비교하면 "대중교통 대비 N분 단축" 이 0 이 되어 근거가 사라진다.
+     */
+    private static int baselineMinutes(Route baseline, Route route) {
+        if (baseline != null) {
+            return baseline.totalMinutes();
+        }
+        if (route.comparison() != null) {
+            return route.comparison().originalMinutes();
+        }
+        return route.totalMinutes();
     }
 
     private static Route baselineOr(Route baseline, Route route) {

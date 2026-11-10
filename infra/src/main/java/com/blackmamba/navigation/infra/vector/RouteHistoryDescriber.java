@@ -143,6 +143,8 @@ public final class RouteHistoryDescriber {
                     transitCount++;
                     modes.add(transitModeLabel(leg));
                 }
+                // 수단 이름은 MobilityType.displayName() 과 일부러 다르게 둔다 — 이미 저장된 임베딩과 같은 문장 형식을 유지해야
+                // 유사 검색이 맞는다. 바꾸려면 컬렉션을 다시 시드해야 한다.
                 case BIKE -> {
                     if (leg.mobilityInfo() != null && leg.mobilityInfo().mobilityType() == MobilityType.DDAREUNGI) {
                         modes.add("따릉이");

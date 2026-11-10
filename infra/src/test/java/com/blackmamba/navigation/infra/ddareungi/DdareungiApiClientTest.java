@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -81,7 +82,7 @@ class DdareungiApiClientTest {
         DdareungiApiClient client = client(NO_TTL, DEFAULT_MAX_STALE_AGE_MS);
 
         // when
-        StationSnapshot snapshot = client.getNearbyStations(LAT, LNG, RADIUS).block();
+        StationSnapshot snapshot = client.getNearbyStations(LAT, LNG, RADIUS, true).block();
 
         // then
         assertThat(snapshot.source()).isEqualTo(AvailabilitySource.EMPTY);
@@ -97,7 +98,7 @@ class DdareungiApiClientTest {
         DdareungiApiClient client = client(NO_TTL, DEFAULT_MAX_STALE_AGE_MS);
 
         // when
-        StationSnapshot snapshot = client.getNearbyStations(LAT, LNG, RADIUS).block();
+        StationSnapshot snapshot = client.getNearbyStations(LAT, LNG, RADIUS, true).block();
 
         // then
         assertThat(snapshot.source()).isEqualTo(AvailabilitySource.EMPTY);
@@ -111,8 +112,8 @@ class DdareungiApiClientTest {
         DdareungiApiClient client = client(NO_TTL, DEFAULT_MAX_STALE_AGE_MS);
 
         // when
-        StationSnapshot first = client.getNearbyStations(LAT, LNG, RADIUS).block();
-        StationSnapshot second = client.getNearbyStations(LAT, LNG, RADIUS).block();
+        StationSnapshot first = client.getNearbyStations(LAT, LNG, RADIUS, true).block();
+        StationSnapshot second = client.getNearbyStations(LAT, LNG, RADIUS, true).block();
 
         // then
         assertThat(first.source()).isEqualTo(AvailabilitySource.LIVE);
@@ -129,8 +130,8 @@ class DdareungiApiClientTest {
         DdareungiApiClient client = client(NO_TTL, DEFAULT_MAX_STALE_AGE_MS);
 
         // when
-        client.getNearbyStations(LAT, LNG, RADIUS).block();
-        StationSnapshot second = client.getNearbyStations(LAT, LNG, RADIUS).block();
+        client.getNearbyStations(LAT, LNG, RADIUS, true).block();
+        StationSnapshot second = client.getNearbyStations(LAT, LNG, RADIUS, true).block();
 
         // then
         assertThat(second.source()).isEqualTo(AvailabilitySource.STALE);
@@ -145,9 +146,9 @@ class DdareungiApiClientTest {
         DdareungiApiClient client = client(NO_TTL, 0L);
 
         // when
-        client.getNearbyStations(LAT, LNG, RADIUS).block();
-        StationSnapshot second = client.getNearbyStations(LAT, LNG, RADIUS).block();
-        StationSnapshot third = client.getNearbyStations(LAT, LNG, RADIUS).block();
+        client.getNearbyStations(LAT, LNG, RADIUS, true).block();
+        StationSnapshot second = client.getNearbyStations(LAT, LNG, RADIUS, true).block();
+        StationSnapshot third = client.getNearbyStations(LAT, LNG, RADIUS, true).block();
 
         // then
         assertThat(second.source()).isEqualTo(AvailabilitySource.EMPTY);
@@ -157,26 +158,23 @@ class DdareungiApiClientTest {
 
     @Test
     void TTL_이_막_지난_snapshot_은_갱신을_기다리지_않고_바로_내주고_뒤에서_갱신한다() throws InterruptedException {
-        // given — TTL 300ms. 두 번째 응답(갱신)은 1초 지연
+        // given — TTL 1초. 두 번째 응답(갱신)은 3초 지연. 내주는 창(TTL~TTL×2)이 1초라 여유가 넉넉하다
         wireMock.stubFor(get(urlPathEqualTo(PAGE_1)).inScenario("swr").whenScenarioStateIs(STARTED)
                 .willReturn(json(successJson(1, "OLD"))).willSetStateTo(BROKEN));
         wireMock.stubFor(get(urlPathEqualTo(PAGE_1)).inScenario("swr").whenScenarioStateIs(BROKEN)
-                .willReturn(json(successJson(1, "NEW")).withFixedDelay(1_000)));
-        DdareungiApiClient client = client(300L, DEFAULT_MAX_STALE_AGE_MS);
-        client.getNearbyStations(LAT, LNG, RADIUS).block();
-        Thread.sleep(350);
+                .willReturn(json(successJson(1, "NEW")).withFixedDelay(3_000)));
+        DdareungiApiClient client = client(1_000L, DEFAULT_MAX_STALE_AGE_MS);
+        client.getNearbyStations(LAT, LNG, RADIUS, true).block();
+        Thread.sleep(1_200);
 
-        // when — TTL 은 지났지만 TTL×2 안
-        long startedAt = System.nanoTime();
-        StationSnapshot served = client.getNearbyStations(LAT, LNG, RADIUS).block();
-        long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000;
+        // when — TTL 은 지났지만 TTL×2 안. 갱신(3초)을 기다렸다면 block 이 1초 안에 끝나지 못한다
+        StationSnapshot served = client.getNearbyStations(LAT, LNG, RADIUS, true).block(Duration.ofSeconds(1));
 
-        // then — 지연된 갱신을 기다리지 않고 이전 snapshot 을 받았고, 갱신 요청은 이미 나갔다
+        // then — 이전 snapshot 을 받았고, 갱신 요청은 이미 나갔다
         assertThat(served.stations())
                 .extracting(DdareungiStation::stationId)
                 .containsExactly("OLD-1");
-        assertThat(elapsedMs).isLessThan(500);
-        Thread.sleep(100);
+        Thread.sleep(200);
         wireMock.verify(2, getRequestedFor(urlPathEqualTo(PAGE_1)));
     }
 
@@ -188,7 +186,7 @@ class DdareungiApiClientTest {
         DdareungiApiClient client = client(NO_TTL, DEFAULT_MAX_STALE_AGE_MS);
 
         // when
-        StationSnapshot snapshot = client.getNearbyStations(LAT, LNG, RADIUS).block();
+        StationSnapshot snapshot = client.getNearbyStations(LAT, LNG, RADIUS, true).block();
 
         // then
         assertThat(snapshot.stations()).hasSize(PAGE_SIZE + 1);
@@ -205,7 +203,7 @@ class DdareungiApiClientTest {
         DdareungiApiClient client = client(NO_TTL, DEFAULT_MAX_STALE_AGE_MS);
 
         // when
-        StationSnapshot snapshot = client.getNearbyStations(LAT, LNG, RADIUS).block();
+        StationSnapshot snapshot = client.getNearbyStations(LAT, LNG, RADIUS, true).block();
 
         // then
         assertThat(snapshot.stations()).hasSize(3);
@@ -220,7 +218,7 @@ class DdareungiApiClientTest {
         DdareungiApiClient client = client(NO_TTL, DEFAULT_MAX_STALE_AGE_MS);
 
         // when
-        StationSnapshot snapshot = client.getNearbyStations(LAT, LNG, RADIUS).block();
+        StationSnapshot snapshot = client.getNearbyStations(LAT, LNG, RADIUS, true).block();
 
         // then
         assertThat(snapshot.source()).isEqualTo(AvailabilitySource.EMPTY);

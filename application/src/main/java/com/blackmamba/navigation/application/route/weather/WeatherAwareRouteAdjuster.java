@@ -2,6 +2,7 @@ package com.blackmamba.navigation.application.route.weather;
 
 import com.blackmamba.navigation.domain.route.Leg;
 import com.blackmamba.navigation.domain.route.Route;
+import com.blackmamba.navigation.domain.route.evaluation.RouteInsightFactory;
 import com.blackmamba.navigation.domain.route.evaluation.RouteInsights;
 import com.blackmamba.navigation.domain.weather.WeatherCondition;
 import org.slf4j.Logger;
@@ -84,7 +85,9 @@ public class WeatherAwareRouteAdjuster {
         }
         if (insights.riskBadges().contains(badge)) return route;
 
+        // 날씨 사유가 붙은 경로에 "안정적" 을 같이 두지 않는다. 화면은 앞의 3개만 보여 주므로 날씨 사유를 맨 앞에 둔다
         List<String> badges = new ArrayList<>(insights.riskBadges());
+        badges.remove(RouteInsightFactory.BADGE_STABLE);
         badges.addFirst(badge);
         return route.withInsights(new RouteInsights(insights.recommendationReasons(), badges,
                 insights.generationDiagnostics(), insights.fallbackDiagnostics()));

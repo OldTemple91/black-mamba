@@ -109,8 +109,9 @@ public class NaturalLanguageRouteController {
             return ResponseEntity.badRequest()
                     .body(ErrorResponse.of("NLP_PARSE_FAILED", e.getMessage(), Map.of("query", query)));
         } catch (RuntimeException e) {
-            // 모델이 답을 못 낸 게 아니라 모델에 닿지 못함(연결 거부·타임아웃) — 사용자 입력 탓(400)도 서버 버그(500)도 아니다
-            log.error("[NLP] LLM 호출 실패 → 503: {}", e.toString());
+            // 모델이 답을 못 낸 게 아니라 모델에 닿지 못함(연결 거부·타임아웃)이 대부분 — 사용자 입력 탓(400)이 아니다.
+            // 우리 쪽 버그도 이 분기로 오므로 스택을 남긴다
+            log.error("[NLP] LLM 호출 실패 → 503", e);
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(ErrorResponse.of("NLP_UNAVAILABLE", "자연어 검색을 일시적으로 사용할 수 없습니다. 출발지·도착지를 직접 선택해 검색해 주세요."));
         }

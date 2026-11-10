@@ -4,6 +4,7 @@ import com.blackmamba.navigation.application.route.InvalidRouteSearchException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.ErrorResponseException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -17,6 +18,9 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
  *   1) Spring ServerHttpObservationFilter가 traceId와 함께 한 번
  *   2) Tomcat StandardWrapperValve가 MDC 비워진 상태에서 한 번
  *
+ * 모든 오류 응답은 Content-Type 을 application/json 으로 못박는다. SSE 엔드포인트(produces=text/event-stream)에서
+ * 던진 예외는 협상 가능한 타입이 event-stream 뿐이라, 지정하지 않으면 JSON 본문을 쓰지 못해 400 이 500 빈 본문이 된다.
+ * <p>
  * 이 핸들러가 예외를 여기서 막고 HTTP 500 응답을 직접 만들어서
  * Tomcat까지 올라가지 않도록 한다. → Loki에 traceId 있는 ERROR 로그 1건만 남음.
  */
@@ -30,6 +34,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleNotFound(NoResourceFoundException e) {
         log.warn("[404] 존재하지 않는 리소스: {}", e.getResourcePath());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(ErrorResponse.of("NOT_FOUND", "요청한 리소스가 존재하지 않습니다: " + e.getResourcePath()));
     }
 
@@ -39,6 +44,7 @@ public class GlobalExceptionHandler {
         log.warn("[{}] {}", e.getStatusCode(), e.getMessage());
         String message = e.getMessage() != null ? e.getMessage() : "요청 처리 실패";
         return ResponseEntity.status(e.getStatusCode())
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(ErrorResponse.of(e.getStatusCode().toString(), message));
     }
 
@@ -47,6 +53,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleInvalidRouteSearch(InvalidRouteSearchException e) {
         log.warn("[400] {}: {}", e.code(), e.getMessage());
         return ResponseEntity.badRequest()
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(ErrorResponse.of(e.code(), e.getMessage()));
     }
 
@@ -55,6 +62,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleBadRequest(IllegalArgumentException e) {
         log.warn("[400] {}", e.getMessage());
         return ResponseEntity.badRequest()
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(ErrorResponse.of("BAD_REQUEST", e.getMessage() != null ? e.getMessage() : "잘못된 요청입니다."));
     }
 
@@ -64,6 +72,7 @@ public class GlobalExceptionHandler {
         if (e instanceof org.springframework.web.ErrorResponse withStatus) {
             log.warn("[{}] {}: {}", withStatus.getStatusCode(), e.getClass().getSimpleName(), e.getMessage());
             return ResponseEntity.status(withStatus.getStatusCode())
+                    .contentType(MediaType.APPLICATION_JSON)
                     .body(ErrorResponse.of(withStatus.getStatusCode().toString(), "요청 형식이 올바르지 않습니다."));
         }
         // e를 인자로 넘겨야 SLF4J가 stackTrace를 event.throwable에 저장 → structuredMetadata 의 %xException 에서 사용
@@ -72,6 +81,7 @@ public class GlobalExceptionHandler {
         // 응답에는 예외 메시지를 싣지 않는다 — 내부 경로·외부 API 상세 등 민감 정보 노출 가능.
         // 상세 원인은 위 ERROR 로그(traceId 포함)로만 추적.
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(ErrorResponse.of("INTERNAL_SERVER_ERROR", "서버 내부 오류가 발생했습니다."));
     }
 }

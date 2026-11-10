@@ -16,6 +16,7 @@ import com.blackmamba.navigation.domain.route.comparison.CarbonFootprintCalculat
 import com.blackmamba.navigation.domain.weather.WeatherCondition;
 import com.blackmamba.navigation.domain.route.evaluation.RouteInsightFactory;
 import com.blackmamba.navigation.domain.route.evaluation.RouteScoreCalculator;
+import com.blackmamba.navigation.domain.route.evaluation.Comparison;
 import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
@@ -112,6 +113,25 @@ class RouteEnrichmentPipelineTest {
     }
 
     @Test
+    void 기준_경로가_목록에_없어도_전략이_계산한_기준_시간으로_비교를_유지한다() {
+        // given — 상위 N 에서 대중교통 단독 경로가 밀려 목록에 없다. 기준 40분 대비 15분 단축으로 평가된 경로
+        Leg walk = new Leg(LegType.WALK, "WALK", 10, 750, origin, origin, null, null, null);
+        Leg bike = new Leg(LegType.BIKE, "DDAREUNGI", 15, 3_600, origin, destination, null, null, null);
+        Route mixed = Route.of(List.of(walk, bike), RouteType.TRANSIT_WITH_BIKE)
+                .withComparison(new Comparison(40, 15))
+                .withScore(0.9, true);
+
+        // when — 3km/h: 도보 10분 → 15분, 총 30분
+        List<Route> result = pipeline.enrich(List.of(mixed), origin, destination, RecommendationPreference.RELIABILITY,
+                AccessibilityContext.of(false, 3.0), WeatherContext.DEFAULT);
+
+        // then — 자기 자신과 비교해 단축 0분이 되지 않는다
+        assertThat(result.getFirst().totalMinutes()).isEqualTo(30);
+        assertThat(result.getFirst().comparison().originalMinutes()).isEqualTo(40);
+        assertThat(result.getFirst().comparison().savedMinutes()).isEqualTo(10);
+    }
+
+    @Test
     void 추천이_옮겨가면_추천_근거_문구도_새_1위_기준으로_다시_만든다() {
         // given — RAIN 으로 자전거(추천)가 2위로 밀린다
         Route bike = bikeRoute().withScore(0.78, true);
@@ -123,7 +143,9 @@ class RouteEnrichmentPipelineTest {
 
         // then — 플래그가 바뀐 두 경로 모두 근거가 다시 생성되어 있고, 감점된 자전거 경로에는 날씨 사유가 붙는다
         assertThat(result).allSatisfy(route -> assertThat(route.insights()).isNotNull());
-        assertThat(result.get(1).insights().riskBadges()).contains("비 예보 — 자전거·킥보드 구간 감점");
+        assertThat(result.get(1).insights().riskBadges())
+                .contains("비 예보 — 자전거·킥보드 구간 감점")
+                .doesNotContain("안정적");
         assertThat(result.getFirst().insights().riskBadges()).noneMatch(badge -> badge.contains("예보"));
     }
 

@@ -19,10 +19,6 @@ public class RouteEvaluator {
         this.routeInsightFactory = routeInsightFactory;
     }
 
-    public Route evaluate(Route route, Route baselineRoute, int baselineMinutes, boolean recommended) {
-        return evaluate(route, baselineRoute, baselineMinutes, recommended, RecommendationPreference.RELIABILITY);
-    }
-
     public Route evaluate(Route route,
                           Route baselineRoute,
                           int baselineMinutes,
@@ -42,10 +38,6 @@ public class RouteEvaluator {
      */
     public Route reRecommend(Route route, Route baselineRoute, boolean recommended, RecommendationPreference preference) {
         return routeInsightFactory.enrich(route.withScore(route.score(), recommended), baselineRoute, preference);
-    }
-
-    public Route evaluate(Route route, boolean recommended) {
-        return evaluate(route, recommended, RecommendationPreference.RELIABILITY);
     }
 
     public Route evaluate(Route route, boolean recommended, RecommendationPreference preference) {

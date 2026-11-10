@@ -43,7 +43,6 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
     private final DdareungiApiClient ddareungiClient;
     private final KickboardApiClient kickboardClient;
     private final Map<MobilityType, Counter> typeToFallbackErrorCounter = new EnumMap<>(MobilityType.class);
-    private final Counter kickboardFallbackErrorCounter;
     private final Counter kickboardFallbackEmptyCounter;
     private final TtlCache<AvailabilityKey, Lookup> availabilityCache;
     private final int searchRadiusMeters;
@@ -61,18 +60,17 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
         this.searchRadiusMeters = searchRadiusMeters;
         this.tagoEnabled = tagoEnabled;
         this.availabilityCache = cacheRegistry.create("mobility_availability", availabilityCacheTtlMs);
+        // 외부 조회가 있는 공유 수단만 — 개인 수단은 조회 자체가 없어 오류 시리즈가 의미 없다
         for (MobilityType type : MobilityType.values()) {
+            if (!type.isShared()) {
+                continue;
+            }
             typeToFallbackErrorCounter.put(type, meterRegistry.counter(
                     "navigation.mobility.fallback.total",
                     "mobility", type.name().toLowerCase(Locale.ROOT),
                     "reason", "error"
             ));
         }
-        this.kickboardFallbackErrorCounter = meterRegistry.counter(
-                "navigation.mobility.fallback.total",
-                "mobility", "kickboard_shared",
-                "reason", "error"
-        );
         this.kickboardFallbackEmptyCounter = meterRegistry.counter(
                 "navigation.mobility.fallback.total",
                 "mobility", "kickboard_shared",
@@ -146,7 +144,10 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                 .map(Lookup::found)
                 .onErrorResume(ex -> {
                     log.warn("[가용성] {} 조회 오류 → 후보 없음 처리(캐시 제외): {}", type, ex.getMessage());
-                    typeToFallbackErrorCounter.get(type).increment();
+                    Counter errorCounter = typeToFallbackErrorCounter.get(type);
+                    if (errorCounter != null) {
+                        errorCounter.increment();
+                    }
                     return Mono.just(Lookup.failure());
                 });
         return availabilityCache.get(key, loader, Lookup::isCacheable)
@@ -229,7 +230,7 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
                 })
                 .onErrorResume(ex -> {
                     log.warn("[킥보드] API 오류: {} → 가상 킥보드(추정)로 폴백", ex.getMessage());
-                    kickboardFallbackErrorCounter.increment();
+                    typeToFallbackErrorCounter.get(MobilityType.KICKBOARD_SHARED).increment();
                     return Mono.just(Optional.of(syntheticKickboard(lat, lng)));
                 });
     }

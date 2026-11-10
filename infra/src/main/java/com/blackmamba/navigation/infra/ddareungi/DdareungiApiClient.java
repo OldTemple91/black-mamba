@@ -50,6 +50,7 @@ import java.util.stream.Stream;
 public class DdareungiApiClient {
 
     private static final Logger log = LoggerFactory.getLogger(DdareungiApiClient.class);
+    private static final String API_NAME = "따릉이";
     /** 서울 열린데이터광장 요청당 최대 행 수 */
     private static final int PAGE_SIZE = 1_000;
     /** 조회 상한 페이지 — 5,000개. 서울 대여소는 약 2,700개 */
@@ -138,13 +139,12 @@ public class DdareungiApiClient {
         }
     }
 
+    /**
+     * @param requireAvailableBike true 면 자전거가 있는 정류소만(대여), false 면 전체 정류소(반납)
+     */
     @Observed(name = "external.api.ddareungi.nearby",
             contextualName = "따릉이 반경 내 정류소 조회",
             lowCardinalityKeyValues = {"external.api", "ddareungi"})
-    public Mono<StationSnapshot> getNearbyStations(double lat, double lng, int radiusMeters) {
-        return getNearbyStations(lat, lng, radiusMeters, true);
-    }
-
     public Mono<StationSnapshot> getNearbyStations(double lat, double lng, int radiusMeters,
                                                    boolean requireAvailableBike) {
         return getStationSnapshot()
@@ -167,12 +167,15 @@ public class DdareungiApiClient {
         if (cached != null && cached.isFreshEnoughToServeWhileRefreshing(now, snapshotCacheTtlMs)) {
             // TTL 이 막 지난 snapshot 은 바로 내주고 갱신은 뒤에서 한다 — 30초마다 그 순간의 요청들이
             // 전체 정류소(3페이지) 재조회를 기다리지 않게. 내주는 데이터의 나이는 최대 TTL 의 2배다.
-            if (refreshBlockedUntilMs.get() <= now) {
-                refreshOrJoin(now).subscribe(
-                        _ -> { },
-                        err -> log.warn("[따릉이 API] 백그라운드 갱신 실패: {}", err.getMessage()));
+            if (refreshBlockedUntilMs.get() > now) {
+                // 직전 갱신이 실패해 backoff 중 — 이 snapshot 은 갱신되지 못한 것이므로 출처를 STALE 로 알린다
+                refreshShortCircuitCounter.increment();
+                return staleOrEmptySnapshot(cached, "backoff active");
             }
-            snapshotCacheHitCounter.increment();
+            // 적중·미스 집계는 refreshOrJoin 이 한다(진행 중 갱신에 합류하면 hit, 새 갱신이면 miss)
+            refreshOrJoin(now).subscribe(
+                    _ -> { },
+                    err -> log.warn("[따릉이 API] 백그라운드 갱신 실패: {}", err.getMessage()));
             return cached.snapshotMono();
         }
         if (refreshBlockedUntilMs.get() > now) {
@@ -234,7 +237,7 @@ public class DdareungiApiClient {
         return fetchPage(page).flatMap(response -> {
             List<DdareungiStation> stations = response.toStations();
             if (page == 1 && response.rowCount() == 0) {
-                return Mono.error(ExternalApiException.of("따릉이", 500, "정류소 0개 응답"));
+                return Mono.error(ExternalApiException.of(API_NAME, 500, "정류소 0개 응답"));
             }
             if (response.rowCount() < PAGE_SIZE) {
                 return Mono.just(stations);
@@ -254,7 +257,7 @@ public class DdareungiApiClient {
         return webClient.get()
                 .uri("/{apiKey}/json/bikeList/{start}/{end}/", apiKey, startIndex, endIndex)
                 .retrieve()
-                .onStatus(HttpStatusCode::isError, response -> ExternalApiException.from("따릉이", response))
+                .onStatus(HttpStatusCode::isError, response -> ExternalApiException.from(API_NAME, response))
                 // 인증키 오류는 XML 로 내려와 record 디코딩이 깨진다 — 문자열로 받아 직접 판별한다
                 .bodyToMono(String.class)
                 .timeout(Duration.ofMillis(requestTimeoutMs))

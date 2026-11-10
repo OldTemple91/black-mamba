@@ -52,7 +52,6 @@ public class CarbonFootprintCalculator {
     /** 친환경 판정 임계 — km 당 배출 강도가 이 값 미만이면 eco. */
     private static final double ECO_INTENSITY_G_PER_KM = 20.0;
 
-    // === 모드 문자열 상수 (ODsay Mapper 와 일치) ===
 
     /**
      * Route 전체의 CO₂ 배출량 (g) 계산. 반환값은 음수가 될 수 없다.

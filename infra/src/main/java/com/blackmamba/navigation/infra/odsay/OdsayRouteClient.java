@@ -13,6 +13,7 @@ import com.blackmamba.navigation.infra.common.http.WebClients;
 import com.blackmamba.navigation.infra.odsay.dto.OdsayRouteResponse;
 import com.blackmamba.navigation.infra.common.resilience.ExternalApiResilience;
 import tools.jackson.core.JacksonException;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.annotation.Observed;
@@ -22,11 +23,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientException;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Component
@@ -185,14 +188,25 @@ public class OdsayRouteClient {
                 .as(guard::protect)
                 .onErrorResume(ex -> {
                     transitRouteErrorFallbackCounter.increment();
-                    if (ex instanceof ExternalApiException) {
-                        log.warn("[ODsay] 호출 실패(최종) → 빈 리스트 반환. 원인: {}", ex.getMessage());
+                    if (isExpectedFailure(ex)) {
+                        log.warn("[ODsay] 호출 실패(최종) → 빈 리스트 반환. 원인: {}", ex.toString());
                     } else {
                         // 매퍼 NPE 같은 우리 쪽 버그 — 스택 없이 WARN 한 줄로 묻지 않는다
                         log.error("[ODsay] 응답 처리 중 예기치 못한 오류 → 빈 리스트 반환", ex);
                     }
                     return Mono.just(List.of());
                 });
+    }
+
+    /**
+     * 외부 사정으로 생기는 실패 — 오류 응답, 연결 거부·타임아웃, 열린 회로의 거절.
+     * 이것들까지 스택과 함께 ERROR 로 남기면 장애 중에 후보 허브 수만큼 스택이 쏟아져 진짜 버그 로그가 묻힌다.
+     */
+    private static boolean isExpectedFailure(Throwable ex) {
+        return ex instanceof ExternalApiException
+                || ex instanceof WebClientException
+                || ex instanceof TimeoutException
+                || ex instanceof CallNotPermittedException;
     }
 
     private List<Leg> normalizeWalkLegs(List<Leg> legs, Location origin, Location destination) {

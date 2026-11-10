@@ -122,6 +122,10 @@ public class OllamaRouteIntentParser implements RouteIntentParser {
         String rawResponse = chatClient.prompt(prompt).call().content();
         log.debug("[NLP] LLM raw response: {}", rawResponse);
 
+        if (rawResponse == null) {
+            log.warn("[NLP] LLM 응답이 비어 있음");
+            throw new IllegalStateException("자연어 요청을 이해하지 못했습니다. 더 명확히 입력해 주세요.");
+        }
         String jsonBody = extractJson(rawResponse);
 
         OllamaIntentPayload payload;
