@@ -215,7 +215,7 @@ flowchart LR
 | **Hallucination 검증** | LLM 출력 숫자(분/원) 정규식 추출 → 실측과 5분/1,000원 초과 차이면 자동 폴백 |
 | **다층 폴백** | LLM 타임아웃·빈약 응답까지 모두 결정론 원본으로 자동 복귀 → 본 응답 무중단 |
 
-- **Spring AI 2.0.2** + **Ollama** (`llama3.2:3b` + `bge-m3`) + **Qdrant v1.13.6**
+- **Spring AI 2.0.2** + **Ollama** (`llama3.2:3b` + `bge-m3`) + **Qdrant v1.18.2**
 - 외부 OpenAI 의존 없이 자체호스팅 → **비용 0 + 데이터 외부 유출 차단**
 - 운영 메트릭: `navigation.rag.narrative.{generated, fallback{reason}, similar_hit}` (Prometheus)
 
@@ -338,7 +338,7 @@ Docker Compose 로 전체 스택 기동 후 실측 트래픽 발생 상태에서
 ### AI / RAG
 - **Spring AI 2.0.2** (`ChatClient` / `VectorStore` 추상화)
 - **Ollama** — `llama3.2:3b` (Chat) + `bge-m3` (Embedding, 1024차원)
-- **Qdrant v1.13.6** — 벡터 DB (gRPC, HNSW 인덱스, Cosine 유사도, 3축 하이브리드 필터)
+- **Qdrant v1.18.2** — 벡터 DB (gRPC, HNSW 인덱스, Cosine 유사도, 3축 하이브리드 필터)
 
 ### 장애 대응
 - **Resilience4j 2.4** — CircuitBreaker + Retry + Fallback (Reactor Operator)

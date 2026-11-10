@@ -112,12 +112,17 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
     }
 
     /**
-     * 문서 ID = 경로 ID + 출발·도착 격자.
-     * 경로 ID 는 구간 이름·소요시간으로만 만들어져 좌표가 없다. 그대로 문서 ID 로 쓰면 가까운 다른 출발·도착 쌍이
-     * 같은 노선을 탈 때 upsert 로 앞 이력의 좌표·시각을 덮어쓴다.
+     * 문서 ID = 서술 문장 + 출발·도착 격자.
+     * <ul>
+     *   <li>경로 ID 만 쓰면(구간 이름·소요시간 해시, 좌표 없음) 가까운 다른 출발·도착 쌍이 같은 노선을 탈 때 서로 덮어쓴다</li>
+     *   <li>경로 ID + 격자만 쓰면 같은 구간의 "평일 오전"·"주말 오후", 선호도가 다른 이력이 한 문서로 합쳐진다
+     *       (시드 200건이 20건이 되는 것을 실제 적재로 확인)</li>
+     * </ul>
+     * 서술 문장에는 시간대·요일·수단·소요시간·선호도가 들어 있어, 문장이 같으면 같은 이력으로 보고 덮어쓴다 —
+     * 같은 검색이 반복돼도 문서가 무한히 늘지 않는다.
      */
-    private static String documentId(Route route, String originGeohash, String destGeohash) {
-        String key = route.routeId() + "|" + originGeohash + "|" + destGeohash;
+    private static String documentId(String description, String originGeohash, String destGeohash) {
+        String key = description + "|" + originGeohash + "|" + destGeohash;
         return UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8))
                 .toString();
     }
@@ -165,7 +170,7 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
             metadata.put(META_PREFERENCE, preference.name());
             metadata.put(META_CREATED_AT, when.getEpochSecond());
 
-            Document document = new Document(documentId(route, originGeohash, destGeohash), description, metadata);
+            Document document = new Document(documentId(description, originGeohash, destGeohash), description, metadata);
             vectorStore.add(List.of(document));
             log.info("[RAG] 경로 이력 저장: routeId={} desc=\"{}\" ({}→{})",
                     route.routeId(), description, originGeohash, destGeohash);
