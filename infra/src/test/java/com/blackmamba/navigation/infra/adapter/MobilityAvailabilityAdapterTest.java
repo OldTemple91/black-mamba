@@ -2,6 +2,7 @@ package com.blackmamba.navigation.infra.adapter;
 
 import com.blackmamba.navigation.domain.route.mobility.AvailabilitySource;
 import com.blackmamba.navigation.domain.route.mobility.MobilityInfo;
+import com.blackmamba.navigation.domain.route.mobility.MobilitySearchHint;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import com.blackmamba.navigation.infra.common.cache.TtlCacheRegistry;
 import com.blackmamba.navigation.infra.ddareungi.DdareungiApiClient;
@@ -12,6 +13,8 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -63,11 +66,11 @@ class MobilityAvailabilityAdapterTest {
     }
 
     @Test
-    void 따릉이_조회_오류는_후보_없음으로_답하되_캐시하지_않는다() {
-        // given — TTL 이 있는 어댑터, 첫 호출은 오류·두 번째는 정상
+    void 따릉이_snapshot_을_확보하지_못한_결과는_후보_없음으로_답하되_캐시하지_않는다() {
+        // given — 실제 클라이언트는 장애 때 예외가 아니라 출처 EMPTY 인 빈 snapshot 을 준다. 첫 호출은 장애, 두 번째는 복구
         MobilityAvailabilityAdapter cachingAdapter = cachingAdapter();
-        when(ddareungiClient.getNearbyStations(HUB_LAT, HUB_LNG, RADIUS))
-                .thenReturn(Mono.error(new IllegalStateException("snapshot 조회 실패")),
+        when(ddareungiClient.getNearbyStations(HUB_LAT, HUB_LNG, RADIUS, true))
+                .thenReturn(Mono.just(new StationSnapshot(List.of(), AvailabilitySource.EMPTY)),
                         Mono.just(live(station("S-142", "142. 아현역 4번출구 앞", HUB_LAT, HUB_LNG, 5))));
 
         // when
@@ -80,10 +83,57 @@ class MobilityAvailabilityAdapterTest {
     }
 
     @Test
+    void 반경_내_정류소가_없다는_정상_결과는_캐시된다() {
+        // given — 출처 LIVE 인 빈 목록은 장애가 아니라 "근처에 없음"
+        MobilityAvailabilityAdapter cachingAdapter = cachingAdapter();
+        when(ddareungiClient.getNearbyStations(HUB_LAT, HUB_LNG, RADIUS, true)).thenReturn(Mono.just(live()));
+
+        // when
+        cachingAdapter.findNearbyMobility(HUB_LAT, HUB_LNG, MobilityType.DDAREUNGI).block();
+        cachingAdapter.findNearbyMobility(HUB_LAT, HUB_LNG, MobilityType.DDAREUNGI).block();
+
+        // then
+        verify(ddareungiClient, times(1)).getNearbyStations(HUB_LAT, HUB_LNG, RADIUS, true);
+    }
+
+    @Test
+    void 장애로_비어_버린_세그먼트_결과는_복구_후_바로_성립한다() {
+        // given — 대여 조회가 첫 호출엔 장애, 두 번째엔 정상
+        MobilityAvailabilityAdapter cachingAdapter = cachingAdapter();
+        when(ddareungiClient.getNearbyStations(HUB_LAT, HUB_LNG, RADIUS, true))
+                .thenReturn(Mono.just(new StationSnapshot(List.of(), AvailabilitySource.EMPTY)),
+                        Mono.just(live(station("S-142", "142. 아현역 4번출구 앞", HUB_LAT, HUB_LNG, 5))));
+        when(ddareungiClient.getNearbyStations(DEST_LAT, DEST_LNG, RADIUS, false))
+                .thenReturn(Mono.just(live(station("S-200", "강남역 따릉이", DEST_LAT, DEST_LNG, 2))));
+
+        // when
+        MobilityInfo first = cachingAdapter.findSegmentMobility(HUB_LAT, HUB_LNG, DEST_LAT, DEST_LNG, MobilityType.DDAREUNGI).block();
+        MobilityInfo second = cachingAdapter.findSegmentMobility(HUB_LAT, HUB_LNG, DEST_LAT, DEST_LNG, MobilityType.DDAREUNGI).block();
+
+        // then
+        assertThat(first).isNull();
+        assertThat(second.stationId()).isEqualTo("S-142");
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false, true", "true, false"})
+    void 대여_힌트는_자전거가_있는_정류소만_반납_힌트는_전체_정류소를_본다(boolean dropoff, boolean requireAvailableBike) {
+        // given — 힌트 반경은 max(700 × 2, 1400)
+        when(ddareungiClient.getNearbyStations(HUB_LAT, HUB_LNG, 1_400, requireAvailableBike))
+                .thenReturn(Mono.just(live(station("S-142", "142. 아현역 4번출구 앞", HUB_LAT, HUB_LNG, 5))));
+
+        // when
+        Optional<MobilitySearchHint> hint = adapter.findNearestMobilityHint(HUB_LAT, HUB_LNG, MobilityType.DDAREUNGI, dropoff).block();
+
+        // then
+        assertThat(hint).isPresent();
+    }
+
+    @Test
     void 따릉이_정상_결과는_TTL_동안_캐시된다() {
         // given
         MobilityAvailabilityAdapter cachingAdapter = cachingAdapter();
-        when(ddareungiClient.getNearbyStations(HUB_LAT, HUB_LNG, RADIUS))
+        when(ddareungiClient.getNearbyStations(HUB_LAT, HUB_LNG, RADIUS, true))
                 .thenReturn(Mono.just(live(station("S-142", "142. 아현역 4번출구 앞", HUB_LAT, HUB_LNG, 5))));
 
         // when
@@ -91,13 +141,13 @@ class MobilityAvailabilityAdapterTest {
         cachingAdapter.findNearbyMobility(HUB_LAT, HUB_LNG, MobilityType.DDAREUNGI).block();
 
         // then
-        verify(ddareungiClient, times(1)).getNearbyStations(HUB_LAT, HUB_LNG, RADIUS);
+        verify(ddareungiClient, times(1)).getNearbyStations(HUB_LAT, HUB_LNG, RADIUS, true);
     }
 
     @Test
     void 대여와_반납_정류소가_다르면_세그먼트가_성립한다() {
         // given
-        when(ddareungiClient.getNearbyStations(HUB_LAT, HUB_LNG, RADIUS))
+        when(ddareungiClient.getNearbyStations(HUB_LAT, HUB_LNG, RADIUS, true))
                 .thenReturn(Mono.just(live(station("S-142", "142. 아현역 4번출구 앞", HUB_LAT, HUB_LNG, 5))));
         when(ddareungiClient.getNearbyStations(DEST_LAT, DEST_LNG, RADIUS, false))
                 .thenReturn(Mono.just(live(station("S-200", "강남역 따릉이", DEST_LAT, DEST_LNG, 2))));
@@ -117,7 +167,7 @@ class MobilityAvailabilityAdapterTest {
     void 대여와_반납이_같은_정류소면_세그먼트를_만들지_않는다() {
         // given
         DdareungiStation same = station("S-142", "142. 아현역 4번출구 앞", HUB_LAT, HUB_LNG, 5);
-        when(ddareungiClient.getNearbyStations(HUB_LAT, HUB_LNG, RADIUS)).thenReturn(Mono.just(live(same)));
+        when(ddareungiClient.getNearbyStations(HUB_LAT, HUB_LNG, RADIUS, true)).thenReturn(Mono.just(live(same)));
         when(ddareungiClient.getNearbyStations(DEST_LAT, DEST_LNG, RADIUS, false)).thenReturn(Mono.just(live(same)));
 
         // when & then
@@ -128,7 +178,7 @@ class MobilityAvailabilityAdapterTest {
     @Test
     void 반납_정류소가_없으면_대여가_가능해도_세그먼트를_만들지_않는다() {
         // given
-        when(ddareungiClient.getNearbyStations(HUB_LAT, HUB_LNG, RADIUS))
+        when(ddareungiClient.getNearbyStations(HUB_LAT, HUB_LNG, RADIUS, true))
                 .thenReturn(Mono.just(live(station("S-142", "142. 아현역 4번출구 앞", HUB_LAT, HUB_LNG, 5))));
         when(ddareungiClient.getNearbyStations(DEST_LAT, DEST_LNG, RADIUS, false))
                 .thenReturn(Mono.just(new StationSnapshot(List.of(), AvailabilitySource.LIVE)));
@@ -141,7 +191,7 @@ class MobilityAvailabilityAdapterTest {
     @Test
     void 대여_가능_정류소가_없으면_세그먼트를_만들지_않는다() {
         // given
-        when(ddareungiClient.getNearbyStations(HUB_LAT, HUB_LNG, RADIUS))
+        when(ddareungiClient.getNearbyStations(HUB_LAT, HUB_LNG, RADIUS, true))
                 .thenReturn(Mono.just(new StationSnapshot(List.of(), AvailabilitySource.LIVE)));
         when(ddareungiClient.getNearbyStations(DEST_LAT, DEST_LNG, RADIUS, false))
                 .thenReturn(Mono.just(live(station("S-200", "강남역 따릉이", DEST_LAT, DEST_LNG, 2))));
@@ -157,14 +207,14 @@ class MobilityAvailabilityAdapterTest {
         StepVerifier.create(adapter.findSegmentMobility(HUB_LAT, HUB_LNG, DEST_LAT, DEST_LNG, MobilityType.PERSONAL_EBIKE))
                 .assertNext(info -> assertThat(info.availabilitySource()).isEqualTo(AvailabilitySource.OWNED))
                 .verifyComplete();
-        verify(ddareungiClient, never()).getNearbyStations(anyDouble(), anyDouble(), anyInt());
+        verify(ddareungiClient, never()).getNearbyStations(anyDouble(), anyDouble(), anyInt(), eq(true));
         verify(ddareungiClient, never()).getNearbyStations(anyDouble(), anyDouble(), anyInt(), eq(false));
     }
 
     @Test
     void stale_snapshot_출처는_결과에_그대로_실린다() {
         // given — 갱신 실패로 이전 snapshot 재사용
-        when(ddareungiClient.getNearbyStations(HUB_LAT, HUB_LNG, RADIUS))
+        when(ddareungiClient.getNearbyStations(HUB_LAT, HUB_LNG, RADIUS, true))
                 .thenReturn(Mono.just(new StationSnapshot(List.of(station("S-1", "정류소", HUB_LAT, HUB_LNG, 3)), AvailabilitySource.STALE)));
 
         // when & then

@@ -9,6 +9,7 @@ import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import com.blackmamba.navigation.infra.common.cache.TtlCache;
 import com.blackmamba.navigation.infra.common.cache.TtlCacheRegistry;
 import com.blackmamba.navigation.infra.ddareungi.DdareungiApiClient;
+import com.blackmamba.navigation.infra.ddareungi.DdareungiApiClient.StationSnapshot;
 import com.blackmamba.navigation.infra.ddareungi.dto.DdareungiStation;
 import com.blackmamba.navigation.infra.kickboard.KickboardApiClient;
 import com.blackmamba.navigation.infra.kickboard.dto.KickboardDevice;
@@ -42,7 +43,6 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
     private final Counter kickboardFallbackErrorCounter;
     private final Counter kickboardFallbackEmptyCounter;
     private final TtlCache<AvailabilityKey, Lookup> availabilityCache;
-    private final TtlCache<SegmentAvailabilityKey, MobilityInfo> segmentAvailabilityCache;
     private final int searchRadiusMeters;
     private final boolean tagoEnabled;
 
@@ -58,8 +58,6 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
         this.searchRadiusMeters = searchRadiusMeters;
         this.tagoEnabled = tagoEnabled;
         this.availabilityCache = cacheRegistry.create("mobility_availability", availabilityCacheTtlMs);
-        // (start × end × type) 조합 키라 경우의 수가 특히 많다 — registry 의 주기 청소가 힙 잠식을 막는다
-        this.segmentAvailabilityCache = cacheRegistry.create("mobility_segment", availabilityCacheTtlMs);
         for (MobilityType type : MobilityType.values()) {
             typeToFallbackErrorCounter.put(type, meterRegistry.counter(
                     "navigation.mobility.fallback.total",
@@ -92,20 +90,19 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
     @Override
     public Mono<Optional<MobilityInfo>> findNearbyDropoff(double lat, double lng, MobilityType type) {
         return cachedLookup(lat, lng, type, true, () -> switch (type) {
-            case DDAREUNGI -> ddareungiClient.getNearbyStations(lat, lng, searchRadiusMeters, false)
+            case DDAREUNGI -> nearbyStations(lat, lng, searchRadiusMeters, false)
                     .map(snapshot -> snapshot.stations().stream().findFirst()
                             .map(station -> ddareungiInfo(station, distanceMeters(lat, lng, station.lat(), station.lng()), snapshot.source())));
             case KICKBOARD_SHARED, PERSONAL_EBIKE, PERSONAL_KICKBOARD -> findNearbyMobility(lat, lng, type);
         });
     }
 
+    /**
+     * 세그먼트 단위 캐시는 두지 않는다 — 입력인 대여·반납 조회가 각각 캐시되고 조합 비용은 없다.
+     * 예전 세그먼트 캐시는 조회 실패로 비어 버린 결과(empty Mono)까지 TTL 동안 재생했다.
+     */
     @Override
     public Mono<MobilityInfo> findSegmentMobility(double startLat, double startLng, double endLat, double endLng, MobilityType type) {
-        SegmentAvailabilityKey key = SegmentAvailabilityKey.of(startLat, startLng, endLat, endLng, type);
-        return segmentAvailabilityCache.get(key, () -> loadSegmentMobility(startLat, startLng, endLat, endLng, type));
-    }
-
-    private Mono<MobilityInfo> loadSegmentMobility(double startLat, double startLng, double endLat, double endLng, MobilityType type) {
         Mono<Optional<MobilityInfo>> pickup = findNearbyMobility(startLat, startLng, type);
 
         if (type != MobilityType.DDAREUNGI) {
@@ -134,7 +131,9 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
         }
 
         int hintRadiusMeters = Math.max(searchRadiusMeters * 2, MIN_HINT_RADIUS_METERS);
-        return ddareungiClient.getNearbyStations(lat, lng, hintRadiusMeters, false)
+        // 대여 힌트는 "자전거가 있는" 정류소여야 한다 — 재고 0대 정류소를 가까운 대여 후보로 안내하지 않는다
+        boolean requireAvailableBike = !dropoff;
+        return ddareungiClient.getNearbyStations(lat, lng, hintRadiusMeters, requireAvailableBike)
                 .map(snapshot -> snapshot.stations().stream().findFirst()
                         .map(station -> new MobilitySearchHint(
                                 station.stationName(),
@@ -183,20 +182,35 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
         }
     }
 
+    /**
+     * 따릉이 클라이언트는 장애 때 예외 대신 출처 EMPTY 인 빈 snapshot 을 준다.
+     * 그대로 두면 "반경 내 정류소 없음" 으로 캐시되므로, 여기서 오류로 바꿔 캐시 제외·오류 카운터 경로에 태운다.
+     */
+    private Mono<StationSnapshot> nearbyStations(double lat, double lng, int radiusMeters, boolean requireAvailableBike) {
+        return ddareungiClient.getNearbyStations(lat, lng, radiusMeters, requireAvailableBike)
+                .<StationSnapshot>handle((snapshot, sink) -> {
+                    if (snapshot.isUnavailable()) {
+                        sink.error(new IllegalStateException("따릉이 snapshot 을 확보하지 못함"));
+                        return;
+                    }
+                    sink.next(snapshot);
+                });
+    }
+
     private Mono<Optional<MobilityInfo>> findNearbyDdareungi(double lat, double lng) {
-        return ddareungiClient.getNearbyStations(lat, lng, searchRadiusMeters)
+        return nearbyStations(lat, lng, searchRadiusMeters, true)
                 .map(snapshot -> {
-                    log.info("[따릉이] 검색 lat={}, lng={}, 반경={}m → 반경 내 대여가능 정류소 {}개",
+                    log.debug("[따릉이] 검색 lat={}, lng={}, 반경={}m → 반경 내 대여가능 정류소 {}개",
                             lat, lng, searchRadiusMeters, snapshot.stations().size());
                     Optional<MobilityInfo> result = snapshot.stations().stream().findFirst()
                             .map(station -> {
                                 int dist = distanceMeters(lat, lng, station.lat(), station.lng());
-                                log.info("[따릉이] 선택: {} | 대여가능 {}대 | 거리 {}m",
+                                log.debug("[따릉이] 선택: {} | 대여가능 {}대 | 거리 {}m",
                                         station.stationName(), station.availableCount(), dist);
                                 return ddareungiInfo(station, dist, snapshot.source());
                             });
                     if (result.isEmpty()) {
-                        log.info("[따릉이] 반경 내 대여 가능한 정류소 없음");
+                        log.debug("[따릉이] 반경 내 대여 가능한 정류소 없음");
                     }
                     return result;
                 });
@@ -332,22 +346,6 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
     private record AvailabilityKey(double latBucket, double lngBucket, MobilityType type, boolean dropoff) {
         private static AvailabilityKey of(double lat, double lng, MobilityType type, boolean dropoff) {
             return new AvailabilityKey(roundCoordinate(lat), roundCoordinate(lng), type, dropoff);
-        }
-    }
-
-    private record SegmentAvailabilityKey(double startLatBucket,
-                                          double startLngBucket,
-                                          double endLatBucket,
-                                          double endLngBucket,
-                                          MobilityType type) {
-        private static SegmentAvailabilityKey of(double startLat, double startLng, double endLat, double endLng, MobilityType type) {
-            return new SegmentAvailabilityKey(
-                    roundCoordinate(startLat),
-                    roundCoordinate(startLng),
-                    roundCoordinate(endLat),
-                    roundCoordinate(endLng),
-                    type
-            );
         }
     }
 }

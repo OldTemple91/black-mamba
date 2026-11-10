@@ -135,6 +135,11 @@ public class RouteController {
             return ResponseEntity.ok(RoutesResponse.from(routes));
         } catch (RuntimeException e) {
             if (!ReactorTimeouts.isTimeout(e)) {
+                // 실패한 요청도 지연 히스토그램에 남긴다 — 빠지면 오류율·SLO 분모가 줄어든다
+                sample.stop(meterRegistry.timer("navigation.route.duration",
+                        "mode", searchMode.name(),
+                        "preference", recommendationPreference.name(),
+                        "outcome", "error"));
                 throw e;  // 타임아웃이 아닌 오류는 전역 핸들러가 500 + 스택과 함께 기록한다
             }
             sample.stop(meterRegistry.timer("navigation.route.duration",
