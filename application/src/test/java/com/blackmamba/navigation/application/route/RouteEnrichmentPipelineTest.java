@@ -121,8 +121,10 @@ class RouteEnrichmentPipelineTest {
         List<Route> result = pipeline.enrich(List.of(bike, transit), origin, destination, RecommendationPreference.RELIABILITY,
                 AccessibilityContext.DEFAULT, WeatherContext.of(WeatherCondition.RAIN));
 
-        // then — 플래그가 바뀐 두 경로 모두 근거가 다시 생성되어 있다
+        // then — 플래그가 바뀐 두 경로 모두 근거가 다시 생성되어 있고, 감점된 자전거 경로에는 날씨 사유가 붙는다
         assertThat(result).allSatisfy(route -> assertThat(route.insights()).isNotNull());
+        assertThat(result.get(1).insights().riskBadges()).contains("비 예보 — 자전거·킥보드 구간 감점");
+        assertThat(result.getFirst().insights().riskBadges()).noneMatch(badge -> badge.contains("예보"));
     }
 
     private Route bikeRoute() {

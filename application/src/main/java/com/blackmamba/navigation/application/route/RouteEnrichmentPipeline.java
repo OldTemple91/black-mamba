@@ -65,7 +65,8 @@ public class RouteEnrichmentPipeline {
             accessible = reEvaluate(accessible, preference);
         }
         List<Route> weatherAdjusted = weatherAwareRouteAdjuster.apply(accessible, weatherContext);
-        return reconcileRecommendation(weatherAdjusted, preference).stream()
+        List<Route> ranked = weatherAwareRouteAdjuster.annotate(reconcileRecommendation(weatherAdjusted, preference), weatherContext);
+        return ranked.stream()
                 .map(route -> route.withCarbon(computeCarbon(route, origin, destination)))
                 .map(route -> route.withCarComparison(carReferenceCalculator.compareWithRoute(route, origin, destination)))
                 .toList();

@@ -26,17 +26,30 @@ public sealed interface StreamEventPayload {
 
     record Initial(Instant timestamp, List<Route> routes) implements StreamEventPayload {}
 
-    record Heartbeat(Instant timestamp, String status) implements StreamEventPayload {
-        public static final String WATCHING = "watching";
-        public static final String SEARCH_FAILED = "search_failed";
-        public static final String NO_ROUTES = "no_routes";
+    record Heartbeat(Instant timestamp, HeartbeatStatus status) implements StreamEventPayload {
 
-        public static Heartbeat watching() {
-            return of(WATCHING);
+        public static Heartbeat from(HeartbeatStatus status) {
+            return new Heartbeat(Instant.now(), status);
+        }
+    }
+
+    /** 변화가 없을 때 스트림이 살아 있음을 알리는 신호의 종류. 전송 형식(소문자 코드)은 api 계층이 정한다. */
+    enum HeartbeatStatus {
+        /** 재탐색했고 의미 있는 변화가 없다 */
+        WATCHING("watching"),
+        /** 재탐색 자체가 실패했다 — 이전 결과를 유지한다 */
+        SEARCH_FAILED("search_failed"),
+        /** 재탐색은 성공했지만 경로가 0건이다 */
+        NO_ROUTES("no_routes");
+
+        private final String code;
+
+        HeartbeatStatus(String code) {
+            this.code = code;
         }
 
-        public static Heartbeat of(String status) {
-            return new Heartbeat(Instant.now(), status);
+        public String code() {
+            return code;
         }
     }
 

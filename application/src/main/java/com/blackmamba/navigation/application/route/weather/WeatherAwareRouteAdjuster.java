@@ -3,11 +3,13 @@ package com.blackmamba.navigation.application.route.weather;
 import com.blackmamba.navigation.domain.route.Leg;
 import com.blackmamba.navigation.domain.route.LegType;
 import com.blackmamba.navigation.domain.route.Route;
+import com.blackmamba.navigation.domain.route.evaluation.RouteInsights;
 import com.blackmamba.navigation.domain.weather.WeatherCondition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
@@ -56,6 +58,51 @@ public class WeatherAwareRouteAdjuster {
                 .map(route -> adjustScore(route, condition))
                 .sorted(Comparator.comparingDouble(Route::score).reversed())
                 .toList();
+    }
+
+    /**
+     * 날씨로 감점된 경로에 그 사유를 리스크 배지로 붙인다.
+     * 점수만 깎고 설명이 없으면 "왜 자전거 경로가 밀렸는지" 를 사용자가 알 수 없고, 비 오는 날에도 "안정적" 배지만 보인다.
+     * 추천 재정렬이 배지를 다시 만들 수 있으므로 파이프라인에서 그 뒤에 호출한다.
+     */
+    public List<Route> annotate(List<Route> routes, WeatherContext weather) {
+        if (routes == null || routes.isEmpty()) return routes;
+        if (weather == null || !weather.hasImpact()) return routes;
+
+        WeatherCondition condition = weather.condition();
+        return routes.stream()
+                .map(route -> withWeatherBadge(route, condition))
+                .toList();
+    }
+
+    private Route withWeatherBadge(Route route, WeatherCondition condition) {
+        if (computePenaltyFactor(route, condition) >= 1.0) return route;
+
+        String badge = weatherBadge(condition, hasRidingLeg(route));
+        RouteInsights insights = route.insights();
+        if (insights == null) {
+            return route.withInsights(new RouteInsights(List.of(), List.of(badge), List.of(), List.of()));
+        }
+        if (insights.riskBadges().contains(badge)) return route;
+
+        List<String> badges = new ArrayList<>(insights.riskBadges());
+        badges.addFirst(badge);
+        return route.withInsights(new RouteInsights(insights.recommendationReasons(), badges,
+                insights.generationDiagnostics(), insights.fallbackDiagnostics()));
+    }
+
+    private static String weatherBadge(WeatherCondition condition, boolean hasRiding) {
+        String target = "긴 도보 구간";
+        if (hasRiding) {
+            target = "자전거·킥보드 구간";
+        }
+        return switch (condition) {
+            case RAIN -> "비 예보 — " + target + " 감점";
+            case SNOW -> "눈 예보 — " + target + " 감점";
+            case HEAT -> "폭염 — 야외 이동 구간 감점";
+            case COLD -> "한파 — 야외 이동 구간 감점";
+            case CLEAR, UNKNOWN -> "";
+        };
     }
 
     private Route adjustScore(Route route, WeatherCondition condition) {

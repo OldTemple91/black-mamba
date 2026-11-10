@@ -1,6 +1,7 @@
 package com.blackmamba.navigation.application.route;
 
 import com.blackmamba.navigation.domain.route.Route;
+import com.blackmamba.navigation.application.route.StreamEventPayload.HeartbeatStatus;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -98,7 +99,7 @@ public class RouteStreamService {
                             return Mono.just(new SearchOutcome.Failed());
                         }))
                 .map(outcome -> switch (outcome) {
-                    case SearchOutcome.Failed() -> heartbeat(StreamEventPayload.Heartbeat.SEARCH_FAILED);
+                    case SearchOutcome.Failed() -> heartbeat(HeartbeatStatus.SEARCH_FAILED);
                     case SearchOutcome.Succeeded(List<Route> current) -> toPollEvent(current, lastRoutes);
                 });
 
@@ -135,20 +136,20 @@ public class RouteStreamService {
     /** 재탐색 성공 1회를 Update 또는 Heartbeat 로 바꾼다. 의미 있는 변화가 있을 때만 lastRoutes 를 갱신한다. */
     private StreamEventPayload toPollEvent(List<Route> current, AtomicReference<List<Route>> lastRoutes) {
         if (current.isEmpty()) {
-            return heartbeat(StreamEventPayload.Heartbeat.NO_ROUTES);
+            return heartbeat(HeartbeatStatus.NO_ROUTES);
         }
         String reason = changeReason(lastRoutes.get(), current);
         if (reason == null) {
-            return heartbeat(StreamEventPayload.Heartbeat.WATCHING);
+            return heartbeat(HeartbeatStatus.WATCHING);
         }
         lastRoutes.set(current);
         updatesPushedCounter.increment();
         return new StreamEventPayload.Update(Instant.now(), current, reason);
     }
 
-    private StreamEventPayload heartbeat(String status) {
+    private StreamEventPayload heartbeat(HeartbeatStatus status) {
         heartbeatsPushedCounter.increment();
-        return StreamEventPayload.Heartbeat.of(status);
+        return StreamEventPayload.Heartbeat.from(status);
     }
 
     /** 재탐색 1회의 결과 — 실패와 "성공했지만 0건" 을 타입으로 구분한다 ("실패인데 경로 있음" 은 표현 불가). */
