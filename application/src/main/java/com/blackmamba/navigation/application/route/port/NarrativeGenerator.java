@@ -2,6 +2,7 @@ package com.blackmamba.navigation.application.route.port;
 
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Route;
+import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
 
 import java.util.List;
 
@@ -36,7 +37,7 @@ public interface NarrativeGenerator {
     String generate(Route route,
                     Location origin,
                     Location destination,
-                    String preference,
+                    RecommendationPreference preference,
                     List<ScoredRouteHistoryEntry> similarHistory,
                     String originalNarrative);
 }

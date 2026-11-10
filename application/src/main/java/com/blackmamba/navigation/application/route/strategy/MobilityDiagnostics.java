@@ -61,12 +61,12 @@ final class MobilityDiagnostics {
 
     static GenerationDiagnostic noCandidateHub(Phase phase, MobilityType type) {
         return diagnostic(phase.code, type, "NO_CANDIDATE_HUB", 0,
-                MobilityConfigs.labelFor(type) + " " + phase.label + " 후보 허브가 없습니다.");
+                type.displayName() + " " + phase.label + " 후보 허브가 없습니다.");
     }
 
     static GenerationDiagnostic directDistanceExceeded(MobilityType type, int maxRangeMeters, double directDistanceMeters) {
         return diagnostic(PHASE_DIRECT, type, "DIRECT_DISTANCE_EXCEEDED", 0,
-                MobilityConfigs.labelFor(type) + " 직접 이동 가능 거리(" + maxRangeMeters + "m)를 초과했습니다. 현재 직선거리 약 "
+                type.displayName() + " 직접 이동 가능 거리(" + maxRangeMeters + "m)를 초과했습니다. 현재 직선거리 약 "
                         + (int) directDistanceMeters + "m");
     }
 
@@ -107,7 +107,7 @@ final class MobilityDiagnostics {
         long noDropoff = countReason(items, DiagnosticReason.NO_DROPOFF);
         long sameStation = countReason(items, DiagnosticReason.SAME_STATION);
 
-        String prefix = MobilityConfigs.labelFor(type) + " " + phase.label + " 후보 " + candidateSummary(hubs) + "를 확인했지만 ";
+        String prefix = type.displayName() + " " + phase.label + " 후보 " + candidateSummary(hubs) + "를 확인했지만 ";
         int hubCount = hubs.size();
 
         if (sameStation > 0) {

@@ -58,8 +58,13 @@ public class CarReferenceCalculator {
      * 출발/도착 좌표로부터 자가용 기준값 계산.
      * CO₂ 계수는 {@link CarbonFootprintCalculator#CAR_G_PER_KM} 에서 공유 (171 g/km).
      */
+    /** 자가용 주행 거리 추정 = 직선거리 × 우회계수. 탄소 비교도 같은 거리를 써야 두 수치가 어긋나지 않는다. */
+    public double carDistanceKm(Location origin, Location destination) {
+        return haversineKm(origin, destination) * DETOUR_FACTOR;
+    }
+
     public CarReference estimate(Location origin, Location destination) {
-        double distKm = haversineKm(origin, destination) * DETOUR_FACTOR;
+        double distKm = carDistanceKm(origin, destination);
 
         int minutes = estimateMinutes(distKm);
         int fuel = (int) Math.round(distKm / FUEL_EFFICIENCY_KM_PER_L * FUEL_PRICE_PER_L);

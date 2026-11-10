@@ -34,9 +34,6 @@ import java.util.List;
 @Component
 public class RouteEnrichmentPipeline {
 
-    /** 자가용 우회계수 — {@link CarReferenceCalculator} 의 DETOUR_FACTOR 와 동일 */
-    private static final double CAR_DETOUR_FACTOR = 1.3;
-
     private final AccessibilityPostProcessor accessibilityPostProcessor;
     private final WeatherAwareRouteAdjuster weatherAwareRouteAdjuster;
     private final CarbonFootprintCalculator carbonFootprintCalculator;
@@ -138,7 +135,7 @@ public class RouteEnrichmentPipeline {
         int totalMeters = route.legs().stream().mapToInt(Leg::distanceMeters).sum();
         double gramsPerKm = totalMeters > 0 ? grams / (totalMeters / 1_000.0) : 0.0;
 
-        double carKm = GeoDistance.kilometers(origin, destination) * CAR_DETOUR_FACTOR;
+        double carKm = carReferenceCalculator.carDistanceKm(origin, destination);
         double carGrams = carbonFootprintCalculator.forCarDistance(carKm);
         double saved = Math.max(0, carGrams - grams);
         carbonMetrics.record(grams, saved);

@@ -2,6 +2,7 @@ package com.blackmamba.navigation.application.route.port;
 
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Route;
+import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
@@ -32,7 +33,7 @@ public interface RouteHistoryPort {
      * 경로를 벡터 DB 에 upsert (현재 시각 기준 맥락 태그 자동 부여).
      * 실패해도 본 요청은 성공해야 한다 — 구현체는 오류를 로그로 삼키고 정상 완료한다.
      */
-    default Mono<Void> save(Route route, Location origin, Location destination, String preference) {
+    default Mono<Void> save(Route route, Location origin, Location destination, RecommendationPreference preference) {
         return save(route, origin, destination, preference, null);
     }
 
@@ -42,7 +43,7 @@ public interface RouteHistoryPort {
      *
      * @param timestamp null 이면 현재 시각 사용
      */
-    Mono<Void> save(Route route, Location origin, Location destination, String preference, Instant timestamp);
+    Mono<Void> save(Route route, Location origin, Location destination, RecommendationPreference preference, Instant timestamp);
 
     /**
      * 유사 경로 이력 조회 (의미 + payload 필터 하이브리드).
@@ -56,5 +57,5 @@ public interface RouteHistoryPort {
      * 이 경로를 이력에 저장한다면 쓰일 서술 문장.
      * 유사 이력을 찾을 때 검색어로 쓴다 — 저장된 문서와 같은 형식의 문장이어야 벡터 유사도가 의미를 가진다.
      */
-    String describe(Route route, Location origin, Location destination, String preference);
+    String describe(Route route, Location origin, Location destination, RecommendationPreference preference);
 }

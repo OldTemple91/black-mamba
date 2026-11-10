@@ -4,6 +4,7 @@ import com.blackmamba.navigation.application.route.port.RouteHistoryPort;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.LegType;
 import com.blackmamba.navigation.domain.route.Route;
+import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -96,7 +97,7 @@ public class RouteHistoryRecorder {
      * 추천 경로를 비동기로 벡터 DB 에 저장 (fire-and-forget).
      * 품질 게이트 + 중복 감지 통과한 경로만 저장.
      */
-    public void recordAsync(List<Route> routes, Location origin, Location destination, String preference) {
+    public void recordAsync(List<Route> routes, Location origin, Location destination, RecommendationPreference preference) {
         if (routeHistoryPort == null) return;
         if (routes == null || routes.isEmpty()) return;
 
@@ -185,11 +186,11 @@ public class RouteHistoryRecorder {
         }
     }
 
-    private static String dedupKey(Location origin, Location destination, String preference) {
+    private static String dedupKey(Location origin, Location destination, RecommendationPreference preference) {
         // 3자리 소수(~100m) 반올림으로 OD 근접 중복까지 잡는다
         return String.format("%.3f,%.3f|%.3f,%.3f|%s",
                 origin.lat(), origin.lng(),
                 destination.lat(), destination.lng(),
-                preference == null ? "" : preference);
+                preference);
     }
 }

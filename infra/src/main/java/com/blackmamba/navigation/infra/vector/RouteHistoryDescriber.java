@@ -5,6 +5,7 @@ import com.blackmamba.navigation.domain.route.Leg;
 import com.blackmamba.navigation.domain.route.LegType;
 import com.blackmamba.navigation.domain.route.Route;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
+import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -42,7 +43,7 @@ public final class RouteHistoryDescriber {
     /**
      * 기본 서술 — {@link Instant#now()} 기준 시간대/요일 태그 자동 부여.
      */
-    public static String describe(Route route, Location origin, Location destination, String preference) {
+    public static String describe(Route route, Location origin, Location destination, RecommendationPreference preference) {
         return describeAt(route, origin, destination, preference, Instant.now());
     }
 
@@ -54,7 +55,7 @@ public final class RouteHistoryDescriber {
      * (기존엔 OD + 소요시간만 달라 문서가 뭉침 → score 0.5~0.6 수준 수렴)
      */
     public static String describeAt(Route route, Location origin, Location destination,
-                                    String preference, Instant when) {
+                                    RecommendationPreference preference, Instant when) {
         StringBuilder sb = new StringBuilder();
 
         // 0. 맥락 태그 (시간대 + 요일)
@@ -181,11 +182,10 @@ public final class RouteHistoryDescriber {
         };
     }
 
-    private static String preferenceNarrative(String preference) {
-        return switch (preference.toUpperCase(Locale.ROOT)) {
-            case "TIME_PRIORITY" -> "빠른 시간 우선";
-            case "RELIABILITY" -> "안정적이고 환승 적은 경로";
-            default -> preference;
+    private static String preferenceNarrative(RecommendationPreference preference) {
+        return switch (preference) {
+            case TIME_PRIORITY -> "빠른 시간 우선";
+            case RELIABILITY -> "안정적이고 환승 적은 경로";
         };
     }
 

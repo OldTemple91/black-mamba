@@ -1,6 +1,6 @@
 package com.blackmamba.navigation.api.rag;
 
-import com.blackmamba.navigation.infra.vector.RouteHistorySeeder;
+import com.blackmamba.navigation.application.route.port.RouteHistorySeedPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.context.annotation.Profile;
@@ -24,9 +24,9 @@ import java.util.Map;
 @Profile("!prod")
 public class RagAdminController {
 
-    private final RouteHistorySeeder routeHistorySeeder;
+    private final RouteHistorySeedPort routeHistorySeeder;
 
-    public RagAdminController(RouteHistorySeeder routeHistorySeeder) {
+    public RagAdminController(RouteHistorySeedPort routeHistorySeeder) {
         this.routeHistorySeeder = routeHistorySeeder;
     }
 

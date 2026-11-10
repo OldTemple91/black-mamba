@@ -5,6 +5,7 @@ import com.blackmamba.navigation.application.route.port.ScoredRouteHistoryEntry;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Route;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
+import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -84,7 +85,7 @@ public class OllamaNarrativeGenerator implements NarrativeGenerator {
     public String generate(Route route,
                            Location origin,
                            Location destination,
-                           String preference,
+                           RecommendationPreference preference,
                            java.util.List<ScoredRouteHistoryEntry> similarHistory,
                            String originalNarrative) {
         if (route == null || origin == null || destination == null) return "";
@@ -215,7 +216,7 @@ public class OllamaNarrativeGenerator implements NarrativeGenerator {
     private String buildUserPrompt(Route route,
                                    Location origin,
                                    Location destination,
-                                   String preference,
+                                   RecommendationPreference preference,
                                    java.util.List<ScoredRouteHistoryEntry> history,
                                    String originalNarrative) {
         StringBuilder sb = new StringBuilder();
@@ -229,7 +230,7 @@ public class OllamaNarrativeGenerator implements NarrativeGenerator {
                 route.totalCostWon(),
                 mobilitySummary(route),
                 legSummary(route),
-                preference == null ? "RELIABILITY" : preference));
+                preference));
 
         if (originalNarrative != null && !originalNarrative.isBlank()) {
             sb.append(String.format("- 자가용 비교: %s%n", originalNarrative));
@@ -260,12 +261,7 @@ public class OllamaNarrativeGenerator implements NarrativeGenerator {
 
     private static String legLabel(com.blackmamba.navigation.domain.route.Leg leg) {
         if (leg.mobilityInfo() != null && leg.mobilityInfo().mobilityType() != null) {
-            return switch (leg.mobilityInfo().mobilityType()) {
-                case DDAREUNGI -> "따릉이";
-                case PERSONAL_EBIKE -> "전기자전거";
-                case PERSONAL_KICKBOARD -> "킥보드";
-                case KICKBOARD_SHARED -> "공유 킥보드";
-            };
+            return leg.mobilityInfo().mobilityType().displayName();
         }
         return switch (leg.type()) {
             case TRANSIT -> "대중교통";
@@ -277,23 +273,7 @@ public class OllamaNarrativeGenerator implements NarrativeGenerator {
     private static String mobilitySummary(Route route) {
         if (route.legs() == null || route.legs().isEmpty()) return "도보";
         return route.legs().stream()
-                .map(leg -> {
-                    if (leg.mobilityInfo() != null && leg.mobilityInfo().mobilityType() != null) {
-                        MobilityType m = leg.mobilityInfo().mobilityType();
-                        return switch (m) {
-                            case DDAREUNGI -> "따릉이";
-                            case PERSONAL_EBIKE -> "전기자전거";
-                            case PERSONAL_KICKBOARD -> "킥보드";
-                            default -> m.name();
-                        };
-                    }
-                    return switch (leg.type()) {
-                        case TRANSIT -> "대중교통";
-                        case WALK -> "도보";
-                        default -> "";
-                    };
-                })
-                .filter(s -> !s.isBlank())
+                .map(OllamaNarrativeGenerator::legLabel)
                 .distinct()
                 .collect(Collectors.joining("+"));
     }

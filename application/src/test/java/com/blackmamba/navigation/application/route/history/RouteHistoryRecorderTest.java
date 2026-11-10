@@ -7,6 +7,7 @@ import com.blackmamba.navigation.domain.route.LegType;
 import com.blackmamba.navigation.domain.route.Route;
 import com.blackmamba.navigation.domain.route.RouteType;
 import com.blackmamba.navigation.domain.route.TransitInfo;
+import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,7 +48,7 @@ class RouteHistoryRecorderTest {
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
         when(portProvider.getIfAvailable()).thenReturn(port);
-        when(port.save(any(), any(), any(), anyString())).thenReturn(Mono.empty());
+        when(port.save(any(), any(), any(), any())).thenReturn(Mono.empty());
         recorder = new RouteHistoryRecorder(portProvider, meterRegistry);
     }
 
@@ -58,10 +59,10 @@ class RouteHistoryRecorderTest {
         Route notRecommended = transitRoute(40, 1_250).withScore(0.7, false);
 
         // when
-        recorder.recordAsync(List.of(good, notRecommended), origin, destination, "RELIABILITY");
+        recorder.recordAsync(List.of(good, notRecommended), origin, destination, RecommendationPreference.RELIABILITY);
 
         // then
-        verify(port, times(1)).save(any(), any(), any(), anyString());
+        verify(port, times(1)).save(any(), any(), any(), any());
         assertThat(meterRegistry.get("navigation.rag.history.saved").counter().count()).isEqualTo(1.0);
     }
 
@@ -73,10 +74,10 @@ class RouteHistoryRecorderTest {
         Route walkOnly = Route.of(List.of(new Leg(LegType.WALK, "WALK", 12, 900, origin, destination, null, null, null)), RouteType.TRANSIT_ONLY).withScore(0.8, true);
 
         // when
-        recorder.recordAsync(List.of(tooShort, free, walkOnly), origin, destination, "RELIABILITY");
+        recorder.recordAsync(List.of(tooShort, free, walkOnly), origin, destination, RecommendationPreference.RELIABILITY);
 
         // then
-        verify(port, never()).save(any(), any(), any(), anyString());
+        verify(port, never()).save(any(), any(), any(), any());
         assertThat(meterRegistry.get("navigation.rag.history.rejected").tag("reason", "quality_gate").counter().count()).isEqualTo(3.0);
     }
 
@@ -87,23 +88,23 @@ class RouteHistoryRecorderTest {
         Location nearbyOrigin = new Location("서울역 근처", 37.5551, 126.9709);   // 3자리 반올림 시 같은 키
 
         // when
-        recorder.recordAsync(List.of(route), origin, destination, "RELIABILITY");
-        recorder.recordAsync(List.of(route), nearbyOrigin, destination, "RELIABILITY");
-        recorder.recordAsync(List.of(route), origin, destination, "TIME_PRIORITY");
+        recorder.recordAsync(List.of(route), origin, destination, RecommendationPreference.RELIABILITY);
+        recorder.recordAsync(List.of(route), nearbyOrigin, destination, RecommendationPreference.RELIABILITY);
+        recorder.recordAsync(List.of(route), origin, destination, RecommendationPreference.TIME_PRIORITY);
 
         // then — 선호도가 다르면 별도 저장
-        verify(port, times(2)).save(any(), any(), any(), anyString());
+        verify(port, times(2)).save(any(), any(), any(), any());
         assertThat(meterRegistry.get("navigation.rag.history.rejected").tag("reason", "duplicate").counter().count()).isEqualTo(1.0);
     }
 
     @Test
     void 저장이_실패하면_saved_카운터는_오르지_않는다() {
         // given
-        when(port.save(any(), any(), any(), anyString())).thenReturn(Mono.error(new IllegalStateException("qdrant down")));
+        when(port.save(any(), any(), any(), any())).thenReturn(Mono.error(new IllegalStateException("qdrant down")));
         Route route = transitRoute(45, 1_250).withScore(0.8, true);
 
         // when
-        recorder.recordAsync(List.of(route), origin, destination, "RELIABILITY");
+        recorder.recordAsync(List.of(route), origin, destination, RecommendationPreference.RELIABILITY);
 
         // then
         assertThat(meterRegistry.get("navigation.rag.history.saved").counter().count()).isZero();
@@ -116,8 +117,8 @@ class RouteHistoryRecorderTest {
         RouteHistoryRecorder disabled = new RouteHistoryRecorder(portProvider, new SimpleMeterRegistry());
 
         // when & then — 예외 없음
-        disabled.recordAsync(List.of(transitRoute(45, 1_250).withScore(0.8, true)), origin, destination, "RELIABILITY");
-        verify(port, never()).save(any(), any(), any(), anyString());
+        disabled.recordAsync(List.of(transitRoute(45, 1_250).withScore(0.8, true)), origin, destination, RecommendationPreference.RELIABILITY);
+        verify(port, never()).save(any(), any(), any(), any());
     }
 
     private Route transitRoute(int minutes, int fare) {

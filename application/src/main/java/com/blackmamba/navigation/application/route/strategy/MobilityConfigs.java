@@ -27,23 +27,9 @@ final class MobilityConfigs {
     }
 
     static RouteType routeTypeFor(MobilityType type) {
-        return isKickboard(type) ? RouteType.TRANSIT_WITH_KICKBOARD : RouteType.TRANSIT_WITH_BIKE;
-    }
-
-    static boolean isKickboard(MobilityType type) {
-        return type == MobilityType.KICKBOARD_SHARED || type == MobilityType.PERSONAL_KICKBOARD;
-    }
-
-    static boolean isPersonal(MobilityType type) {
-        return type == MobilityType.PERSONAL_EBIKE || type == MobilityType.PERSONAL_KICKBOARD;
-    }
-
-    static String labelFor(MobilityType type) {
-        return switch (type) {
-            case DDAREUNGI          -> "따릉이";
-            case KICKBOARD_SHARED   -> "공유 킥보드";
-            case PERSONAL_EBIKE     -> "개인 전기자전거";
-            case PERSONAL_KICKBOARD -> "개인 킥보드";
-        };
+        if (type.isKickboard()) {
+            return RouteType.TRANSIT_WITH_KICKBOARD;
+        }
+        return RouteType.TRANSIT_WITH_BIKE;
     }
 }

@@ -261,7 +261,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     }
 
     private Mono<Boolean> hasPickupNearOrigin(Location origin, MobilityType type) {
-        if (MobilityConfigs.isPersonal(type)) {
+        if (type.isPersonal()) {
             return Mono.just(true);
         }
         return mobilityAvailabilityPort.findNearbyMobility(origin.lat(), origin.lng(), type)

@@ -9,6 +9,7 @@ import com.blackmamba.navigation.domain.route.RouteType;
 import com.blackmamba.navigation.domain.route.history.RouteHistoryEntry;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import com.blackmamba.navigation.infra.common.GeohashKeyGenerator;
+import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
@@ -104,7 +105,7 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
     // ─── 쓰기 ─────────────────────────────────────
 
     @Override
-    public Mono<Void> save(Route route, Location origin, Location destination, String preference, Instant timestamp) {
+    public Mono<Void> save(Route route, Location origin, Location destination, RecommendationPreference preference, Instant timestamp) {
         return Mono.fromRunnable(() -> saveBlocking(route, origin, destination, preference, timestamp))
                 .subscribeOn(Schedulers.boundedElastic())
                 .then();
@@ -122,11 +123,11 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
     }
 
     @Override
-    public String describe(Route route, Location origin, Location destination, String preference) {
+    public String describe(Route route, Location origin, Location destination, RecommendationPreference preference) {
         return RouteHistoryDescriber.describeAt(route, origin, destination, preference, Instant.now());
     }
 
-    private void saveBlocking(Route route, Location origin, Location destination, String preference, Instant timestamp) {
+    private void saveBlocking(Route route, Location origin, Location destination, RecommendationPreference preference, Instant timestamp) {
         if (route == null || origin == null || destination == null) {
             log.debug("[RAG] save 생략 — route/origin/destination null");
             return;
@@ -161,7 +162,7 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
             metadata.put(META_ROUTE_TYPE, route.type() == null ? "" : route.type().name());
             metadata.put(META_TOTAL_MINUTES, route.totalMinutes());
             metadata.put(META_TOTAL_COST, route.totalCostWon());
-            metadata.put(META_PREFERENCE, preference == null ? "RELIABILITY" : preference);
+            metadata.put(META_PREFERENCE, preference.name());
             metadata.put(META_CREATED_AT, when.getEpochSecond());
 
             Document document = new Document(documentId(route, originGeohash, destGeohash), description, metadata);

@@ -14,7 +14,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  *
  * <pre>
  *   api → application → domain ← infra
- *   api -→ infra (빈 와이어링용 허용 — 모듈 그래프의 점선)
+ *   api -→ infra (모듈 의존은 빈 와이어링용. 코드 참조는 금지 — 아래 규칙)
  * </pre>
  *
  * 규칙 위반 시 CI 가 실패하므로, "아키텍처를 지킨다" 가
@@ -42,6 +42,15 @@ class HexagonalArchitectureTest {
                 .should().dependOnClassesThat()
                 .resideInAnyPackage(APPLICATION, INFRA, API)
                 .because("domain 은 순수 모델 — 바깥 레이어를 알면 의존 역전이 깨진다")
+                .check(classes);
+    }
+
+    @Test
+    void api_는_infra_를_직접_참조하지_않는다() {
+        noClasses().that().resideInAPackage(API)
+                .should().dependOnClassesThat()
+                .resideInAPackage(INFRA)
+                .because("컨트롤러는 application 의 포트만 안다 — infra 구현은 빈 와이어링(런타임)으로만 만난다")
                 .check(classes);
     }
 

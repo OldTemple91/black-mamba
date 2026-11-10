@@ -7,6 +7,7 @@ import com.blackmamba.navigation.application.route.port.ScoredRouteHistoryEntry;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Route;
 import com.blackmamba.navigation.domain.route.comparison.RouteComparison;
+import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -97,7 +98,7 @@ public class RouteNarrativeEnhancer {
     public List<Route> enhanceRecommended(List<Route> routes,
                                            Location origin,
                                            Location destination,
-                                           String preference) {
+                                           RecommendationPreference preference) {
         return enhanceRecommended(routes, origin, destination, preference, LLM_TIMEOUT);
     }
 
@@ -108,7 +109,7 @@ public class RouteNarrativeEnhancer {
     public List<Route> enhanceRecommended(List<Route> routes,
                                            Location origin,
                                            Location destination,
-                                           String preference,
+                                           RecommendationPreference preference,
                                            Duration budget) {
         if (routes == null || routes.isEmpty()) return routes;
         if (narrativeGenerator == null) return routes; // 비활성화 상태
@@ -128,7 +129,7 @@ public class RouteNarrativeEnhancer {
                 .toList();
     }
 
-    private Route enhanceOne(Route route, Location origin, Location destination, String preference, Duration llmTimeout) {
+    private Route enhanceOne(Route route, Location origin, Location destination, RecommendationPreference preference, Duration llmTimeout) {
         try {
             String originalNarrative = route.carComparison() == null ? null : route.carComparison().narrative();
             // Retrieval(포트, 어댑터가 스케줄러 격리) → Augmented + Generation(LLM, boundedElastic 격리)
@@ -169,7 +170,7 @@ public class RouteNarrativeEnhancer {
     private Mono<List<ScoredRouteHistoryEntry>> fetchSimilar(Route route,
                                                              Location origin,
                                                              Location destination,
-                                                             String preference) {
+                                                             RecommendationPreference preference) {
         if (routeHistoryPort == null) return Mono.just(List.of());
 
         // 검색어 = 이 경로를 저장할 때 쓰일 서술 문장. 예전엔 "출발지에서 목적지까지 안정적 선호 경로" 로

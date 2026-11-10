@@ -172,7 +172,7 @@ public class NaturalLanguageRouteController {
         // RAG-4: 추천 경로의 carComparison.narrative 를 LLM 설명으로 업그레이드
         if (routes != null && !routes.isEmpty()) {
             routes = narrativeEnhancer.enhanceRecommended(
-                    routes, origin, destination, intent.preference().name());
+                    routes, origin, destination, intent.preference());
         }
 
         return ResponseEntity.ok(new NaturalLanguageRoutesResponse(

@@ -1,10 +1,12 @@
 package com.blackmamba.navigation.infra.vector;
 
 import com.blackmamba.navigation.application.route.port.RouteHistoryPort;
+import com.blackmamba.navigation.application.route.port.RouteHistorySeedPort;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.*;
 import com.blackmamba.navigation.domain.route.mobility.MobilityInfo;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
+import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -46,7 +48,7 @@ import java.util.List;
  */
 @Component
 @Profile("!prod")
-public class RouteHistorySeeder {
+public class RouteHistorySeeder implements RouteHistorySeedPort {
 
     private static final Logger log = LoggerFactory.getLogger(RouteHistorySeeder.class);
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
@@ -61,6 +63,7 @@ public class RouteHistorySeeder {
      * 시드 데이터를 모두 저장한다.
      * @return 실제 저장 시도된 건수
      */
+    @Override
     public int seed() {
         if (routeHistoryPort == null) {
             log.warn("[RAG] Seed 스킵 — RouteHistoryPort 빈 부재 (Qdrant 미기동?)");
@@ -69,12 +72,12 @@ public class RouteHistorySeeder {
 
         List<OdSpec> odPool = buildOdPool();
         List<Instant> timeSlots = buildTimeSlots();   // 5개
-        String[] preferences = {"RELIABILITY", "TIME_PRIORITY"};
+        RecommendationPreference[] preferences = RecommendationPreference.values();
 
         List<Mono<Void>> saves = new ArrayList<>();
         for (OdSpec od : odPool) {
             for (Instant slot : timeSlots) {
-                for (String pref : preferences) {
+                for (RecommendationPreference pref : preferences) {
                     Route route = toRoute(od, pref);
                     saves.add(routeHistoryPort.save(route, od.origin, od.destination, pref, slot));
                 }
@@ -225,7 +228,7 @@ public class RouteHistorySeeder {
 
     // ─── OD → Route 변환 ───────────────
 
-    private Route toRoute(OdSpec od, String preference) {
+    private Route toRoute(OdSpec od, RecommendationPreference preference) {
         List<Leg> legs = new ArrayList<>();
         legs.add(new Leg(
                 LegType.TRANSIT, od.transitMode, od.transitMinutes, od.transitDistanceMeters,
