@@ -201,6 +201,8 @@ services:
   # 경로 이력을 1024차원 벡터(bge-m3)로 임베딩해 저장.
   # 사용자 자연어 쿼리를 벡터화해 코사인 유사도로 유사 경로를 검색.
   qdrant:
+    # 예전 버전(v1.13.x)으로 만든 qdrant-data 볼륨이 남아 있으면 지우고 다시 시드한다 — 여러 마이너 버전을 건너뛴 저장소 호환은 보장되지 않는다
+    #   docker compose down && docker volume rm <프로젝트>_qdrant-data && docker compose up -d
     image: qdrant/qdrant:v1.18.2
     container_name: black-mamba-qdrant
     ports:

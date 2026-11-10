@@ -84,13 +84,15 @@ record Hub(hubId, name, type, location, metadata)
 
 | API | 용도 | 상태 |
 |-----|------|------|
-| ODsay | 대중교통 경로 조회 | ✅ 정상 (rate limit, TTL 캐시) |
+| ODsay | 대중교통 경로 조회 | ✅ 정상 (rate limit, TTL 캐시, 일일 호출 예산 가드) |
 | 서울 공공데이터 따릉이 | 대여소 실시간 가용 | ✅ 정상 (snapshot 캐시, stale fallback) |
 | Tmap 보행자 경로 | 자전거/킥보드 이동거리·경로 | ✅ 정상 (quota backoff) |
 | 네이버 지오코딩/장소 검색 | 주소→좌표, 장소 자동완성 | ✅ 정상 |
 | TAGO GetPMListByProvider | 공유킥보드 위치 | ⚠️ 서울 미제공, `TAGO_ENABLED` env 토글로 호출 스킵 (T-7) |
 
-환경변수: `ODSAY_API_KEY`, `DDAREUNGI_API_KEY`, `TAGO_API_KEY`, `TMAP_APP_KEY`, `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`
+환경변수: `ODSAY_API_KEY`, `DDAREUNGI_API_KEY`, `TAGO_API_KEY`, `TMAP_APP_KEY`, `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, `ODSAY_DAILY_LIMIT`(ODsay 일일 호출 한도, 기본 1000)
+
+**ODsay 일일 예산 가드:** 실제로 나간 요청 수를 세어, 남은 예산이 30% 이하면 후보 허브를 5 → 2개로 줄이고 패턴 D 를 건너뛴다. 소진되면 호출하지 않고 기준 경로 기반 근사로 답한다. ODsay 가 한도 초과로 답하면 15분 동안 막고 다시 확인한다.
 
 ## 알고리즘 핵심 흐름
 
@@ -115,6 +117,11 @@ record Hub(hubId, name, type, location, metadata)
 ./gradlew test              # 전체 테스트
 ./gradlew :domain:test      # 도메인 모듈 테스트
 ./gradlew :application:test # 비즈니스 로직 테스트
+
+# 순위 회귀(리플레이) 테스트 — 녹화한 외부 API 응답으로 실제 탐색을 다시 돌린다 (api/src/test/.../replay)
+./gradlew :api:test --tests '*RouteRankingReplayTest'
+# 응답 녹화 + 기대값 생성 (실제 API 호출 — 한도 사용. .env 의 키 필요)
+REPLAY_RECORD=true REPLAY_UPDATE_EXPECTED=true ./gradlew :api:test --tests '*RouteRankingReplayTest' --rerun-tasks
 
 # 프론트엔드
 cd frontend && npm install && npm run dev
