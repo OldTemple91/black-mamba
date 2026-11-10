@@ -1,9 +1,9 @@
 # Black Mamba — AI 기반 MaaS 라우팅 엔진
 
 [![CI](https://github.com/OldTemple91/black-mamba/actions/workflows/ci.yml/badge.svg)](https://github.com/OldTemple91/black-mamba/actions/workflows/ci.yml)
-[![Java 21](https://img.shields.io/badge/Java-21-orange)](https://openjdk.org/projects/jdk/21/)
-[![Spring Boot 3.5](https://img.shields.io/badge/Spring%20Boot-3.5.13-brightgreen)](https://spring.io/projects/spring-boot)
-[![Spring AI 1.0](https://img.shields.io/badge/Spring%20AI-1.0.2-0081CB)](https://docs.spring.io/spring-ai/reference/)
+[![Java 25](https://img.shields.io/badge/Java-25-orange)](https://openjdk.org/projects/jdk/25/)
+[![Spring Boot 4.1](https://img.shields.io/badge/Spring%20Boot-4.1.2-brightgreen)](https://spring.io/projects/spring-boot)
+[![Spring AI 2.0](https://img.shields.io/badge/Spring%20AI-2.0.2-0081CB)](https://docs.spring.io/spring-ai/reference/)
 [![Resilience4j](https://img.shields.io/badge/Resilience4j-2.2-green)](https://resilience4j.readme.io/)
 [![Observability](https://img.shields.io/badge/Observability-Loki%20%7C%20Tempo%20%7C%20Prometheus-F46800)](docs/monitoring/observability-stack.md)
 
@@ -166,7 +166,7 @@ flowchart TB
 ```mermaid
 flowchart LR
     api[api<br/>Spring MVC] --> application
-    application --> domain[domain<br/>Pure Java 21]
+    application --> domain[domain<br/>Pure Java 25]
     infra --> application
     infra -.implements.-> application
     api -.-> infra
@@ -215,7 +215,7 @@ flowchart LR
 | **Hallucination 검증** | LLM 출력 숫자(분/원) 정규식 추출 → 실측과 5분/1,000원 초과 차이면 자동 폴백 |
 | **다층 폴백** | LLM 타임아웃·빈약 응답까지 모두 결정론 원본으로 자동 복귀 → 본 응답 무중단 |
 
-- **Spring AI 1.0.2** + **Ollama** (`llama3.2:3b` + `bge-m3`) + **Qdrant v1.13.6**
+- **Spring AI 2.0.2** + **Ollama** (`llama3.2:3b` + `bge-m3`) + **Qdrant v1.13.6**
 - 외부 OpenAI 의존 없이 자체호스팅 → **비용 0 + 데이터 외부 유출 차단**
 - 운영 메트릭: `navigation.rag.narrative.{generated, fallback{reason}, similar_hit}` (Prometheus)
 
@@ -330,13 +330,13 @@ Docker Compose 로 전체 스택 기동 후 실측 트래픽 발생 상태에서
 ## 5. 기술 스택
 
 ### Backend Core
-- **Java 21** (LTS, records / sealed interface / pattern matching 활용)
-- **Spring Boot 3.5.13** + Gradle 8.14 멀티모듈
+- **Java 25** (LTS, records / sealed interface / pattern matching 활용)
+- **Spring Boot 4.1.2** + Gradle 9.9 멀티모듈
 - **Reactor** (Mono/Flux) — WebClient + 비동기 체인
 - **Micrometer Observation + `@Observed`** — 트레이싱/메트릭 통합
 
 ### AI / RAG
-- **Spring AI 1.0.2** (`ChatClient` / `VectorStore` 추상화)
+- **Spring AI 2.0.2** (`ChatClient` / `VectorStore` 추상화)
 - **Ollama** — `llama3.2:3b` (Chat) + `bge-m3` (Embedding, 1024차원)
 - **Qdrant v1.13.6** — 벡터 DB (gRPC, HNSW 인덱스, Cosine 유사도, 3축 하이브리드 필터)
 

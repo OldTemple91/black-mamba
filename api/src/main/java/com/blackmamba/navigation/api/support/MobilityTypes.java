@@ -49,7 +49,7 @@ public final class MobilityTypes {
         for (String token : tokens(raw)) {
             try {
                 types.add(MobilityType.valueOf(token));
-            } catch (IllegalArgumentException ignored) {
+            } catch (IllegalArgumentException _) {
                 log.warn("[MobilityTypes] 알 수 없는 mobility \"{}\" 무시", token);
             }
         }

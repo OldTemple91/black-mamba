@@ -92,7 +92,7 @@ public class LastMileHubPrioritizer {
         if (raw == null) return false;
         try {
             return Integer.parseInt(raw) <= MAX_HINT_PRIORITY_DISTANCE_METERS;
-        } catch (NumberFormatException ignored) {
+        } catch (NumberFormatException _) {
             return false;
         }
     }
@@ -102,7 +102,7 @@ public class LastMileHubPrioritizer {
         if (raw == null) return Integer.MAX_VALUE;
         try {
             return Integer.parseInt(raw);
-        } catch (NumberFormatException ignored) {
+        } catch (NumberFormatException _) {
             return Integer.MAX_VALUE;
         }
     }
@@ -112,7 +112,7 @@ public class LastMileHubPrioritizer {
         if (raw == null) return Integer.MAX_VALUE;
         try {
             return Integer.parseInt(raw);
-        } catch (NumberFormatException ignored) {
+        } catch (NumberFormatException _) {
             return Integer.MAX_VALUE;
         }
     }

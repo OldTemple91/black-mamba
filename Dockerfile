@@ -1,5 +1,5 @@
 # === Backend Build ===
-FROM eclipse-temurin:21-jdk AS backend-build
+FROM eclipse-temurin:25-jdk AS backend-build
 WORKDIR /app
 COPY gradlew settings.gradle build.gradle ./
 COPY gradle/ gradle/
@@ -18,7 +18,7 @@ COPY frontend/ ./
 RUN VITE_API_BASE_URL=/api npm run build
 
 # === Production ===
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:25-jre
 WORKDIR /app
 
 # curl 설치 (healthcheck용)

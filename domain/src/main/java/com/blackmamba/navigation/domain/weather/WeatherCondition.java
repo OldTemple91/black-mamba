@@ -30,7 +30,7 @@ public enum WeatherCondition {
         if (raw == null || raw.isBlank()) return UNKNOWN;
         try {
             return WeatherCondition.valueOf(raw.trim().toUpperCase());
-        } catch (IllegalArgumentException ignored) {
+        } catch (IllegalArgumentException _) {
             return UNKNOWN;
         }
     }

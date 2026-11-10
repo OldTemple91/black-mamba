@@ -128,7 +128,7 @@ final class RouteReliabilityMetrics {
     private static int parseDistanceOrZero(String raw) {
         try {
             return Integer.parseInt(raw);
-        } catch (NumberFormatException ignored) {
+        } catch (NumberFormatException _) {
             return 0;
         }
     }

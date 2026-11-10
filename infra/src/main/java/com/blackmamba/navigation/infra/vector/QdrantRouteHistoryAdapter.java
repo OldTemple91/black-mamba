@@ -275,7 +275,7 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
         try {
             Double s = doc.getScore();
             if (s != null) return s;
-        } catch (RuntimeException ignore) {
+        } catch (RuntimeException _) {
             // 점수 미제공 구현체: metadata 폴백
         }
         Object dist = doc.getMetadata().get("distance");
@@ -327,7 +327,7 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
         for (String token : csv.split(",")) {
             String t = token.trim();
             if (t.isEmpty()) continue;
-            try { list.add(MobilityType.valueOf(t)); } catch (Exception ignore) {}
+            try { list.add(MobilityType.valueOf(t)); } catch (Exception _) {}
         }
         return list;
     }

@@ -132,10 +132,10 @@ public class RouteStreamController {
     /** Payload → ServerSentEvent 래핑. event name 은 payload 타입에서 추론 */
     private static ServerSentEvent<StreamEventPayload> toSse(StreamEventPayload payload) {
         String eventName = switch (payload) {
-            case StreamEventPayload.Initial ignored -> "INITIAL";
-            case StreamEventPayload.Heartbeat ignored -> "HEARTBEAT";
-            case StreamEventPayload.Update ignored -> "UPDATE";
-            case StreamEventPayload.Complete ignored -> "COMPLETE";
+            case StreamEventPayload.Initial _ -> "INITIAL";
+            case StreamEventPayload.Heartbeat _ -> "HEARTBEAT";
+            case StreamEventPayload.Update _ -> "UPDATE";
+            case StreamEventPayload.Complete _ -> "COMPLETE";
         };
         return ServerSentEvent.<StreamEventPayload>builder(payload)
                 .event(eventName)

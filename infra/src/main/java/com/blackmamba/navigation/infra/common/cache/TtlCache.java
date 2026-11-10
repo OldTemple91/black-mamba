@@ -53,7 +53,7 @@ public final class TtlCache<K, V> {
      */
     public Mono<V> get(K key, Supplier<Mono<V>> loader, Predicate<V> cacheable) {
         long now = System.currentTimeMillis();
-        return entries.compute(key, (ignored, existing) -> {
+        return entries.compute(key, (_, existing) -> {
             if (existing != null && !existing.isExpired(now)) {
                 hitCounter.increment();
                 return existing;

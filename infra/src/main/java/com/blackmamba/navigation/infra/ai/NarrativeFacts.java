@@ -63,7 +63,7 @@ record NarrativeFacts(Set<Integer> allowedMinutes, Set<Integer> allowedWon, int 
         while (wm.find()) {
             try {
                 won.add(Integer.parseInt(wm.group(1).replace(",", "")));
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException _) {
                 // "," 만 있는 토큰 등
             }
         }
