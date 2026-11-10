@@ -11,6 +11,8 @@ import com.blackmamba.navigation.domain.route.*;
 import com.blackmamba.navigation.domain.route.comparison.CarReferenceCalculator;
 import com.blackmamba.navigation.domain.route.comparison.CarbonFootprintCalculator;
 import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
+import com.blackmamba.navigation.domain.route.evaluation.RouteInsightFactory;
+import com.blackmamba.navigation.domain.route.evaluation.RouteScoreCalculator;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,6 +45,7 @@ class RouteOptimizationServiceTest {
     // 후처리 파이프라인은 순수 계산 컴포넌트들의 조합 → 실제 인스턴스
     private final CarbonFootprintCalculator carbonFootprintCalculator = new CarbonFootprintCalculator();
     private final RouteEnrichmentPipeline enrichmentPipeline = new RouteEnrichmentPipeline(
+            new RouteEvaluator(new RouteScoreCalculator(), new RouteInsightFactory()),
             new AccessibilityPostProcessor(new AccessibilityStationRegistry()),
             new WeatherAwareRouteAdjuster(),
             carbonFootprintCalculator,

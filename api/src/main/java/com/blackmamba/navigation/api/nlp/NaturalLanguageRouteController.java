@@ -12,6 +12,7 @@ import com.blackmamba.navigation.application.route.port.PlaceResolverPort;
 import com.blackmamba.navigation.application.route.port.RouteIntentParser;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Route;
+import com.blackmamba.navigation.domain.route.TransitSearchDistancePolicy;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -136,6 +137,15 @@ public class NaturalLanguageRouteController {
         if (origin == null || destination == null) {
             return ResponseEntity.badRequest()
                     .body(ErrorResponse.of("GEOCODING_FAILED", "출발지 또는 도착지를 찾지 못했습니다.",
+                            Map.of("parsed", intent)));
+        }
+
+        // /api/routes·/stream 과 같은 거리 하한 — 입력 경로가 달라도 규칙은 하나다
+        if (TransitSearchDistancePolicy.isTooCloseForTransit(origin, destination)) {
+            return ResponseEntity.badRequest()
+                    .body(ErrorResponse.of("SHORT_DISTANCE",
+                            "출발지와 목적지가 " + (int) TransitSearchDistancePolicy.MIN_TRANSIT_DISTANCE_METERS
+                                    + "m 이내라 현재 대중교통/복합 경로 탐색을 지원하지 않습니다. 도보 이동을 이용하거나 더 먼 목적지를 검색해 주세요.",
                             Map.of("parsed", intent)));
         }
 

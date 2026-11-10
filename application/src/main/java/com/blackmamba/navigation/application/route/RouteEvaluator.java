@@ -36,6 +36,14 @@ public class RouteEvaluator {
         return routeInsightFactory.enrich(scored, baselineRoute, preference);
     }
 
+    /**
+     * 점수는 그대로 두고 추천 여부만 바꾼다.
+     * 추천 근거·배지 문구는 추천 여부를 읽어 만들어지므로 플래그만 뒤집으면 문구가 어긋난다 — 함께 다시 만든다.
+     */
+    public Route reRecommend(Route route, Route baselineRoute, boolean recommended, RecommendationPreference preference) {
+        return routeInsightFactory.enrich(route.withScore(route.score(), recommended), baselineRoute, preference);
+    }
+
     public Route evaluate(Route route, boolean recommended) {
         return evaluate(route, recommended, RecommendationPreference.RELIABILITY);
     }

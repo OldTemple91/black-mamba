@@ -8,6 +8,8 @@ import com.blackmamba.navigation.domain.location.GeoDistance;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Leg;
 import com.blackmamba.navigation.domain.route.Route;
+import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
+import com.blackmamba.navigation.domain.route.RouteType;
 import com.blackmamba.navigation.domain.route.comparison.CarReferenceCalculator;
 import com.blackmamba.navigation.domain.route.comparison.CarbonFootprintCalculator;
 import com.blackmamba.navigation.domain.route.comparison.CarbonSummary;
@@ -40,12 +42,15 @@ public class RouteEnrichmentPipeline {
     private final CarbonFootprintCalculator carbonFootprintCalculator;
     private final CarReferenceCalculator carReferenceCalculator;
     private final CarbonMetrics carbonMetrics;
+    private final RouteEvaluator routeEvaluator;
 
-    public RouteEnrichmentPipeline(AccessibilityPostProcessor accessibilityPostProcessor,
+    public RouteEnrichmentPipeline(RouteEvaluator routeEvaluator,
+                                   AccessibilityPostProcessor accessibilityPostProcessor,
                                    WeatherAwareRouteAdjuster weatherAwareRouteAdjuster,
                                    CarbonFootprintCalculator carbonFootprintCalculator,
                                    CarReferenceCalculator carReferenceCalculator,
                                    CarbonMetrics carbonMetrics) {
+        this.routeEvaluator = routeEvaluator;
         this.accessibilityPostProcessor = accessibilityPostProcessor;
         this.weatherAwareRouteAdjuster = weatherAwareRouteAdjuster;
         this.carbonFootprintCalculator = carbonFootprintCalculator;
@@ -56,11 +61,15 @@ public class RouteEnrichmentPipeline {
     public List<Route> enrich(List<Route> routes,
                               Location origin,
                               Location destination,
+                              RecommendationPreference preference,
                               AccessibilityContext accessibilityContext,
                               WeatherContext weatherContext) {
         List<Route> accessible = accessibilityPostProcessor.apply(routes, accessibilityContext);
+        if (accessibilityContext.walkingSpeedKmh() != null) {
+            accessible = reEvaluate(accessible, preference);
+        }
         List<Route> weatherAdjusted = weatherAwareRouteAdjuster.apply(accessible, weatherContext);
-        return reconcileRecommendation(weatherAdjusted).stream()
+        return reconcileRecommendation(weatherAdjusted, preference).stream()
                 .map(route -> route.withCarbon(computeCarbon(route, origin, destination)))
                 .map(route -> route.withCarComparison(carReferenceCalculator.compareWithRoute(route, origin, destination)))
                 .toList();
@@ -71,17 +80,53 @@ public class RouteEnrichmentPipeline {
      * 전략이 매긴 플래그는 날씨 감점·접근성 필터 이전 기준이라 그대로 두면
      * 2위가 추천 배지를 달거나 추천 경로가 아예 없는 응답이 나간다.
      */
-    private static List<Route> reconcileRecommendation(List<Route> routes) {
+    private List<Route> reconcileRecommendation(List<Route> routes, RecommendationPreference preference) {
         if (routes.isEmpty()) return routes;
         List<Route> sorted = new ArrayList<>(routes);
         sorted.sort(Comparator.comparingDouble(Route::score).reversed());
+        Route baseline = baselineOf(sorted);
         List<Route> reconciled = new ArrayList<>(sorted.size());
         for (int i = 0; i < sorted.size(); i++) {
             Route route = sorted.get(i);
             boolean recommended = i == 0;
-            reconciled.add(route.recommended() == recommended ? route : route.withScore(route.score(), recommended));
+            if (route.recommended() == recommended) {
+                reconciled.add(route);
+                continue;
+            }
+            // 추천 여부가 바뀐 경로는 근거·배지 문구도 다시 만든다 — 플래그만 뒤집으면 2위가 "추천" 문구를 달고 나간다
+            reconciled.add(routeEvaluator.reRecommend(route, baselineOr(baseline, route), recommended, preference));
         }
         return reconciled;
+    }
+
+    /**
+     * 보행 속도 반영으로 소요시간이 바뀌면 점수·비교·근거를 바뀐 시간으로 다시 평가한다.
+     * 시간만 고치고 예전 점수로 정렬하면 느린 보행자에게도 순위가 그대로이고,
+     * "대중교통 대비 N분 단축" 은 조정 전 기준 경로와 비교한 값이 된다.
+     */
+    private List<Route> reEvaluate(List<Route> routes, RecommendationPreference preference) {
+        Route baseline = baselineOf(routes);
+        return routes.stream()
+                .map(route -> {
+                    Route base = baselineOr(baseline, route);
+                    return routeEvaluator.evaluate(route, base, base.totalMinutes(), route.recommended(), preference);
+                })
+                .toList();
+    }
+
+    /** 비교 기준인 대중교통 단독 경로. 접근성 필터로 빠졌거나 이동수단 단독 탐색이면 없다(null). */
+    private static Route baselineOf(List<Route> routes) {
+        return routes.stream()
+                .filter(route -> route.type() == RouteType.TRANSIT_ONLY)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static Route baselineOr(Route baseline, Route route) {
+        if (baseline == null) {
+            return route;
+        }
+        return baseline;
     }
 
     /**

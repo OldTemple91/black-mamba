@@ -75,7 +75,7 @@ public class RouteOptimizationService {
                 ? RecommendationPreference.RELIABILITY : recommendationPreference;
 
         return strategy.search(origin, destination, mobilityTypes, preference)
-                .map(routes -> enrichmentPipeline.enrich(routes, origin, destination, accessibilityContext, weatherContext))
+                .map(routes -> enrichmentPipeline.enrich(routes, origin, destination, preference, accessibilityContext, weatherContext))
                 // RAG Phase 2: 추천 경로를 벡터 DB 에 비동기 저장 (fire-and-forget, 본 요청에 영향 없음)
                 .doOnNext(routes -> routeHistoryRecorder.recordAsync(routes, origin, destination, preference.name()));
     }

@@ -14,6 +14,9 @@ import com.blackmamba.navigation.domain.route.TransitInfo;
 import com.blackmamba.navigation.domain.route.comparison.CarReferenceCalculator;
 import com.blackmamba.navigation.domain.route.comparison.CarbonFootprintCalculator;
 import com.blackmamba.navigation.domain.weather.WeatherCondition;
+import com.blackmamba.navigation.domain.route.evaluation.RouteInsightFactory;
+import com.blackmamba.navigation.domain.route.evaluation.RouteScoreCalculator;
+import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 
@@ -30,6 +33,7 @@ class RouteEnrichmentPipelineTest {
     private final Location destination = new Location("강남역", 37.4979, 127.0276);
     private final CarbonFootprintCalculator carbon = new CarbonFootprintCalculator();
     private final RouteEnrichmentPipeline pipeline = new RouteEnrichmentPipeline(
+            new RouteEvaluator(new RouteScoreCalculator(), new RouteInsightFactory()),
             new AccessibilityPostProcessor(new AccessibilityStationRegistry()),
             new WeatherAwareRouteAdjuster(),
             carbon,
@@ -43,7 +47,7 @@ class RouteEnrichmentPipelineTest {
         Route transit = transitRoute().withScore(0.72, false);
 
         // when
-        List<Route> result = pipeline.enrich(List.of(bike, transit), origin, destination,
+        List<Route> result = pipeline.enrich(List.of(bike, transit), origin, destination, RecommendationPreference.RELIABILITY,
                 AccessibilityContext.DEFAULT, WeatherContext.of(WeatherCondition.RAIN));
 
         // then
@@ -58,7 +62,7 @@ class RouteEnrichmentPipelineTest {
         Route transit = transitRoute().withScore(0.7, false);
 
         // when
-        List<Route> result = pipeline.enrich(List.of(bike, transit), origin, destination,
+        List<Route> result = pipeline.enrich(List.of(bike, transit), origin, destination, RecommendationPreference.RELIABILITY,
                 AccessibilityContext.of(true, null), WeatherContext.DEFAULT);
 
         // then
@@ -74,13 +78,51 @@ class RouteEnrichmentPipelineTest {
         Route transit = transitRoute().withScore(0.72, false);
 
         // when
-        List<Route> result = pipeline.enrich(List.of(bike, transit), origin, destination,
+        List<Route> result = pipeline.enrich(List.of(bike, transit), origin, destination, RecommendationPreference.RELIABILITY,
                 AccessibilityContext.DEFAULT, WeatherContext.DEFAULT);
 
         // then
         assertThat(result).extracting(Route::recommended).containsExactly(true, false);
         assertThat(result.getFirst().carbon()).isNotNull();
         assertThat(result.getFirst().carComparison()).isNotNull();
+    }
+
+    @Test
+    void 보행_속도를_반영하면_바뀐_소요시간으로_점수와_비교_근거를_다시_평가한다() {
+        // given — 도보 20분이 낀 자전거 경로(추천) vs 도보 없는 지하철. 3km/h 면 도보가 30분으로 늘어 자전거 경로가 더 느려진다
+        Leg longWalk = new Leg(LegType.WALK, "WALK", 20, 1_500, origin, origin, null, null, null);
+        Leg bike = new Leg(LegType.BIKE, "DDAREUNGI", 5, 1_200, origin, destination, null, null, null);
+        Route walkHeavy = Route.of(List.of(longWalk, bike), RouteType.TRANSIT_WITH_BIKE).withScore(0.9, true);
+        Route transit = transitRoute().withScore(0.7, false);
+
+        // when
+        List<Route> result = pipeline.enrich(List.of(walkHeavy, transit), origin, destination, RecommendationPreference.RELIABILITY,
+                AccessibilityContext.of(false, 3.0), WeatherContext.DEFAULT);
+
+        // then — 25분 → 35분, 기준 30분 대비 단축 없음. 점수는 예전 값(0.9)이 아니라 다시 계산된 값이다
+        Route adjusted = result.stream()
+                .filter(route -> route.type() == RouteType.TRANSIT_WITH_BIKE)
+                .findFirst()
+                .orElseThrow();
+        assertThat(adjusted.totalMinutes()).isEqualTo(35);
+        assertThat(adjusted.comparison().originalMinutes()).isEqualTo(30);
+        assertThat(adjusted.comparison().savedMinutes()).isZero();
+        assertThat(adjusted.score()).isEqualTo(adjusted.evaluation().totalScore());
+        assertThat(adjusted.score()).isNotEqualTo(0.9);
+    }
+
+    @Test
+    void 추천이_옮겨가면_추천_근거_문구도_새_1위_기준으로_다시_만든다() {
+        // given — RAIN 으로 자전거(추천)가 2위로 밀린다
+        Route bike = bikeRoute().withScore(0.78, true);
+        Route transit = transitRoute().withScore(0.72, false);
+
+        // when
+        List<Route> result = pipeline.enrich(List.of(bike, transit), origin, destination, RecommendationPreference.RELIABILITY,
+                AccessibilityContext.DEFAULT, WeatherContext.of(WeatherCondition.RAIN));
+
+        // then — 플래그가 바뀐 두 경로 모두 근거가 다시 생성되어 있다
+        assertThat(result).allSatisfy(route -> assertThat(route.insights()).isNotNull());
     }
 
     private Route bikeRoute() {
