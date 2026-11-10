@@ -23,11 +23,17 @@ import java.util.Optional;
  * 실패는 빈 결과로 정규화하되 <b>조용히</b> 하지 않는다 — 로그와 카운터를 남긴다.
  * 예전엔 {@code onErrorReturn} 만 있어 시크릿 회전·5xx 가 전부 "장소를 못 찾았습니다"(400) 로 사용자 탓이 됐다.
  */
+/**
+ * 네이버 클라우드 Maps 의 Geocoding 클라이언트.
+ * <p>
+ * 호스트는 신규 Maps 서비스({@code maps.apigw.ntruss.com})다. 예전 AI·NAVER API 호스트
+ * ({@code naveropenapi.apigw.ntruss.com})는 2026-11-24 서비스 종료 예정이고, 그 전에 이미
+ * {@code 401 "A subscription to the API is required"} 로 거절되고 있었다. 경로·헤더·응답 형식은 같다.
+ */
 @Component
 public class NaverGeocodingClient {
 
     private static final Logger log = LoggerFactory.getLogger(NaverGeocodingClient.class);
-    private static final String BASE_URL = "https://naveropenapi.apigw.ntruss.com";
     private static final String API_NAME = "Naver Geocoding";
 
     private final WebClient webClient;
@@ -39,6 +45,7 @@ public class NaverGeocodingClient {
             WebClient.Builder builder,
             @Value("${naver.client-id}") String clientId,
             @Value("${naver.client-secret}") String clientSecret,
+            @Value("${naver.geocoding.base-url:https://maps.apigw.ntruss.com}") String baseUrl,
             @Value("${naver.request-timeout-ms:3000}") long requestTimeoutMs,
             MeterRegistry meterRegistry,
             ExternalApiResilience resilience
@@ -46,7 +53,7 @@ public class NaverGeocodingClient {
         this.webClient = WebClients.withTimeout(
                 builder.defaultHeader("X-NCP-APIGW-API-KEY-ID", clientId)
                         .defaultHeader("X-NCP-APIGW-API-KEY", clientSecret),
-                BASE_URL, requestTimeoutMs);
+                baseUrl, requestTimeoutMs);
         this.guard = resilience.forApi("naver-geocoding");
         this.geocodeErrorCounter = meterRegistry.counter("navigation.naver.fallback.total", "api", "geocode", "reason", "error");
         this.suggestErrorCounter = meterRegistry.counter("navigation.naver.fallback.total", "api", "suggest", "reason", "error");

@@ -51,6 +51,9 @@ tmap:
 naver:
   client-id: ${NAVER_CLIENT_ID}
   client-secret: ${NAVER_CLIENT_SECRET}
+  geocoding:
+    # 네이버 클라우드 "Maps" (Application Services) — 예전 AI·NAVER API 호스트(naveropenapi.apigw.ntruss.com)는 2026-11-24 종료
+    base-url: https://maps.apigw.ntruss.com
   request-timeout-ms: 3000
   search:
     client-id: ${NAVER_SEARCH_CLIENT_ID:}
