@@ -75,8 +75,16 @@ public final class TtlCache<K, V> {
             CompletableFuture<V> future = cache.get(key, (_, _) -> loader.get()
                     .contextWrite(context)
                     .toFuture());
-            // 구독자 한 명의 취소가 공유 중인 로드를 취소하지 않게 한다(suppressCancel).
-            // 캐시 불가 값은 구독자에게 전달하기 "전에" 엔트리를 지운다 — 값을 받은 호출자의 다음 호출이 그 값을 다시 받지 않게
+            // 캐시 불가 값은 두 곳에서 지운다(remove(key, future) 는 동일성 비교라 멱등이고 새 엔트리는 건드리지 않는다).
+            //  - future 완료 시: 구독자가 타임아웃·연결 종료로 취소돼도 로드는 끝까지 돈다. 지울 주체가 구독자뿐이면
+            //    "느려서 취소된 호출이 남긴 실패 폴백" 이 TTL 동안 캐시에 남는다
+            //  - 구독자 전달 직전: 값을 받은 호출자의 바로 다음 호출이 그 값을 다시 받지 않게
+            future.thenAccept(value -> {
+                if (value != null && !cacheable.test(value)) {
+                    cache.asMap().remove(key, future);
+                }
+            });
+            // 구독자 한 명의 취소가 공유 중인 로드를 취소하지 않게 한다(suppressCancel)
             return Mono.fromFuture(future, true)
                     .doOnNext(value -> {
                         if (!cacheable.test(value)) {

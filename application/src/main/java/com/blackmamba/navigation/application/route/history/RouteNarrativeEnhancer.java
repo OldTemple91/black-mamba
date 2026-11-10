@@ -54,7 +54,7 @@ public class RouteNarrativeEnhancer {
     /** 이보다 적게 남았으면 LLM 을 시도하지 않는다 — 로컬 모델은 그 안에 답하지 못한다 */
     private static final Duration MIN_LLM_BUDGET = Duration.ofSeconds(2);
     /**
-     * LLM 이 타임아웃·오류를 낸 뒤 다시 시도하기까지 쉬는 시간.
+     * LLM 이 온전한 시간을 받고도 타임아웃된 뒤 다시 시도하기까지 쉬는 시간.
      * 없으면 Ollama 가 멈춰 있는 동안 모든 경로 탐색이 타임아웃(15초)만큼 느려진다 — 설명 문장은 부가 기능이지 탐색을 붙잡을 이유가 아니다.
      */
     private static final Duration LLM_COOLDOWN = Duration.ofSeconds(60);
@@ -103,10 +103,6 @@ public class RouteNarrativeEnhancer {
      * 경로 리스트에서 추천 경로 1개에만 LLM narrative 적용.
      * @return 입력 순서 유지, 추천 경로만 narrative 가 교체된 새 리스트
      */
-    @Observed(
-            name = "navigation.rag.enhance_narrative",
-            contextualName = "RAG 경로 설명 LLM 생성"
-    )
     public List<Route> enhanceRecommended(List<Route> routes,
                                            Location origin,
                                            Location destination,
@@ -118,6 +114,10 @@ public class RouteNarrativeEnhancer {
      * @param budget 호출자가 줄 수 있는 남은 시간. 경로 탐색에 시간을 다 썼으면 LLM 을 기다리지 않고 원본을 돌려준다 —
      *               탐색 타임아웃 뒤에 LLM 타임아웃이 따로 붙어 응답이 두 상한의 합까지 늘어지지 않게.
      */
+    @Observed(
+            name = "navigation.rag.enhance_narrative",
+            contextualName = "RAG 경로 설명 LLM 생성"
+    )
     public List<Route> enhanceRecommended(List<Route> routes,
                                            Location origin,
                                            Location destination,
@@ -160,7 +160,11 @@ public class RouteNarrativeEnhancer {
                             .subscribeOn(Schedulers.boundedElastic()))
                     .timeout(llmTimeout)
                     .onErrorResume(e -> {
-                        startCooldown();
+                        // 온전한 시간(LLM_TIMEOUT)을 주고도 실패했을 때만 쉰다. 탐색이 오래 걸려 예산이 짧았던 요청의
+                        // 타임아웃은 LLM 탓이 아니다 — 그걸로 쉬면 느린 탐색 한 건이 모든 사용자의 설명 생성을 끈다
+                        if (llmTimeout.compareTo(LLM_TIMEOUT) >= 0) {
+                            startCooldown();
+                        }
                         if (e instanceof TimeoutException) {
                             timeoutCounter.increment();
                             log.warn("[RAG4] LLM 타임아웃({}ms) → 원본 narrative 유지. routeId={}", llmTimeout.toMillis(), route.routeId());

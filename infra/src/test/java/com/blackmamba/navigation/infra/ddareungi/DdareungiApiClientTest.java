@@ -179,6 +179,25 @@ class DdareungiApiClientTest {
     }
 
     @Test
+    void 백그라운드_갱신이_실패해_backoff_중이면_그_snapshot_을_LIVE_가_아니라_STALE_로_알린다() throws InterruptedException {
+        // given — TTL 1초, backoff 60초. 두 번째 응답(백그라운드 갱신)은 오류
+        stubSuccessThen("swr-failed", json(errorEnvelopeJson("ERROR-500", "서버 오류입니다.")));
+        DdareungiApiClient client = client(1_000L, DEFAULT_MAX_STALE_AGE_MS, 60_000L);
+        client.getNearbyStations(LAT, LNG, RADIUS, true).block();
+        Thread.sleep(1_200);
+        StationSnapshot servedWhileRefreshing = client.getNearbyStations(LAT, LNG, RADIUS, true).block();
+        Thread.sleep(300);
+
+        // when — 갱신이 실패해 backoff 에 들어간 뒤, 아직 TTL×2 안
+        StationSnapshot afterFailedRefresh = client.getNearbyStations(LAT, LNG, RADIUS, true).block();
+
+        // then
+        assertThat(servedWhileRefreshing.source()).isEqualTo(AvailabilitySource.LIVE);
+        assertThat(afterFailedRefresh.source()).isEqualTo(AvailabilitySource.STALE);
+        assertThat(afterFailedRefresh.stations()).hasSize(1);
+    }
+
+    @Test
     void 페이지가_가득_차_있으면_다음_페이지를_이어_받는다() {
         // given — 1페이지 1,000행(가득), 2페이지 1행 → 3페이지는 요청하지 않는다
         wireMock.stubFor(get(urlPathEqualTo(PAGE_1)).willReturn(json(successJson(PAGE_SIZE, "P1"))));
@@ -227,12 +246,16 @@ class DdareungiApiClientTest {
 
     /** 운영 application.yml 의 recordExceptions 와 같은 구성 — 예외 타입이 틀리면 실패로 집계되지 않는다. */
     private DdareungiApiClient client(long snapshotTtlMs, long maxStaleAgeMs) {
+        return client(snapshotTtlMs, maxStaleAgeMs, 0L);
+    }
+
+    private DdareungiApiClient client(long snapshotTtlMs, long maxStaleAgeMs, long refreshBackoffMs) {
         CircuitBreakerRegistry circuitBreakerRegistry = CircuitBreakerRegistry.of(CircuitBreakerConfig.custom()
                 .recordExceptions(IOException.class, TimeoutException.class, ExternalApiException.class)
                 .build());
         circuitBreaker = circuitBreakerRegistry.circuitBreaker("ddareungi");
         RetryRegistry retryRegistry = RetryRegistry.of(RetryConfig.custom().maxAttempts(1).build());
-        return new DdareungiApiClient(WebClient.builder(), API_KEY, wireMock.baseUrl(), snapshotTtlMs, 5_000L, 0L, maxStaleAgeMs,
+        return new DdareungiApiClient(WebClient.builder(), API_KEY, wireMock.baseUrl(), snapshotTtlMs, 5_000L, refreshBackoffMs, maxStaleAgeMs,
                 meterRegistry, new ExternalApiResilience(circuitBreakerRegistry, retryRegistry));
     }
 

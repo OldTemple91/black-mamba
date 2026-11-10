@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.util.function.Tuple2;
 
 import java.time.Duration;
@@ -52,6 +53,8 @@ public class NaturalLanguageRouteController {
     private static final Logger log = LoggerFactory.getLogger(NaturalLanguageRouteController.class);
     private static final Duration ROUTE_SEARCH_TIMEOUT = Duration.ofSeconds(45);
     /** 출발/도착 병렬 해석 상한 — 어댑터 자체 타임아웃(5s) 보다 넉넉히 */
+    /** LLM 의도 파싱 상한 — 모델 첫 로드(약 11초)는 넘기고, 응답 없는 모델에는 오래 붙잡히지 않게 */
+    private static final Duration INTENT_PARSE_TIMEOUT = Duration.ofSeconds(20);
     private static final Duration PLACE_RESOLVE_TIMEOUT = Duration.ofSeconds(10);
     /** LLM 프롬프트에 들어가는 입력 — 과도한 길이로 인한 자원 고갈/인젝션 방어 */
     private static final int MAX_QUERY_LENGTH = 200;
@@ -103,7 +106,11 @@ public class NaturalLanguageRouteController {
         // Step 1: LLM 의도 파싱
         RouteIntent intent;
         try {
-            intent = intentParser.parse(query);
+            // 파서는 블로킹 LLM 호출이다. HTTP 읽기 타임아웃(30초, 모델 첫 로드 대비)과 별개로 응답 상한을 둔다
+            intent = Mono.fromCallable(() -> intentParser.parse(query))
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .timeout(INTENT_PARSE_TIMEOUT)
+                    .block();
         } catch (IllegalArgumentException | IllegalStateException e) {
             log.warn("[NLP] 파싱 실패: {}", e.getMessage());
             return ResponseEntity.badRequest()

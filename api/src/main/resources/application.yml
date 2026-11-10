@@ -79,6 +79,7 @@ springdoc:
 # 주의: Spring AI 2.0 의 max-attempts 는 "재시도 횟수" 다(RetryPolicy.maxRetries). 1 이면 호출 2회 + backoff 2초.
 # 읽기 타임아웃은 "모델을 처음 메모리에 올리는 시간" 보다 길어야 한다. 실측: llama3.2:3b 첫 호출 11.3초, 이후 0.2초.
 # 10초로 두면 모델이 내려간 뒤(기본 5분 유휴) 첫 요청이 매번 타임아웃이 된다.
+# 응답 없는 모델에 30초씩 붙잡히지 않도록 호출부가 따로 상한을 둔다: 의도 파싱 20초(컨트롤러), 설명 생성 15초(Enhancer).
 spring.http.clients:
   connect-timeout: 2s
   read-timeout: 30s

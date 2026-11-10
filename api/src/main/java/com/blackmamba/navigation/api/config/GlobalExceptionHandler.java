@@ -3,6 +3,7 @@ package com.blackmamba.navigation.api.config;
 import com.blackmamba.navigation.application.route.InvalidRouteSearchException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -55,6 +56,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(ErrorResponse.of(e.code(), e.getMessage()));
+    }
+
+    /** 파라미터 타입 불일치(originLat=abc, searchMode=BOGUS) — Spring 의 ErrorResponse 가 아니라서 따로 받지 않으면 500 이 된다 */
+    @ExceptionHandler(TypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(TypeMismatchException e) {
+        log.warn("[400] 파라미터 타입 불일치: {}", e.getMessage());
+        return ResponseEntity.badRequest()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(ErrorResponse.of("INVALID_PARAMETER", "요청 파라미터 형식이 올바르지 않습니다."));
     }
 
     /** 입력 검증 실패(컨트롤러·SSE 가 던지는 IllegalArgumentException) 는 400 — 사용자 입력이지 서버 장애가 아니다 */

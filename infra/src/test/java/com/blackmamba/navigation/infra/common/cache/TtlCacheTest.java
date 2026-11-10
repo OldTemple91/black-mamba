@@ -4,6 +4,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -91,6 +92,32 @@ class TtlCacheTest {
         // then
         assertThat(first).isEqualTo(-1);
         assertThat(second).isEqualTo(2);
+    }
+
+    @Test
+    void 구독자가_취소한_뒤_끝난_캐시_불가_값도_캐시에_남지_않는다() throws InterruptedException {
+        // given — 느린 로드(300ms)가 실패 폴백(-1, 캐시 불가)으로 끝난다. 호출자는 100ms 에 포기한다
+        TtlCache<String, Integer> cache = registry.create("cancelled", 60_000L);
+        AtomicInteger loads = new AtomicInteger();
+        Integer first = cache.get("k", () -> Mono.delay(Duration.ofMillis(300)).map(_ -> {
+                    loads.incrementAndGet();
+                    return -1;
+                }), value -> value >= 0)
+                .timeout(Duration.ofMillis(100))
+                .onErrorReturn(-99)
+                .block();
+        Thread.sleep(400);
+
+        // when — 로드는 호출자 없이 끝났다. 다음 호출은 그 폴백을 받지 않고 다시 로드해야 한다
+        Integer second = cache.get("k", () -> Mono.fromSupplier(() -> {
+            loads.incrementAndGet();
+            return 7;
+        }), value -> value >= 0).block();
+
+        // then
+        assertThat(first).isEqualTo(-99);
+        assertThat(second).isEqualTo(7);
+        assertThat(loads).hasValue(2);
     }
 
     @Test

@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 /**
  * LLM (Ollama)을 호출해 자연어 요청을 {@link RouteIntent}로 파싱하는 어댑터.
@@ -123,8 +124,8 @@ public class OllamaRouteIntentParser implements RouteIntentParser {
         log.debug("[NLP] LLM raw response: {}", rawResponse);
 
         if (rawResponse == null) {
-            log.warn("[NLP] LLM 응답이 비어 있음");
-            throw new IllegalStateException("자연어 요청을 이해하지 못했습니다. 더 명확히 입력해 주세요.");
+            // 모델이 아무것도 돌려주지 않은 것은 사용자 입력 문제가 아니다 — 파싱 실패(400)가 아니라 모델 불가(503)로 올린다
+            throw new NoSuchElementException("LLM 응답이 비어 있음");
         }
         String jsonBody = extractJson(rawResponse);
 
