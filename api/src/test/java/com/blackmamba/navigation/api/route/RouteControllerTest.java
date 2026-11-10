@@ -1,5 +1,6 @@
 package com.blackmamba.navigation.api.route;
 
+import com.blackmamba.navigation.api.config.GlobalExceptionHandler;
 import com.blackmamba.navigation.application.route.RouteOptimizationService;
 import com.blackmamba.navigation.application.route.SearchMode;
 import com.blackmamba.navigation.application.route.history.RouteNarrativeEnhancer;
@@ -10,17 +11,12 @@ import com.blackmamba.navigation.domain.route.evaluation.RouteEvaluation;
 import com.blackmamba.navigation.domain.route.evaluation.RouteHub;
 import com.blackmamba.navigation.domain.route.pricing.CostComponent;
 import com.blackmamba.navigation.domain.route.pricing.RouteCostBreakdown;
-import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.invocation.InvocationOnMock;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -28,28 +24,25 @@ import java.util.concurrent.TimeoutException;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(RouteController.class)
-@Import(RouteControllerTest.MeterRegistryTestConfig.class)
+/**
+ * Spring 컨텍스트 없이 컨트롤러 + 전역 예외 핸들러만 조립한 standalone MockMvc 테스트
+ * (프로젝트 규칙: 컨텍스트를 띄우는 테스트 금지).
+ */
 class RouteControllerTest {
-
-    @Autowired MockMvc mockMvc;
-    @MockBean RouteOptimizationService routeOptimizationService;
-    @MockBean RouteNarrativeEnhancer narrativeEnhancer;  // RAG-4 추가 의존성
-
-    /** Micrometer Prometheus registry가 WebMvcTest 슬라이스에 없어 SimpleMeterRegistry로 대체 주입 */
-    static class MeterRegistryTestConfig {
-        @Bean
-        MeterRegistry meterRegistry() {
-            return new SimpleMeterRegistry();
-        }
-    }
+    private final RouteOptimizationService routeOptimizationService = mock(RouteOptimizationService.class);
+    private final RouteNarrativeEnhancer narrativeEnhancer = mock(RouteNarrativeEnhancer.class);  // RAG-4 추가 의존성
+    private MockMvc mockMvc;
 
     @BeforeEach
-    void setUpNarrativeEnhancer() {
+    void setUp() {
+        mockMvc = MockMvcBuilders.standaloneSetup(new RouteController(routeOptimizationService, narrativeEnhancer, new SimpleMeterRegistry()))
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
         // RAG-4 narrativeEnhancer 는 Mock — 기본적으로 입력 routes 를 그대로 반환 (pass-through)
         when(narrativeEnhancer.enhanceRecommended(any(), any(), any(), any()))
                 .thenAnswer((InvocationOnMock inv) -> inv.getArgument(0));
