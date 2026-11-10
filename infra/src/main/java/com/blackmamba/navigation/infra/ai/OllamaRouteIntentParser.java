@@ -123,8 +123,8 @@ public class OllamaRouteIntentParser implements RouteIntentParser {
         String rawResponse = chatClient.prompt(prompt).call().content();
         log.debug("[NLP] LLM raw response: {}", rawResponse);
 
-        if (rawResponse == null) {
-            // 모델이 아무것도 돌려주지 않은 것은 사용자 입력 문제가 아니다 — 파싱 실패(400)가 아니라 모델 불가(503)로 올린다
+        if (rawResponse == null || rawResponse.isBlank()) {
+            // 모델이 아무것도 돌려주지 않은 것(null, 빈 문자열)은 사용자 입력 문제가 아니다 — 파싱 실패(400)가 아니라 모델 불가(503)로 올린다
             throw new NoSuchElementException("LLM 응답이 비어 있음");
         }
         String jsonBody = extractJson(rawResponse);

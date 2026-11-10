@@ -18,13 +18,10 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * NCP 지오코딩 클라이언트.
+ * 네이버 클라우드 Maps 의 Geocoding 클라이언트.
  * <p>
  * 실패는 빈 결과로 정규화하되 <b>조용히</b> 하지 않는다 — 로그와 카운터를 남긴다.
  * 예전엔 {@code onErrorReturn} 만 있어 시크릿 회전·5xx 가 전부 "장소를 못 찾았습니다"(400) 로 사용자 탓이 됐다.
- */
-/**
- * 네이버 클라우드 Maps 의 Geocoding 클라이언트.
  * <p>
  * 호스트는 신규 Maps 서비스({@code maps.apigw.ntruss.com})다. 예전 AI·NAVER API 호스트
  * ({@code naveropenapi.apigw.ntruss.com})는 2026-11-24 서비스 종료 예정이고, 그 전에 이미

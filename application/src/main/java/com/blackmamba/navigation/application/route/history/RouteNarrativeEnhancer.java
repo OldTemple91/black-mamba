@@ -101,16 +101,10 @@ public class RouteNarrativeEnhancer {
 
     /**
      * 경로 리스트에서 추천 경로 1개에만 LLM narrative 적용.
+     * <p>
+     * 시간 인자가 없는 오버로드는 두지 않는다 — 그 오버로드가 이 메서드를 {@code this} 로 부르면 프록시를 거치지 않아 관측(@Observed)이 빠진다.
+     *
      * @return 입력 순서 유지, 추천 경로만 narrative 가 교체된 새 리스트
-     */
-    public List<Route> enhanceRecommended(List<Route> routes,
-                                           Location origin,
-                                           Location destination,
-                                           RecommendationPreference preference) {
-        return enhanceRecommended(routes, origin, destination, preference, LLM_TIMEOUT);
-    }
-
-    /**
      * @param budget 호출자가 줄 수 있는 남은 시간. 경로 탐색에 시간을 다 썼으면 LLM 을 기다리지 않고 원본을 돌려준다 —
      *               탐색 타임아웃 뒤에 LLM 타임아웃이 따로 붙어 응답이 두 상한의 합까지 늘어지지 않게.
      */
@@ -160,9 +154,9 @@ public class RouteNarrativeEnhancer {
                             .subscribeOn(Schedulers.boundedElastic()))
                     .timeout(llmTimeout)
                     .onErrorResume(e -> {
-                        // 온전한 시간(LLM_TIMEOUT)을 주고도 실패했을 때만 쉰다. 탐색이 오래 걸려 예산이 짧았던 요청의
-                        // 타임아웃은 LLM 탓이 아니다 — 그걸로 쉬면 느린 탐색 한 건이 모든 사용자의 설명 생성을 끈다
-                        if (llmTimeout.compareTo(LLM_TIMEOUT) >= 0) {
+                        // 쉬는 것은 LLM 탓일 때만이다 — 타임아웃이 아닌 오류(연결 거부 등), 또는 온전한 시간(LLM_TIMEOUT)을 주고도 난 타임아웃.
+                        // 탐색이 오래 걸려 예산이 짧았던 요청의 타임아웃은 LLM 탓이 아니다 — 그걸로 쉬면 느린 탐색 한 건이 모든 사용자의 설명 생성을 끈다
+                        if (!(e instanceof TimeoutException) || llmTimeout.compareTo(LLM_TIMEOUT) >= 0) {
                             startCooldown();
                         }
                         if (e instanceof TimeoutException) {

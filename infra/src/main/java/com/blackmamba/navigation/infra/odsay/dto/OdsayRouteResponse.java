@@ -61,15 +61,15 @@ public record OdsayRouteResponse(Result result, JsonNode error) {
             return BAD_REQUEST_CODES.contains(code);
         }
 
-        /**
-         * 500 은 서버 내부 오류뿐 아니라 인증 실패에도 쓰인다(실응답: {@code "[ApiKeyAuthFailed] ApiKey authentication failed."}).
-         * 인증 실패는 재시도해도 같은 답이라 서버 오류에서 뺀다.
-         */
-        /** 일일 호출 한도 초과 — 실응답 {@code "429" "Daily quota exceeded"}. 내일까지 풀리지 않는다. */
+        /** 일일 호출 한도 초과 — 실응답 {@code "429" "Daily quota exceeded"}. 풀리는 시각은 알 수 없다. */
         public boolean isQuotaExceeded() {
             return QUOTA_EXCEEDED_CODE.equals(code);
         }
 
+        /**
+         * 500 은 서버 내부 오류뿐 아니라 인증 실패에도 쓰인다(실응답: {@code "[ApiKeyAuthFailed] ApiKey authentication failed."}).
+         * 인증 실패는 재시도해도 같은 답이라 서버 오류에서 뺀다.
+         */
         public boolean isServerError() {
             return SERVER_ERROR_CODE.equals(code) && !message.contains(AUTH_FAILURE_MARKER);
         }

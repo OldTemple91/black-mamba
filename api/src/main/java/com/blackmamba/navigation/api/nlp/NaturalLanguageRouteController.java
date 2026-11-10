@@ -52,9 +52,9 @@ public class NaturalLanguageRouteController {
 
     private static final Logger log = LoggerFactory.getLogger(NaturalLanguageRouteController.class);
     private static final Duration ROUTE_SEARCH_TIMEOUT = Duration.ofSeconds(45);
-    /** 출발/도착 병렬 해석 상한 — 어댑터 자체 타임아웃(5s) 보다 넉넉히 */
     /** LLM 의도 파싱 상한 — 모델 첫 로드(약 11초)는 넘기고, 응답 없는 모델에는 오래 붙잡히지 않게 */
     private static final Duration INTENT_PARSE_TIMEOUT = Duration.ofSeconds(20);
+    /** 출발/도착 병렬 해석 상한 — 어댑터 자체 타임아웃(5s) 보다 넉넉히 */
     private static final Duration PLACE_RESOLVE_TIMEOUT = Duration.ofSeconds(10);
     /** LLM 프롬프트에 들어가는 입력 — 과도한 길이로 인한 자원 고갈/인젝션 방어 */
     private static final int MAX_QUERY_LENGTH = 200;
@@ -156,6 +156,7 @@ public class NaturalLanguageRouteController {
                 AccessibilityContext.of(intent.wheelchairAccessible(), intent.walkingSpeedKmh()), WeatherContext.DEFAULT);
 
         List<Route> routes;
+        long searchStartedAtNanos = System.nanoTime();
         try {
             routes = routeOptimizationService
                     .findRoutes(searchQuery)
@@ -173,8 +174,10 @@ public class NaturalLanguageRouteController {
 
         // RAG-4: 추천 경로의 carComparison.narrative 를 LLM 설명으로 업그레이드
         if (routes != null && !routes.isEmpty()) {
+            // /api/routes 와 같다 — LLM 은 탐색이 쓰고 남은 시간만 쓴다
+            Duration remaining = ROUTE_SEARCH_TIMEOUT.minus(Duration.ofNanos(System.nanoTime() - searchStartedAtNanos));
             routes = narrativeEnhancer.enhanceRecommended(
-                    routes, origin, destination, intent.preference());
+                    routes, origin, destination, intent.preference(), remaining);
         }
 
         return ResponseEntity.ok(new NaturalLanguageRoutesResponse(

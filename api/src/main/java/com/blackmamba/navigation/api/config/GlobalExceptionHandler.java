@@ -3,13 +3,13 @@ package com.blackmamba.navigation.api.config;
 import com.blackmamba.navigation.application.route.InvalidRouteSearchException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.ErrorResponseException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
@@ -58,9 +58,12 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(e.code(), e.getMessage()));
     }
 
-    /** 파라미터 타입 불일치(originLat=abc, searchMode=BOGUS) — Spring 의 ErrorResponse 가 아니라서 따로 받지 않으면 500 이 된다 */
-    @ExceptionHandler(TypeMismatchException.class)
-    public ResponseEntity<ErrorResponse> handleTypeMismatch(TypeMismatchException e) {
+    /**
+     * 요청 파라미터 타입 불일치(originLat=abc, searchMode=BOGUS) — Spring 의 ErrorResponse 가 아니라서 따로 받지 않으면 500 이 된다.
+     * 상위 타입(TypeMismatchException)으로 받지 않는다 — 변환기가 없는 서버 설정 오류(ConversionNotSupportedException)까지 사용자 탓 400 이 된다.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
         log.warn("[400] 파라미터 타입 불일치: {}", e.getMessage());
         return ResponseEntity.badRequest()
                 .contentType(MediaType.APPLICATION_JSON)

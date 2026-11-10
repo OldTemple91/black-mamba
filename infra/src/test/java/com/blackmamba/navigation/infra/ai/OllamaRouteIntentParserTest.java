@@ -15,6 +15,7 @@ import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -55,6 +56,17 @@ class OllamaRouteIntentParserTest {
         assertThat(intent.mobility()).containsExactly(MobilityType.DDAREUNGI);
         assertThat(intent.wheelchairAccessible()).isTrue();
         assertThat(intent.walkingSpeedKmh()).isEqualTo(3.0);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "  \n"})
+    void 모델이_빈_응답을_주면_입력_탓_파싱_실패가_아니라_응답_없음으로_올린다(String answer) {
+        // given — Ollama 는 생성이 비면 null 이 아니라 빈 문자열을 준다
+        llmAnswers(answer);
+
+        // when & then — 컨트롤러가 IllegalStateException(400)과 구분해 503 으로 답한다
+        assertThatThrownBy(() -> parser.parse("강남에서 홍대까지"))
+                .isInstanceOf(NoSuchElementException.class);
     }
 
     @ParameterizedTest
