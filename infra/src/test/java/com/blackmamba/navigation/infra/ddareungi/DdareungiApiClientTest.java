@@ -156,6 +156,31 @@ class DdareungiApiClientTest {
     }
 
     @Test
+    void TTL_이_막_지난_snapshot_은_갱신을_기다리지_않고_바로_내주고_뒤에서_갱신한다() throws InterruptedException {
+        // given — TTL 300ms. 두 번째 응답(갱신)은 1초 지연
+        wireMock.stubFor(get(urlPathEqualTo(PAGE_1)).inScenario("swr").whenScenarioStateIs(STARTED)
+                .willReturn(json(successJson(1, "OLD"))).willSetStateTo(BROKEN));
+        wireMock.stubFor(get(urlPathEqualTo(PAGE_1)).inScenario("swr").whenScenarioStateIs(BROKEN)
+                .willReturn(json(successJson(1, "NEW")).withFixedDelay(1_000)));
+        DdareungiApiClient client = client(300L, DEFAULT_MAX_STALE_AGE_MS);
+        client.getNearbyStations(LAT, LNG, RADIUS).block();
+        Thread.sleep(350);
+
+        // when — TTL 은 지났지만 TTL×2 안
+        long startedAt = System.nanoTime();
+        StationSnapshot served = client.getNearbyStations(LAT, LNG, RADIUS).block();
+        long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000;
+
+        // then — 지연된 갱신을 기다리지 않고 이전 snapshot 을 받았고, 갱신 요청은 이미 나갔다
+        assertThat(served.stations())
+                .extracting(DdareungiStation::stationId)
+                .containsExactly("OLD-1");
+        assertThat(elapsedMs).isLessThan(500);
+        Thread.sleep(100);
+        wireMock.verify(2, getRequestedFor(urlPathEqualTo(PAGE_1)));
+    }
+
+    @Test
     void 페이지가_가득_차_있으면_다음_페이지를_이어_받는다() {
         // given — 1페이지 1,000행(가득), 2페이지 1행 → 3페이지는 요청하지 않는다
         wireMock.stubFor(get(urlPathEqualTo(PAGE_1)).willReturn(json(successJson(PAGE_SIZE, "P1"))));

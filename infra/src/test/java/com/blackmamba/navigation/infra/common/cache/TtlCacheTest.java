@@ -61,18 +61,49 @@ class TtlCacheTest {
     }
 
     @Test
-    void 만료_엔트리는_purge_로_제거되고_유효_엔트리는_남는다() {
+    void TTL_이_지나면_다시_로드한다() throws InterruptedException {
         // given
-        TtlCache<String, Integer> expiring = registry.create("expiring", 0L);
-        TtlCache<String, Integer> alive = registry.create("alive", 60_000L);
-        expiring.get("k", () -> Mono.just(1)).block();
-        alive.get("k", () -> Mono.just(1)).block();
+        TtlCache<String, Integer> cache = registry.create("expiring", 50L);
+        AtomicInteger loads = new AtomicInteger();
+        cache.get("k", () -> Mono.fromSupplier(loads::incrementAndGet)).block();
 
         // when
-        registry.purgeAll();
+        Thread.sleep(120);
+        Integer reloaded = cache.get("k", () -> Mono.fromSupplier(loads::incrementAndGet)).block();
 
         // then
-        assertThat(expiring.size()).isZero();
-        assertThat(alive.size()).isEqualTo(1);
+        assertThat(reloaded).isEqualTo(2);
+        assertThat(cache.size()).isEqualTo(1);
+    }
+
+    @Test
+    void 오류로_끝난_로드는_캐시에_남지_않는다() {
+        // given
+        TtlCache<String, Integer> cache = registry.create("error", 60_000L);
+        AtomicInteger loads = new AtomicInteger();
+
+        // when
+        Integer first = cache.get("k", () -> Mono.<Integer>error(new IllegalStateException("일시 장애")).doOnSubscribe(_ -> loads.incrementAndGet()))
+                .onErrorReturn(-1)
+                .block();
+        Integer second = cache.get("k", () -> Mono.fromSupplier(loads::incrementAndGet)).block();
+
+        // then
+        assertThat(first).isEqualTo(-1);
+        assertThat(second).isEqualTo(2);
+    }
+
+    @Test
+    void 로더는_구독자의_Reactor_컨텍스트를_물려받는다() {
+        // given — 추적 정보(traceId)는 Reactor 컨텍스트로 전파된다. 캐시가 끊으면 외부 호출 span 이 고아가 된다
+        TtlCache<String, String> cache = registry.create("context", 60_000L);
+
+        // when
+        String seen = cache.get("k", () -> Mono.deferContextual(context -> Mono.just(context.getOrDefault("traceId", "없음"))))
+                .contextWrite(context -> context.put("traceId", "abc123"))
+                .block();
+
+        // then
+        assertThat(seen).isEqualTo("abc123");
     }
 }

@@ -42,6 +42,7 @@ import java.util.stream.Stream;
  *   <li>정류소 0개의 "성공" 도 실패로 본다 — 서울 전체가 0개일 수는 없다. 실패와 같은 경로라
  *       이전 snapshot 재사용·나이 상한·backoff 가 그대로 적용된다</li>
  *   <li>stale 재사용은 조회 후 {@code ddareungi.max-stale-age-ms} 까지만 — 몇 시간 전 재고로 "대여 여유" 를 판정하지 않는다</li>
+ *   <li>TTL 이 막 지난 snapshot(나이 &lt; TTL×2)은 바로 내주고 갱신은 백그라운드로 한다 — 요청이 갱신을 기다리지 않는다</li>
  *   <li>재시도는 페이지 단위 — 3페이지째 실패가 앞 페이지까지 다시 받게 하지 않는다. 부분 결과는 저장하지 않는다</li>
  * </ul>
  */
@@ -163,10 +164,26 @@ public class DdareungiApiClient {
             snapshotCacheHitCounter.increment();
             return cached.snapshotMono();
         }
+        if (cached != null && cached.isFreshEnoughToServeWhileRefreshing(now, snapshotCacheTtlMs)) {
+            // TTL 이 막 지난 snapshot 은 바로 내주고 갱신은 뒤에서 한다 — 30초마다 그 순간의 요청들이
+            // 전체 정류소(3페이지) 재조회를 기다리지 않게. 내주는 데이터의 나이는 최대 TTL 의 2배다.
+            if (refreshBlockedUntilMs.get() <= now) {
+                refreshOrJoin(now).subscribe(
+                        _ -> { },
+                        err -> log.warn("[따릉이 API] 백그라운드 갱신 실패: {}", err.getMessage()));
+            }
+            snapshotCacheHitCounter.increment();
+            return cached.snapshotMono();
+        }
         if (refreshBlockedUntilMs.get() > now) {
             refreshShortCircuitCounter.increment();
             return staleOrEmptySnapshot(cached, "backoff active");
         }
+        return refreshOrJoin(now);
+    }
+
+    /** 진행 중인 갱신이 있으면 합류하고, 없으면 새로 시작한다. */
+    private Mono<StationSnapshot> refreshOrJoin(long now) {
         Mono<StationSnapshot> inFlight = refreshInFlight.get();
         if (inFlight != null) {
             snapshotCacheHitCounter.increment();
@@ -286,6 +303,11 @@ public class DdareungiApiClient {
 
         private boolean isExpired(long nowMs) {
             return nowMs >= expiresAtMs;
+        }
+
+        /** TTL 은 지났지만 TTL 의 2배보다는 젊다 — 갱신을 기다리지 않고 내줘도 되는 나이. TTL 0 이면 항상 거짓. */
+        private boolean isFreshEnoughToServeWhileRefreshing(long nowMs, long ttlMs) {
+            return nowMs - fetchedAtMs < 2 * ttlMs;
         }
 
         private boolean isTooOld(long nowMs, long maxAgeMs) {
