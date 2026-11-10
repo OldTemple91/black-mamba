@@ -17,10 +17,8 @@ import com.blackmamba.navigation.domain.route.Route;
 import com.blackmamba.navigation.domain.route.RouteType;
 import com.blackmamba.navigation.domain.route.evaluation.GenerationDiagnostic;
 import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
-import com.blackmamba.navigation.domain.route.evaluation.RouteHub;
-import com.blackmamba.navigation.domain.route.evaluation.RouteHubExtractor;
-import com.blackmamba.navigation.domain.route.mobility.MobilityInfo;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
+import com.blackmamba.navigation.application.route.strategy.CandidateRouteBuilder.SearchContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -30,7 +28,6 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * 기본 MaaS 최적탐색 전략.
@@ -53,9 +50,8 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
             List.of(MobilityType.DDAREUNGI);
 
     private final TransitRoutePort transitRoutePort;
-    private final MobilityAvailabilityPort mobilityAvailabilityPort;
     private final HubSelector hubSelector;
-    private final MobilitySegmentBuilder mobilitySegmentBuilder;
+    private final CandidateRouteBuilder candidateRoutes;
     private final LastMileHubPrioritizer hubPrioritizer;
     private final MobilityDiagnostics diagnostics;
     private final RouteRanker ranker;
@@ -66,9 +62,8 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                                   HubSelector hubSelector,
                                   RouteEvaluator routeEvaluator) {
         this.transitRoutePort = transitRoutePort;
-        this.mobilityAvailabilityPort = mobilityAvailabilityPort;
         this.hubSelector = hubSelector;
-        this.mobilitySegmentBuilder = new MobilitySegmentBuilder(mobilityTimePort);
+        this.candidateRoutes = new CandidateRouteBuilder(transitRoutePort, mobilityAvailabilityPort, new MobilitySegmentBuilder(mobilityTimePort));
         this.hubPrioritizer = new LastMileHubPrioritizer(hubSelector, mobilityAvailabilityPort);
         this.diagnostics = new MobilityDiagnostics(mobilityAvailabilityPort);
         this.ranker = new RouteRanker(routeEvaluator);
@@ -97,15 +92,16 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
 
                     Route baseRoute = baseline.toRoute();
                     int baseMinutes = baseline.minutes();
+                    SearchContext context = new SearchContext(origin, destination, baseLegs);
 
                     Flux<Route> allPatterns = Flux.fromIterable(ALL_TYPES)
                             .flatMap(type -> {
                                 MobilityConfig config = MobilityConfigs.forType(type);
                                 return Flux.merge(
-                                        patternB(origin, destination, baseLegs, type, config),
-                                        patternC(origin, destination, baseLegs, type, lastMileHubsByType.get(type)),
-                                        patternD(origin, destination, baseLegs, type, config, lastMileHubsByType.get(type)),
-                                        patternE(origin, destination, type, config)
+                                        patternB(context, type, config),
+                                        patternC(context, type, lastMileHubsByType.get(type)),
+                                        patternD(context, type, config, lastMileHubsByType.get(type)),
+                                        patternE(context, type, config)
                                 );
                             });
 
@@ -126,152 +122,48 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     }
 
     // 패턴 B: 이동수단으로 첫 정류장까지 → 대중교통으로 목적지
-    private Flux<Route> patternB(Location origin, Location destination,
-                                  List<Leg> baseLegs, MobilityType type, MobilityConfig config) {
-        return hasPickupNearOrigin(origin, type)
+    private Flux<Route> patternB(SearchContext context, MobilityType type, MobilityConfig config) {
+        return candidateRoutes.hasPickupNearOrigin(context.origin(), type)
                 .flatMapMany(hasPickup -> {
                     if (!hasPickup) {
                         return Flux.empty();
                     }
-                    List<Hub> firstMile = hubSelector.selectFirstMileHubs(origin, baseLegs, config).stream()
+                    List<Hub> firstMile = hubSelector.selectFirstMileHubs(context.origin(), context.baseLegs(), config).stream()
                             .limit(MAX_CANDIDATE_HUBS)
                             .toList();
                     return Flux.fromIterable(firstMile)
-                            .flatMap(firstHub -> {
-                                Location transitStart = firstHub.location();
-                                return mobilityInfoForSegment(origin, transitStart, type)
-                                            .flatMap(info -> {
-                                                Mono<List<Leg>> transitLegs = transitRoutePort.getTransitRoute(transitStart, destination);
-                                                Mono<Integer> transitTime = transitRoutePort.getTransitTimeMinutes(transitStart, destination);
-                                                return Mono.zip(
-                                                                mobilitySegmentBuilder.build(origin, transitStart, type, info),
-                                                                transitLegs,
-                                                                transitTime
-                                                        )
-                                                        .map(tuple -> {
-                                                            List<Leg> partialTransit = tuple.getT2().isEmpty()
-                                                                    ? List.of(TransitLegFactory.approximate(tuple.getT3(), transitStart, destination, baseLegs))
-                                                                    : tuple.getT2();
-                                                            List<Leg> legs = new ArrayList<>();
-                                                            legs.addAll(tuple.getT1());
-                                                            legs.addAll(partialTransit);
-                                                            return buildRoute(legs, RouteType.MOBILITY_FIRST_TRANSIT,
-                                                                    List.of(RouteHubExtractor.fromSelectedHub(firstHub, "FIRST_MILE_CANDIDATE")));
-                                                        });
-                                            });
-                            });
+                            .flatMap(firstHub -> candidateRoutes.firstMileVia(context, type, firstHub));
                 });
     }
 
     // 패턴 C: 대중교통으로 환승점까지 → 이동수단으로 목적지
-    private Flux<Route> patternC(Location origin, Location destination,
-                                  List<Leg> baseLegs, MobilityType type, Mono<List<Hub>> lastMileHubs) {
+    private Flux<Route> patternC(SearchContext context, MobilityType type, Mono<List<Hub>> lastMileHubs) {
         return lastMileHubs
-                .flatMapMany(lastMile -> Flux.fromIterable(lastMile)
-                .flatMap(lastHub -> {
-                    Location switchPoint = lastHub.location();
-                    return mobilityInfoForSegment(switchPoint, destination, type)
-                                .flatMap(info -> {
-                                    Mono<List<Leg>> transitLegs = transitRoutePort.getTransitRoute(origin, switchPoint);
-                                    Mono<Integer> transitTime = transitRoutePort.getTransitTimeMinutes(origin, switchPoint);
-                                    return Mono.zip(
-                                                    transitLegs,
-                                                    transitTime,
-                                                    mobilitySegmentBuilder.build(switchPoint, destination, type, info)
-                                            )
-                                            .map(tuple -> {
-                                                List<Leg> partialTransit = tuple.getT1().isEmpty()
-                                                        ? List.of(TransitLegFactory.approximate(tuple.getT2(), origin, switchPoint, baseLegs))
-                                                        : tuple.getT1();
-                                                List<Leg> legs = new ArrayList<>(partialTransit);
-                                                legs.addAll(tuple.getT3());
-                                                return buildRoute(legs, MobilityConfigs.routeTypeFor(type),
-                                                        List.of(RouteHubExtractor.fromSelectedHub(lastHub, "LAST_MILE_CANDIDATE")));
-                                            });
-                                });
-                }));
+                .flatMapMany(Flux::fromIterable)
+                .flatMap(lastHub -> candidateRoutes.lastMileVia(context, type, lastHub));
     }
 
     // 패턴 D: 이동수단→정류장 + 대중교통(중간) + 이동수단→목적지
-    private Flux<Route> patternD(Location origin, Location destination,
-                                  List<Leg> baseLegs, MobilityType type, MobilityConfig config, Mono<List<Hub>> lastMileHubs) {
-        return hasPickupNearOrigin(origin, type)
+    private Flux<Route> patternD(SearchContext context, MobilityType type, MobilityConfig config, Mono<List<Hub>> lastMileHubs) {
+        return candidateRoutes.hasPickupNearOrigin(context.origin(), type)
                 .flatMapMany(hasPickup -> {
                     if (!hasPickup) {
                         return Flux.empty();
                     }
-                    List<Hub> firstMile = hubSelector.selectFirstMileHubs(origin, baseLegs, config);
+                    List<Hub> firstMile = hubSelector.selectFirstMileHubs(context.origin(), context.baseLegs(), config);
                     return lastMileHubs
                             .flatMapMany(lastMile -> {
                                 if (firstMile.isEmpty() || lastMile.isEmpty()) return Flux.empty();
-
                                 // 우선순위화된 목록은 "대여 가능성이 높은 순" — 가운데가 아니라 1순위를 쓴다
-                                Hub startHub = firstMile.get(0);
-                                Hub endHub = lastMile.get(0);
-                                Location transitStart = startHub.location();
-                                Location transitEnd   = endHub.location();
-
-                                Mono<MobilityInfo> startInfo = mobilityInfoForSegment(origin, transitStart, type);
-                                Mono<MobilityInfo> endInfo   = mobilityInfoForSegment(transitEnd, destination, type);
-
-                                // 어느 한쪽이 empty 면 zip 전체가 empty → 해당 패턴 후보 스킵 (의도된 의미)
-                                return Mono.zip(startInfo, endInfo)
-                                        .flatMapMany(tuple -> {
-                                            MobilityInfo startMobility = tuple.getT1();
-                                            MobilityInfo endMobility   = tuple.getT2();
-                                            Mono<List<Leg>> startSegment = mobilitySegmentBuilder.build(origin, transitStart, type, startMobility);
-                                            Mono<List<Leg>>           tranLegs = transitRoutePort.getTransitRoute(transitStart, transitEnd);
-                                            Mono<Integer>             tranTime = transitRoutePort.getTransitTimeMinutes(transitStart, transitEnd);
-                                            Mono<List<Leg>> endSegment = mobilitySegmentBuilder.build(transitEnd, destination, type, endMobility);
-                                            return Mono.zip(startSegment, tranLegs, tranTime, endSegment)
-                                                    .map(t -> {
-                                                        List<Leg> middleTransit = t.getT2().isEmpty()
-                                                                ? List.of(TransitLegFactory.approximate(t.getT3(), transitStart, transitEnd, baseLegs))
-                                                                : t.getT2();
-                                                        List<Leg> legs = new ArrayList<>();
-                                                        legs.addAll(t.getT1());
-                                                        legs.addAll(middleTransit);
-                                                        legs.addAll(t.getT4());
-                                                        return buildRoute(legs, RouteType.MOBILITY_TRANSIT_MOBILITY,
-                                                                List.of(
-                                                                        RouteHubExtractor.fromSelectedHub(startHub, "FIRST_MILE_CANDIDATE"),
-                                                                        RouteHubExtractor.fromSelectedHub(endHub, "LAST_MILE_CANDIDATE")
-                                                                ));
-                                                    })
-                                                    .flux();
-                                        });
+                                return candidateRoutes.bothEndsVia(context, type, firstMile.getFirst(), lastMile.getFirst());
                             });
                 });
     }
 
     // 패턴 E: 이동수단만 (직선거리 < 수단 최대범위)
-    private Flux<Route> patternE(Location origin, Location destination,
-                                  MobilityType type, MobilityConfig config) {
-        double dist = GeoDistance.meters(origin, destination);
-        if (dist > config.maxRangeMeters()) return Flux.empty();
-
-        return mobilityInfoForSegment(origin, destination, type)
-                .flatMapMany(info -> mobilitySegmentBuilder.build(origin, destination, type, info)
-                        .map(legs -> buildRoute(legs, RouteType.MOBILITY_ONLY, List.of()))
-                        .flux());
-    }
-
-    private Mono<MobilityInfo> mobilityInfoForSegment(Location start, Location end, MobilityType type) {
-        return mobilityAvailabilityPort.findSegmentMobility(start.lat(), start.lng(), end.lat(), end.lng(), type);
-    }
-
-    private Mono<Boolean> hasPickupNearOrigin(Location origin, MobilityType type) {
-        if (type.isPersonal()) {
-            return Mono.just(true);
-        }
-        return mobilityAvailabilityPort.findNearbyMobility(origin.lat(), origin.lng(), type)
-                .map(Optional::isPresent);
-    }
-
-    // ── 헬퍼 ──────────────────────────────────────────────────────────────────
-
-    private Route buildRoute(List<Leg> legs, RouteType type, List<RouteHub> selectedHubs) {
-        return Route.of(legs, type).withSelectedHubs(selectedHubs);
+    private Flux<Route> patternE(SearchContext context, MobilityType type, MobilityConfig config) {
+        return candidateRoutes.direct(context, type, config)
+                .flux();
     }
 
     private boolean hasOnlyTransitCandidate(List<Route> candidates) {
@@ -304,9 +196,8 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
         if (firstMileHubs.isEmpty()) immediateReasons.add(MobilityDiagnostics.noCandidateHub(Phase.FIRST_MILE, type));
         if (lastMileHubs.isEmpty()) immediateReasons.add(MobilityDiagnostics.noCandidateHub(Phase.LAST_MILE, type));
 
-        double directDistance = GeoDistance.meters(origin, destination);
-        if (directDistance > config.maxRangeMeters()) {
-            immediateReasons.add(MobilityDiagnostics.directDistanceExceeded(type, config.maxRangeMeters(), directDistance));
+        if (CandidateRouteBuilder.exceedsDirectRange(origin, destination, config)) {
+            immediateReasons.add(MobilityDiagnostics.directDistanceExceeded(type, config.maxRangeMeters(), GeoDistance.meters(origin, destination)));
         }
 
         return Mono.zip(

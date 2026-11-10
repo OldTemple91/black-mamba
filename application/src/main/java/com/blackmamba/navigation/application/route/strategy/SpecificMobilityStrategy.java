@@ -9,17 +9,14 @@ import com.blackmamba.navigation.application.route.port.MobilityTimePort;
 import com.blackmamba.navigation.application.route.port.TransitRoutePort;
 import com.blackmamba.navigation.application.route.segment.MobilitySegmentBuilder;
 import com.blackmamba.navigation.application.route.strategy.MobilityDiagnostics.Phase;
-import com.blackmamba.navigation.domain.hub.Hub;
 import com.blackmamba.navigation.domain.location.GeoDistance;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Leg;
 import com.blackmamba.navigation.domain.route.Route;
-import com.blackmamba.navigation.domain.route.RouteType;
 import com.blackmamba.navigation.domain.route.evaluation.GenerationDiagnostic;
 import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
-import com.blackmamba.navigation.domain.route.evaluation.RouteHubExtractor;
-import com.blackmamba.navigation.domain.route.mobility.MobilityInfo;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
+import com.blackmamba.navigation.application.route.strategy.CandidateRouteBuilder.SearchContext;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -28,17 +25,16 @@ import java.util.List;
 
 /**
  * 사용자가 선택한 이동수단으로 라스트마일(패턴 C)만 탐색하는 전략.
- * 대중교통 결과가 없을 경우 직접 이동수단 경로로 폴백.
+ * 후보 허브가 없으면 이동수단만으로 가는 경로(패턴 E)로 대체한다.
+ * 후보 하나를 조립하는 방법은 OPTIMAL 전략과 같은 {@link CandidateRouteBuilder} 를 쓴다.
  */
 public class SpecificMobilityStrategy implements RouteSearchStrategy {
 
     private static final int MAX_CANDIDATE_HUBS = LastMileHubPrioritizer.MAX_CANDIDATE_HUBS;
 
     private final TransitRoutePort transitRoutePort;
-    private final MobilityAvailabilityPort mobilityAvailabilityPort;
-    private final HubSelector hubSelector;
     private final RouteEvaluator routeEvaluator;
-    private final MobilitySegmentBuilder mobilitySegmentBuilder;
+    private final CandidateRouteBuilder candidateRoutes;
     private final LastMileHubPrioritizer hubPrioritizer;
     private final MobilityDiagnostics diagnostics;
     private final RouteRanker ranker;
@@ -49,10 +45,8 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                                      HubSelector hubSelector,
                                      RouteEvaluator routeEvaluator) {
         this.transitRoutePort = transitRoutePort;
-        this.mobilityAvailabilityPort = mobilityAvailabilityPort;
-        this.hubSelector = hubSelector;
         this.routeEvaluator = routeEvaluator;
-        this.mobilitySegmentBuilder = new MobilitySegmentBuilder(mobilityTimePort);
+        this.candidateRoutes = new CandidateRouteBuilder(transitRoutePort, mobilityAvailabilityPort, new MobilitySegmentBuilder(mobilityTimePort));
         this.hubPrioritizer = new LastMileHubPrioritizer(hubSelector, mobilityAvailabilityPort);
         this.diagnostics = new MobilityDiagnostics(mobilityAvailabilityPort);
         this.ranker = new RouteRanker(routeEvaluator);
@@ -71,7 +65,7 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                     if (mobilityTypes.isEmpty()) {
                         return Mono.just(List.of(routeEvaluator.evaluate(baseRoute, true, preference)));
                     }
-                    return generateCombinedRoutes(baseLegs, origin, destination, mobilityTypes)
+                    return generateCombinedRoutes(new SearchContext(origin, destination, baseLegs), mobilityTypes)
                             .collectList()
                             .flatMap(combined -> {
                                 if (combined.isEmpty()) {
@@ -88,56 +82,20 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                 });
     }
 
-    private Flux<Route> generateCombinedRoutes(List<Leg> baseLegs, Location origin, Location destination,
-                                               List<MobilityType> mobilityTypes) {
+    /** 선택한 수단별로 라스트마일(패턴 C) 후보를 만든다. 후보 허브가 없으면 이동수단만으로 가는 경로(패턴 E)로 대체한다. */
+    private Flux<Route> generateCombinedRoutes(SearchContext context, List<MobilityType> mobilityTypes) {
         return Flux.fromIterable(mobilityTypes)
                 .flatMap(type -> {
                     MobilityConfig config = MobilityConfigs.forType(type);
-                    return hubPrioritizer.prioritize(baseLegs, destination, type, config)
+                    return hubPrioritizer.prioritize(context.baseLegs(), context.destination(), type, config)
                             .flatMapMany(candidateHubs -> {
                                 if (candidateHubs.isEmpty()) {
-                                    return buildDirectRoute(origin, destination, type, config).flux();
+                                    return candidateRoutes.direct(context, type, config).flux();
                                 }
                                 return Flux.fromIterable(candidateHubs)
-                                        .flatMap(candidateHub -> buildRoute(origin, candidateHub, destination, type, baseLegs));
+                                        .flatMap(candidateHub -> candidateRoutes.lastMileVia(context, type, candidateHub));
                             });
                 });
-    }
-
-    private Mono<Route> buildRoute(Location origin, Hub candidateHub,
-                                    Location destination, MobilityType type,
-                                    List<Leg> baseLegs) {
-        Location switchPoint = candidateHub.location();
-        Mono<List<Leg>>           transitLegs  = transitRoutePort.getTransitRoute(origin, switchPoint);
-        Mono<Integer>             transitTime  = transitRoutePort.getTransitTimeMinutes(origin, switchPoint);
-        Mono<MobilityInfo> avail = mobilityInfoForSegment(switchPoint, destination, type);
-
-        // avail 이 empty 면 zip 전체가 empty → 이 후보 스킵 (의도된 의미)
-        return Mono.zip(transitLegs, transitTime, avail)
-                .flatMap(tuple -> mobilitySegmentBuilder.build(switchPoint, destination, type, tuple.getT3())
-                .map(mobilityLegs -> {
-                    List<Leg> partialTransit = tuple.getT1().isEmpty()
-                            ? List.of(TransitLegFactory.approximate(tuple.getT2(), origin, switchPoint, baseLegs))
-                            : tuple.getT1();
-                    List<Leg> legs = new ArrayList<>(partialTransit);
-                    legs.addAll(mobilityLegs);
-                    return Route.of(legs, MobilityConfigs.routeTypeFor(type))
-                            .withSelectedHubs(List.of(RouteHubExtractor.fromSelectedHub(candidateHub, "LAST_MILE_CANDIDATE")));
-                }));
-    }
-
-    /** 대중교통 없이 출발지→목적지 직접 이동수단 경로. 수단의 최대 범위를 넘으면 만들지 않는다 (OPTIMAL 패턴 E 와 동일 규칙). */
-    private Mono<Route> buildDirectRoute(Location origin, Location destination, MobilityType type, MobilityConfig config) {
-        if (GeoDistance.meters(origin, destination) > config.maxRangeMeters()) {
-            return Mono.empty();
-        }
-        return mobilityInfoForSegment(origin, destination, type)
-                .flatMap(info -> mobilitySegmentBuilder.build(origin, destination, type, info)
-                        .map(legs -> Route.of(legs, RouteType.MOBILITY_ONLY)));
-    }
-
-    private Mono<MobilityInfo> mobilityInfoForSegment(Location start, Location end, MobilityType type) {
-        return mobilityAvailabilityPort.findSegmentMobility(start.lat(), start.lng(), end.lat(), end.lng(), type);
     }
 
     private Mono<List<GenerationDiagnostic>> buildNoMixedDiagnostics(List<Leg> baseLegs, Location origin, Location destination,
@@ -157,9 +115,8 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                     if (candidateHubs.isEmpty()) {
                         List<GenerationDiagnostic> reasons = new ArrayList<>();
                         reasons.add(MobilityDiagnostics.noCandidateHub(Phase.LAST_MILE, type));
-                        double directDistance = GeoDistance.meters(origin, destination);
-                        if (directDistance > config.maxRangeMeters()) {
-                            reasons.add(MobilityDiagnostics.directDistanceExceeded(type, config.maxRangeMeters(), directDistance));
+                        if (CandidateRouteBuilder.exceedsDirectRange(origin, destination, config)) {
+                            reasons.add(MobilityDiagnostics.directDistanceExceeded(type, config.maxRangeMeters(), GeoDistance.meters(origin, destination)));
                         }
                         return Flux.fromIterable(reasons);
                     }
