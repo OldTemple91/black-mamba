@@ -14,6 +14,9 @@ jobs:
   backend-test:
     name: Backend Test & Coverage
     runs-on: ubuntu-latest
+    # PR 의 코드를 빌드·실행하는 잡이다 — 쓰기 권한을 주지 않는다. 테스트 요약은 아래 test-report 잡이 맡는다
+    permissions:
+      contents: read
     env:
       ODSAY_API_KEY: dummy-ci-key
       DDAREUNGI_API_KEY: dummy-ci-key
@@ -58,9 +61,25 @@ jobs:
           path: build/reports/jacoco/aggregate/
           retention-days: 14
 
+
+  # 테스트 요약을 체크로 올린다. 체크를 만들려면 checks 쓰기 권한이 필요한데(기본 토큰은 읽기 전용이라 거절됐다),
+  # 그 권한을 저장소 코드를 실행하는 잡에 주지 않으려고 따로 둔다 — 이 잡은 체크아웃도 빌드도 하지 않고 결과 파일만 읽는다
+  test-report:
+    name: Backend Test Report
+    runs-on: ubuntu-latest
+    needs: [backend-test]
+    if: always()
+    permissions:
+      checks: write
+    steps:
+      - name: Download test reports
+        uses: actions/download-artifact@v4
+        with:
+          name: test-reports
+
       - name: Publish test summary
-        if: always()
-        uses: mikepenz/action-junit-report@v4
+        # 쓰기 권한 토큰을 받는 외부 액션이라 태그가 아닌 커밋으로 고정한다 (v4.3.1)
+        uses: mikepenz/action-junit-report@db71d41eb79864e25ab0337e395c352e84523afe
         with:
           report_paths: "**/build/test-results/test/TEST-*.xml"
           check_name: "Backend Test Results"
