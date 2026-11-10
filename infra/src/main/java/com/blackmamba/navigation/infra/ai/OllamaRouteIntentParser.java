@@ -5,13 +5,13 @@ import com.blackmamba.navigation.application.route.port.RouteIntentParser;
 import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import com.blackmamba.navigation.infra.ai.dto.OllamaIntentPayload;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
+import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -98,13 +98,17 @@ public class OllamaRouteIntentParser implements RouteIntentParser {
     private static final String USER_PROMPT_TEMPLATE = "요청: \"{query}\"";
 
     private final ChatClient chatClient;
-    private final ObjectMapper objectMapper;
+    /**
+     * JSON → payload 변환은 Spring AI 의 변환기에 맡긴다 (어댑터가 Jackson ObjectMapper 를 직접 들지 않는다).
+     * {@code call().entity(..)} 를 쓰지 않는 이유: entity 는 프롬프트에 스키마 지시문을 덧붙여 few-shot 으로 맞춘
+     * 프롬프트를 바꾸고, 3B 모델이 JSON 앞뒤에 붙이는 설명 문장을 견디지 못한다 — 그 부분은 {@link #extractJson} 이 맡는다.
+     */
+    private final BeanOutputConverter<OllamaIntentPayload> payloadConverter = new BeanOutputConverter<>(OllamaIntentPayload.class);
 
-    public OllamaRouteIntentParser(ChatModel chatModel, ObjectMapper objectMapper) {
+    public OllamaRouteIntentParser(ChatModel chatModel) {
         this.chatClient = ChatClient.builder(chatModel)
                 .defaultSystem(SYSTEM_PROMPT)
                 .build();
-        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -122,12 +126,12 @@ public class OllamaRouteIntentParser implements RouteIntentParser {
 
         OllamaIntentPayload payload;
         try {
-            payload = objectMapper.readValue(jsonBody, OllamaIntentPayload.class);
-        } catch (Exception e) {
+            payload = payloadConverter.convert(jsonBody);
+        } catch (RuntimeException e) {
             log.error("[NLP] 파싱 실패. raw={}, error={}", rawResponse, e.getMessage());
             throw new IllegalStateException("자연어 요청을 이해하지 못했습니다. 더 명확히 입력해 주세요.", e);
         }
-        if (!payload.hasOriginAndDestination()) {
+        if (payload == null || !payload.hasOriginAndDestination()) {
             log.error("[NLP] 출발지/도착지 파싱 실패: {}", payload);
             throw new IllegalStateException("자연어 요청을 이해하지 못했습니다. 출발지와 도착지를 명확히 입력해 주세요.");
         }
