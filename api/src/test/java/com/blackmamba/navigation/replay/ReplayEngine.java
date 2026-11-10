@@ -31,12 +31,15 @@ import com.blackmamba.navigation.infra.tmap.TmapPedestrianClient;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 import static org.mockito.Mockito.mock;
 
@@ -45,6 +48,9 @@ import static org.mockito.Mockito.mock;
  * 다른 것은 외부 API 주소뿐이다({@link ReplayApiServer}). 그래서 여기서 바뀌는 순위는 우리 코드가 바꾼 것이다.
  * <p>
  * 캐시 TTL 은 길게, 예산은 사실상 무제한으로 둔다. 이력 저장(RAG)은 끈다 — 순위와 무관하고 LLM·벡터 DB 가 필요하다.
+ * <p>
+ * 탐색 한 번에 하나씩 새로 만들어 쓴다. 경로·도보 캐시의 키는 좌표가 아니라 약 150m 격자라, 엔진을 케이스끼리 공유하면
+ * 같은 격자에 든 다른 좌표의 응답을 먼저 돈 케이스가 채워 넣고, 결과가 케이스 실행 순서에 따라 달라진다.
  */
 final class ReplayEngine {
 
@@ -54,10 +60,10 @@ final class ReplayEngine {
     private static final Duration SEARCH_TIMEOUT = Duration.ofSeconds(120);
 
     private final RouteOptimizationService routeOptimizationService;
+    private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @SuppressWarnings("unchecked")
     ReplayEngine(String apiBaseUrl) {
-        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
         ExternalApiResilience resilience = new ExternalApiResilience(
                 CircuitBreakerRegistry.ofDefaults(),
                 RetryRegistry.of(RetryConfig.custom().maxAttempts(1).build()));
@@ -99,5 +105,27 @@ final class ReplayEngine {
 
     List<Route> search(RouteSearchQuery query) {
         return routeOptimizationService.findRoutes(query).block(SEARCH_TIMEOUT);
+    }
+
+    /**
+     * 클라이언트가 응답을 못 쓰고 추정값으로 대체한 횟수. 파일은 있지만 읽지 못한 경우(응답 형식·매퍼가 바뀜)는
+     * 서버 쪽에서는 정상 응답이라 여기서만 보인다. 0 이 아니면 그 순위는 실제 응답으로 만든 것이 아니다.
+     */
+    Map<String, Double> fallbackCounts() {
+        Map<String, Double> counts = new TreeMap<>();
+        for (Counter counter : meterRegistry.find("navigation.odsay.fallback.total").tag("reason", "error").counters()) {
+            counts.merge("odsay", counter.count(), Double::sum);
+        }
+        for (Counter counter : meterRegistry.find("navigation.tmap.fallback.total").counters()) {
+            counts.merge("tmap", counter.count(), Double::sum);
+        }
+        for (Counter counter : meterRegistry.find("navigation.ddareungi.fallback.total").counters()) {
+            counts.merge("ddareungi", counter.count(), Double::sum);
+        }
+        for (Counter counter : meterRegistry.find("navigation.mobility.fallback.total").tag("reason", "error").counters()) {
+            counts.merge("mobility", counter.count(), Double::sum);
+        }
+        counts.values().removeIf(count -> count == 0.0);
+        return counts;
     }
 }

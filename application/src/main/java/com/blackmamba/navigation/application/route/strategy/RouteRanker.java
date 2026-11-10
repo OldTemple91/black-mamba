@@ -34,7 +34,8 @@ final class RouteRanker {
     List<Route> rank(List<Route> candidates, Route baseRoute, int baseMinutes, RecommendationPreference preference) {
         List<Route> evaluated = candidates.stream()
                 .map(route -> routeEvaluator.evaluate(route, baseRoute, baseMinutes, false, preference))
-                .sorted(Comparator.comparingDouble(Route::score).reversed())
+                // 점수가 같으면 routeId 로 순서를 정한다 — 후보는 병렬 탐색이 끝난 순서로 들어와, 동점이면 요청마다 순위·상위 5개가 달라질 수 있다
+                .sorted(Comparator.comparingDouble(Route::score).reversed().thenComparing(Route::routeId, Comparator.nullsLast(Comparator.naturalOrder())))
                 .limit(MAX_RESULTS)
                 .toList();
 

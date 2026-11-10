@@ -1,5 +1,7 @@
 package com.blackmamba.navigation.replay;
 
+import com.blackmamba.navigation.infra.common.http.ExternalApiJson;
+import com.blackmamba.navigation.infra.odsay.dto.OdsayRouteResponse;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
@@ -21,6 +23,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.Executors;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -43,7 +46,7 @@ final class ReplayApiServer implements AutoCloseable {
     private static final Pattern BIKE_LIST_PATTERN = Pattern.compile("/json/bikeList/(\\d+)/(\\d+)/?$");
     private static final Pattern JSON_FIELD_PATTERN = Pattern.compile("\"(startX|startY|endX|endY)\"\\s*:\\s*\"([^\"]+)\"");
 
-    /** 녹화할 때만 쓰는 실제 API 주소와 키. 재생에서는 null. */
+    /** 녹화할 때만 쓰는 실제 API 키. 재생에서는 null. */
     record Upstream(String odsayApiKey, String ddareungiApiKey, String tmapAppKey) {}
 
     private final HttpServer server;
@@ -83,14 +86,20 @@ final class ReplayApiServer implements AutoCloseable {
         return "http://127.0.0.1:" + server.getAddress().getPort();
     }
 
-    /** 재생 중 파일이 없어 답하지 못한 조회 — 비어 있어야 재생 결과를 믿을 수 있다. */
-    Set<String> missingFixtures() {
-        return new TreeSet<>(missingFixtures);
+    /** 지난번 확인 뒤로 파일이 없어 답하지 못한 조회 — 비어 있어야 재생 결과를 믿을 수 있다. 읽으면 비운다(다음 테스트에 섞이지 않게). */
+    Set<String> drainMissingFixtures() {
+        return drain(missingFixtures);
     }
 
-    /** 녹화 중 실제 API 가 실패로 답해 저장하지 않은 조회. */
-    Set<String> rejectedResponses() {
-        return new TreeSet<>(rejectedResponses);
+    /** 지난번 확인 뒤로 녹화 중 실제 API 가 실패로 답해 저장하지 않은 조회. 읽으면 비운다. */
+    Set<String> drainRejectedResponses() {
+        return drain(rejectedResponses);
+    }
+
+    private static Set<String> drain(Set<String> names) {
+        Set<String> drained = new TreeSet<>(names);
+        names.removeAll(drained);
+        return drained;
     }
 
     Set<String> recordedFixtures() {
@@ -107,7 +116,7 @@ final class ReplayApiServer implements AutoCloseable {
     private void handleOdsay(HttpExchange exchange) throws IOException {
         Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
         String name = "odsay/" + query.get("SX") + "_" + query.get("SY") + "_" + query.get("EX") + "_" + query.get("EY") + ".json";
-        respond(exchange, name, "\"result\"", () -> {
+        respond(exchange, name, ReplayApiServer::isRecordableOdsay, () -> {
             String url = "https://api.odsay.com/v1/api/searchPubTransPathT?apiKey=" + encode(upstream.odsayApiKey())
                     + "&SX=" + query.get("SX") + "&SY=" + query.get("SY") + "&EX=" + query.get("EX") + "&EY=" + query.get("EY");
             return HttpRequest.newBuilder(URI.create(url)).GET();
@@ -124,7 +133,7 @@ final class ReplayApiServer implements AutoCloseable {
         }
         String start = matcher.group(1);
         String end = matcher.group(2);
-        respond(exchange, "ddareungi/bikeList_" + start + "_" + end + ".json", "\"rentBikeStatus\"", () -> {
+        respond(exchange, "ddareungi/bikeList_" + start + "_" + end + ".json", ReplayApiServer::isRecordableDdareungi, () -> {
             String url = "http://openapi.seoul.go.kr:8088/" + upstream.ddareungiApiKey() + "/json/bikeList/" + start + "/" + end + "/";
             return HttpRequest.newBuilder(URI.create(url)).GET();
         });
@@ -140,7 +149,7 @@ final class ReplayApiServer implements AutoCloseable {
             fields.put(matcher.group(1), matcher.group(2));
         }
         String name = "tmap/" + fields.get("startX") + "_" + fields.get("startY") + "_" + fields.get("endX") + "_" + fields.get("endY") + ".json";
-        respond(exchange, name, "\"features\"", () -> HttpRequest.newBuilder(URI.create("https://apis.openapi.sk.com/tmap/routes/pedestrian?version=1"))
+        respond(exchange, name, response -> response.contains("\"features\""), () -> HttpRequest.newBuilder(URI.create("https://apis.openapi.sk.com/tmap/routes/pedestrian?version=1"))
                 .header("appKey", upstream.tmapAppKey())
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body)));
@@ -153,9 +162,29 @@ final class ReplayApiServer implements AutoCloseable {
     }
 
     /**
-     * @param successMarker 정상 응답에만 있는 문자열. ODsay 한도 초과·따릉이 키 오류는 HTTP 200 으로 오므로 상태 코드만으로는 걸러지지 않는다
+     * ODsay 는 한도 초과·키 오류도, "경로 없음" 도 HTTP 200 의 error 봉투로 준다. 경로 없음은 운영에서도 정상 결과(빈 경로)라 녹화하고,
+     * 나머지 오류는 저장하지 않는다. 판정은 운영 코드와 같은 파서로 한다.
      */
-    private void respond(HttpExchange exchange, String fixtureName, String successMarker, UpstreamRequest upstreamRequest) throws IOException {
+    private static boolean isRecordableOdsay(String body) {
+        try {
+            return ExternalApiJson.MAPPER.readValue(body, OdsayRouteResponse.class)
+                    .findApiError()
+                    .map(OdsayRouteResponse.ApiError::isNoRoute)
+                    .orElse(true);
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /** 따릉이 키 오류는 HTTP 200 의 XML 이다. 마지막 쪽 너머(INFO-200, 데이터 없음)는 정상 응답이다. */
+    private static boolean isRecordableDdareungi(String body) {
+        return body.contains("\"rentBikeStatus\"") || body.contains("INFO-200");
+    }
+
+    /**
+     * @param isRecordable 저장해도 되는 응답인가 — 상태 코드만으로는 걸러지지 않는 실패가 있다
+     */
+    private void respond(HttpExchange exchange, String fixtureName, Predicate<String> isRecordable, UpstreamRequest upstreamRequest) throws IOException {
         Path file = fixtureDir.resolve(fixtureName);
         if (Files.exists(file)) {
             write(exchange, 200, Files.readString(file));
@@ -169,7 +198,7 @@ final class ReplayApiServer implements AutoCloseable {
         try {
             HttpResponse<String> response = httpClient.send(
                     upstreamRequest.build().timeout(Duration.ofSeconds(15)).build(), HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200 || !response.body().contains(successMarker)) {
+            if (response.statusCode() != 200 || !isRecordable.test(response.body())) {
                 // 실패 응답은 저장하지 않는다 — 다음 녹화에서 다시 시도할 수 있게
                 rejectedResponses.add(fixtureName + " (HTTP " + response.statusCode() + ")");
                 write(exchange, response.statusCode(), response.body());
@@ -179,8 +208,13 @@ final class ReplayApiServer implements AutoCloseable {
             Files.writeString(file, response.body());
             recordedFixtures.add(fixtureName);
             write(exchange, 200, response.body());
+        } catch (IOException e) {
+            // 실제 API 에 닿지 못했다 — 연결을 끊어 버리면 클라이언트가 추정값으로 대체하고 그 결과가 기대값이 된다
+            rejectedResponses.add(fixtureName + " (" + e.getClass().getSimpleName() + ")");
+            write(exchange, 502, "{}");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            rejectedResponses.add(fixtureName + " (interrupted)");
             write(exchange, 500, "{}");
         }
     }

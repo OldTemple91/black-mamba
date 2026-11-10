@@ -80,7 +80,7 @@ public class RouteEnrichmentPipeline {
     private List<Route> reconcileRecommendation(List<Route> routes, RecommendationPreference preference) {
         if (routes.isEmpty()) return routes;
         List<Route> sorted = new ArrayList<>(routes);
-        sorted.sort(Comparator.comparingDouble(Route::score).reversed());
+        sorted.sort(Comparator.comparingDouble(Route::score).reversed().thenComparing(Route::routeId, Comparator.nullsLast(Comparator.naturalOrder())));
         Route baseline = baselineOf(sorted);
         List<Route> reconciled = new ArrayList<>(sorted.size());
         for (int i = 0; i < sorted.size(); i++) {
