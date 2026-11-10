@@ -47,6 +47,8 @@ public class RouteHistoryRecorder {
 
     /** 중복 저장 방지 윈도우 */
     private static final Duration DEDUP_WINDOW = Duration.ofSeconds(60);
+    /** 임베딩(Ollama) + Qdrant 저장 상한 — 응답 없는 저장이 boundedElastic 스레드를 붙잡고 쌓이지 않게 */
+    private static final Duration SAVE_TIMEOUT = Duration.ofSeconds(20);
 
     /** 품질 게이트 임계값 */
     private static final int MIN_TOTAL_MINUTES = 5;
@@ -56,6 +58,7 @@ public class RouteHistoryRecorder {
     private final Counter savedCounter;
     private final Counter qualityGateRejectedCounter;
     private final Counter duplicateSkippedCounter;
+    private final Counter saveFailedCounter;
 
     /**
      * (OD 해시 + preference) → 최근 저장 시각.
@@ -76,6 +79,9 @@ public class RouteHistoryRecorder {
         this.duplicateSkippedCounter = Counter.builder("navigation.rag.history.rejected")
                 .description("중복 감지로 스킵된 경로 이력 건수")
                 .tag("reason", "duplicate")
+                .register(meterRegistry);
+        this.saveFailedCounter = Counter.builder("navigation.rag.history.failed")
+                .description("저장을 시도했지만 실패(오류·타임아웃)한 횟수")
                 .register(meterRegistry);
 
         if (this.routeHistoryPort == null) {
@@ -103,23 +109,28 @@ public class RouteHistoryRecorder {
         if (rejectedByQuality > 0) qualityGateRejectedCounter.increment(rejectedByQuality);
         if (toSave.isEmpty()) return;
 
-        // 중복 감지 (OD + preference 키로)
-        if (isRecentlySaved(origin, destination, preference)) {
+        // 중복 감지 (OD + preference 키로) — 확인과 표시를 한 번에 해 동시 요청이 둘 다 통과하지 않게 한다
+        String dedupKey = dedupKey(origin, destination, preference);
+        if (!claim(dedupKey)) {
             log.debug("[RAG] 중복 저장 스킵 — {} → {} [{}]", origin.name(), destination.name(), preference);
             duplicateSkippedCounter.increment(toSave.size());
             return;
         }
 
-        markSaved(origin, destination, preference);
-
         int savingCount = toSave.size();
         Flux.fromIterable(toSave)
                 .concatMap(r -> routeHistoryPort.save(r, origin, destination, preference))
                 .then()
-                .doOnSuccess(v -> savedCounter.increment(savingCount))
-                .doOnError(err -> log.warn("[RAG] 비동기 저장 실패 — {}: {}",
-                        err.getClass().getSimpleName(), err.getMessage()))
-                .subscribe();
+                .timeout(SAVE_TIMEOUT)
+                .subscribe(
+                        _ -> { },
+                        err -> {
+                            // 실패한 저장이 중복 창(60초) 동안 재시도를 막지 않게 표시를 푼다
+                            recentlySaved.remove(dedupKey);
+                            saveFailedCounter.increment();
+                            log.warn("[RAG] 비동기 저장 실패 — {}: {}", err.getClass().getSimpleName(), err.getMessage());
+                        },
+                        () -> savedCounter.increment(savingCount));
     }
 
     // ─── 품질 게이트 ─────────────────────────────
@@ -151,16 +162,17 @@ public class RouteHistoryRecorder {
 
     // ─── 중복 감지 ──────────────────────────────
 
-    private boolean isRecentlySaved(Location origin, Location destination, String preference) {
+    /** 최근에 저장한 적이 없으면 표시를 남기고 true. 확인-후-표시를 원자적으로 한다. */
+    private boolean claim(String key) {
         purgeExpired();
-        String key = dedupKey(origin, destination, preference);
-        Instant last = recentlySaved.get(key);
-        if (last == null) return false;
-        return Duration.between(last, Instant.now()).compareTo(DEDUP_WINDOW) < 0;
-    }
-
-    private void markSaved(Location origin, Location destination, String preference) {
-        recentlySaved.put(dedupKey(origin, destination, preference), Instant.now());
+        Instant now = Instant.now();
+        Instant winner = recentlySaved.compute(key, (_, last) -> {
+            if (last != null && Duration.between(last, now).compareTo(DEDUP_WINDOW) < 0) {
+                return last;
+            }
+            return now;
+        });
+        return winner == now;
     }
 
     /** 접근 때마다 만료된 엔트리 제거 (별도 스케줄러 없이 self-clean) */

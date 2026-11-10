@@ -21,6 +21,8 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Instant;
+import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -108,6 +110,22 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
                 .then();
     }
 
+    /**
+     * 문서 ID = 경로 ID + 출발·도착 격자.
+     * 경로 ID 는 구간 이름·소요시간으로만 만들어져 좌표가 없다. 그대로 문서 ID 로 쓰면 가까운 다른 출발·도착 쌍이
+     * 같은 노선을 탈 때 upsert 로 앞 이력의 좌표·시각을 덮어쓴다.
+     */
+    private static String documentId(Route route, String originGeohash, String destGeohash) {
+        String key = route.routeId() + "|" + originGeohash + "|" + destGeohash;
+        return UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8))
+                .toString();
+    }
+
+    @Override
+    public String describe(Route route, Location origin, Location destination, String preference) {
+        return RouteHistoryDescriber.describeAt(route, origin, destination, preference, Instant.now());
+    }
+
     private void saveBlocking(Route route, Location origin, Location destination, String preference, Instant timestamp) {
         if (route == null || origin == null || destination == null) {
             log.debug("[RAG] save 생략 — route/origin/destination null");
@@ -146,7 +164,7 @@ public class QdrantRouteHistoryAdapter implements RouteHistoryPort {
             metadata.put(META_PREFERENCE, preference == null ? "RELIABILITY" : preference);
             metadata.put(META_CREATED_AT, when.getEpochSecond());
 
-            Document document = new Document(route.routeId(), description, metadata);
+            Document document = new Document(documentId(route, originGeohash, destGeohash), description, metadata);
             vectorStore.add(List.of(document));
             log.info("[RAG] 경로 이력 저장: routeId={} desc=\"{}\" ({}→{})",
                     route.routeId(), description, originGeohash, destGeohash);

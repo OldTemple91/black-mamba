@@ -51,4 +51,10 @@ public interface RouteHistoryPort {
      *         실패 시 빈 리스트 (empty Mono 가 아니다 — zip 안전).
      */
     Mono<List<ScoredRouteHistoryEntry>> search(RagSearchRequest request);
+
+    /**
+     * 이 경로를 이력에 저장한다면 쓰일 서술 문장.
+     * 유사 이력을 찾을 때 검색어로 쓴다 — 저장된 문서와 같은 형식의 문장이어야 벡터 유사도가 의미를 가진다.
+     */
+    String describe(Route route, Location origin, Location destination, String preference);
 }

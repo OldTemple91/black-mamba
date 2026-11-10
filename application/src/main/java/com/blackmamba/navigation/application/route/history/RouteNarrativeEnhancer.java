@@ -111,7 +111,7 @@ public class RouteNarrativeEnhancer {
             // 타임아웃은 .timeout() 한 곳에서만 관리 — 조회 + 생성 전체에 걸린다.
             // blockOptional(LLM_TIMEOUT) 로 이중 설정하면 바깥 타임아웃이 먼저 만료될 때
             // 내부 Mono 가 취소되지 않은 채 boundedElastic 스레드를 계속 점유한다 (스레드 누수).
-            String llmNarrative = fetchSimilar(origin, destination, preference)
+            String llmNarrative = fetchSimilar(route, origin, destination, preference)
                     .doOnNext(similar -> similarHitSummary.record(similar.size()))
                     .flatMap(similar -> Mono.fromCallable(() ->
                                     narrativeGenerator.generate(
@@ -142,18 +142,15 @@ public class RouteNarrativeEnhancer {
         }
     }
 
-    private Mono<List<ScoredRouteHistoryEntry>> fetchSimilar(Location origin,
+    private Mono<List<ScoredRouteHistoryEntry>> fetchSimilar(Route route,
+                                                             Location origin,
                                                              Location destination,
                                                              String preference) {
         if (routeHistoryPort == null) return Mono.just(List.of());
 
-        // 쿼리 = 경로의 서술 요약 (RAG-2 에서 이미 임베딩된 형식과 유사)
-        String query = String.format(
-                "%s에서 %s까지 %s 선호 경로",
-                origin.name() == null ? "" : origin.name(),
-                destination.name() == null ? "" : destination.name(),
-                "TIME_PRIORITY".equalsIgnoreCase(preference) ? "빠른 시간" : "안정적"
-        );
+        // 검색어 = 이 경로를 저장할 때 쓰일 서술 문장. 예전엔 "출발지에서 목적지까지 안정적 선호 경로" 로
+        // 사실상 상수여서(컨트롤러가 이름을 고정) 벡터 유사도가 격자 필터 이상의 정보를 주지 못했다.
+        String query = routeHistoryPort.describe(route, origin, destination, preference);
 
         // 공간 필터: 같은 OD 격자의 이력만 — 타지역 사례가 narrative 근거로 오염되는 것 방지.
         // 격자 인코딩은 infra 어댑터 책임 (application 은 좌표만 전달).
