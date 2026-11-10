@@ -8,12 +8,7 @@ import com.blackmamba.navigation.infra.common.http.ExternalApiClientException;
 import com.blackmamba.navigation.infra.common.http.ExternalApiException;
 import com.blackmamba.navigation.infra.common.http.WebClients;
 import com.blackmamba.navigation.infra.tmap.dto.TmapPedestrianResponse;
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
-import io.github.resilience4j.reactor.retry.RetryOperator;
-import io.github.resilience4j.retry.Retry;
-import io.github.resilience4j.retry.RetryRegistry;
+import com.blackmamba.navigation.infra.common.resilience.ExternalApiResilience;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.annotation.Observed;
@@ -56,9 +51,7 @@ public class TmapPedestrianClient {
     private final AtomicLong quotaBlockedUntilMs = new AtomicLong(0L);
     /** backoff 창마다 한 번만 WARN — 요청당 구간 수만큼 반복되면 실제 경고가 묻힌다. 집계는 quotaShortCircuitCounter 가 한다 */
     private final AtomicBoolean quotaBackoffLogged = new AtomicBoolean(false);
-    // T-3: Resilience4j
-    private final CircuitBreaker circuitBreaker;
-    private final Retry retry;
+    private final ExternalApiResilience.Guard guard;
 
     public TmapPedestrianClient(
             WebClient.Builder webClientBuilder,
@@ -68,16 +61,14 @@ public class TmapPedestrianClient {
             @Value("${navigation.cache.tmap-rate-limit-backoff-ms:3600000}") long quotaBackoffMs,
             @Value("${tmap.request-timeout-ms:5000}") long requestTimeoutMs,
             MeterRegistry meterRegistry,
-            CircuitBreakerRegistry circuitBreakerRegistry,
-            RetryRegistry retryRegistry,
+            ExternalApiResilience resilience,
             TtlCacheRegistry cacheRegistry
     ) {
         this.webClient = WebClients.withTimeout(webClientBuilder, baseUrl, requestTimeoutMs);
         this.appKey = appKey;
         this.routeCache = cacheRegistry.create("tmap_pedestrian_route", routeCacheTtlMs);
         this.quotaBackoffMs = quotaBackoffMs;
-        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("tmap");
-        this.retry = retryRegistry.retry("tmap");
+        this.guard = resilience.forApi("tmap");
         this.fallbackCounter = meterRegistry.counter(
                 "navigation.tmap.fallback.total", "reason", "error");
         this.quotaFallbackCounter = meterRegistry.counter(
@@ -139,8 +130,7 @@ public class TmapPedestrianClient {
                     return Optional.<TmapRouteData>empty();
                 })
                 // T-3: Retry(안쪽) + CircuitBreaker(바깥). 최종 onErrorResume 으로 해버사인 fallback.
-                .transformDeferred(RetryOperator.of(retry))
-                .transformDeferred(CircuitBreakerOperator.of(circuitBreaker))
+                .as(guard::protect)
                 .onErrorResume(ex -> {
                     if (isTooManyRequests(ex)) {
                         quotaFallbackCounter.increment();

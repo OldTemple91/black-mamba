@@ -2,6 +2,7 @@ package com.blackmamba.navigation.infra.ddareungi;
 
 import com.blackmamba.navigation.domain.route.mobility.AvailabilitySource;
 import com.blackmamba.navigation.infra.common.http.ExternalApiException;
+import com.blackmamba.navigation.infra.common.resilience.ExternalApiResilience;
 import com.blackmamba.navigation.infra.ddareungi.DdareungiApiClient.StationSnapshot;
 import com.blackmamba.navigation.infra.ddareungi.dto.DdareungiStation;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -210,7 +211,7 @@ class DdareungiApiClientTest {
         circuitBreaker = circuitBreakerRegistry.circuitBreaker("ddareungi");
         RetryRegistry retryRegistry = RetryRegistry.of(RetryConfig.custom().maxAttempts(1).build());
         return new DdareungiApiClient(WebClient.builder(), new ObjectMapper(), API_KEY, wireMock.baseUrl(), snapshotTtlMs, 5_000L, 0L, maxStaleAgeMs,
-                meterRegistry, circuitBreakerRegistry, retryRegistry);
+                meterRegistry, new ExternalApiResilience(circuitBreakerRegistry, retryRegistry));
     }
 
     /** 첫 호출은 정류소 1개 성공, 이후 호출은 {@code next} 응답. */

@@ -2,17 +2,12 @@ package com.blackmamba.navigation.infra.kickboard;
 
 import com.blackmamba.navigation.infra.kickboard.dto.KickboardDevice;
 import com.blackmamba.navigation.infra.kickboard.dto.KickboardResponse;
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
-import io.github.resilience4j.reactor.retry.RetryOperator;
-import io.github.resilience4j.retry.Retry;
-import io.github.resilience4j.retry.RetryRegistry;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.blackmamba.navigation.infra.common.http.ExternalApiException;
+import com.blackmamba.navigation.infra.common.resilience.ExternalApiResilience;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
@@ -50,9 +45,7 @@ public class KickboardApiClient {
     private final Counter emptyFallbackCounter;
     private final long snapshotCacheTtlMs;
     private final long requestTimeoutMs;
-    // T-3: Resilience4j
-    private final CircuitBreaker circuitBreaker;
-    private final Retry retry;
+    private final ExternalApiResilience.Guard guard;
 
     public KickboardApiClient(
             WebClient.Builder webClientBuilder,
@@ -61,8 +54,7 @@ public class KickboardApiClient {
             @Value("${navigation.cache.kickboard-snapshot-ttl-ms:30000}") long snapshotCacheTtlMs,
             @Value("${tago.request-timeout-ms:5000}") long requestTimeoutMs,
             MeterRegistry meterRegistry,
-            CircuitBreakerRegistry circuitBreakerRegistry,
-            RetryRegistry retryRegistry
+            ExternalApiResilience resilience
     ) {
         this.apiKey = apiKey;
         this.cityCode = cityCode;
@@ -70,8 +62,7 @@ public class KickboardApiClient {
         this.requestTimeoutMs = requestTimeoutMs;
         this.webClient = webClientBuilder.baseUrl(BASE_URL).build();
         this.filter = new KickboardDeviceFilter();
-        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("kickboard");
-        this.retry = retryRegistry.retry("kickboard");
+        this.guard = resilience.forApi("kickboard");
         this.snapshotCacheHitCounter = meterRegistry.counter(
                 "navigation.cache.total",
                 "cache", "kickboard_snapshot",
@@ -153,8 +144,7 @@ public class KickboardApiClient {
                         deviceSnapshot.set(new DeviceSnapshotCache(Mono.just(devices).cache(), System.currentTimeMillis() + snapshotCacheTtlMs));
                     })
                     // T-3: Retry(안쪽) + CircuitBreaker(바깥) → 최종 onErrorResume 에서 stale snapshot fallback
-                    .transformDeferred(RetryOperator.of(retry))
-                    .transformDeferred(CircuitBreakerOperator.of(circuitBreaker))
+                    .as(guard::protect)
                     .onErrorResume(ex -> {
                         log.warn("[킥보드 API] snapshot 조회 실패. 원인: {}", ex.getMessage());
                         return staleOrEmptySnapshot(deviceSnapshot.get());

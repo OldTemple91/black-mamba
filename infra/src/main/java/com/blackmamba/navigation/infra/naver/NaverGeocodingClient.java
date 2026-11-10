@@ -3,12 +3,7 @@ package com.blackmamba.navigation.infra.naver;
 import com.blackmamba.navigation.infra.common.http.ExternalApiException;
 import com.blackmamba.navigation.infra.common.http.WebClients;
 import com.blackmamba.navigation.infra.naver.dto.NaverGeocodingResponse;
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
-import io.github.resilience4j.reactor.retry.RetryOperator;
-import io.github.resilience4j.retry.Retry;
-import io.github.resilience4j.retry.RetryRegistry;
+import com.blackmamba.navigation.infra.common.resilience.ExternalApiResilience;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -38,9 +33,7 @@ public class NaverGeocodingClient {
     private final WebClient webClient;
     private final Counter geocodeErrorCounter;
     private final Counter suggestErrorCounter;
-    // T-3: Resilience4j
-    private final CircuitBreaker circuitBreaker;
-    private final Retry retry;
+    private final ExternalApiResilience.Guard guard;
 
     public NaverGeocodingClient(
             WebClient.Builder builder,
@@ -48,15 +41,13 @@ public class NaverGeocodingClient {
             @Value("${naver.client-secret}") String clientSecret,
             @Value("${naver.request-timeout-ms:3000}") long requestTimeoutMs,
             MeterRegistry meterRegistry,
-            CircuitBreakerRegistry circuitBreakerRegistry,
-            RetryRegistry retryRegistry
+            ExternalApiResilience resilience
     ) {
         this.webClient = WebClients.withTimeout(
                 builder.defaultHeader("X-NCP-APIGW-API-KEY-ID", clientId)
                         .defaultHeader("X-NCP-APIGW-API-KEY", clientSecret),
                 BASE_URL, requestTimeoutMs);
-        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("naver-geocoding");
-        this.retry = retryRegistry.retry("naver-geocoding");
+        this.guard = resilience.forApi("naver-geocoding");
         this.geocodeErrorCounter = meterRegistry.counter("navigation.naver.fallback.total", "api", "geocode", "reason", "error");
         this.suggestErrorCounter = meterRegistry.counter("navigation.naver.fallback.total", "api", "suggest", "reason", "error");
     }
@@ -84,8 +75,7 @@ public class NaverGeocodingClient {
                     var addr = response.addresses().get(0);
                     return Optional.of(new double[]{addr.lat(), addr.lng()});
                 })
-                .transformDeferred(RetryOperator.of(retry))
-                .transformDeferred(CircuitBreakerOperator.of(circuitBreaker))
+                .as(guard::protect)
                 .onErrorResume(e -> {
                     geocodeErrorCounter.increment();
                     log.warn("[Naver] 지오코딩 실패(최종) → 빈 결과. query=\"{}\" err={}", query, e.toString());
@@ -121,8 +111,7 @@ public class NaverGeocodingClient {
                             })
                             .toList();
                 })
-                .transformDeferred(RetryOperator.of(retry))
-                .transformDeferred(CircuitBreakerOperator.of(circuitBreaker))
+                .as(guard::protect)
                 .onErrorResume(e -> {
                     suggestErrorCounter.increment();
                     log.warn("[Naver] 자동완성 실패(최종) → 빈 결과. query=\"{}\" err={}", query, e.toString());

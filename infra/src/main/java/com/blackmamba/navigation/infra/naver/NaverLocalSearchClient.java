@@ -3,12 +3,7 @@ package com.blackmamba.navigation.infra.naver;
 import com.blackmamba.navigation.infra.common.http.ExternalApiException;
 import com.blackmamba.navigation.infra.common.http.WebClients;
 import com.blackmamba.navigation.infra.naver.dto.NaverLocalSearchResponse;
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
-import io.github.resilience4j.reactor.retry.RetryOperator;
-import io.github.resilience4j.retry.Retry;
-import io.github.resilience4j.retry.RetryRegistry;
+import com.blackmamba.navigation.infra.common.resilience.ExternalApiResilience;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -39,9 +34,7 @@ public class NaverLocalSearchClient {
     private final WebClient webClient;
     private final boolean enabled;
     private final Counter errorCounter;
-    // T-3: Resilience4j
-    private final CircuitBreaker circuitBreaker;
-    private final Retry retry;
+    private final ExternalApiResilience.Guard guard;
 
     public NaverLocalSearchClient(
             WebClient.Builder builder,
@@ -49,16 +42,14 @@ public class NaverLocalSearchClient {
             @Value("${naver.search.client-secret:}") String clientSecret,
             @Value("${naver.request-timeout-ms:3000}") long requestTimeoutMs,
             MeterRegistry meterRegistry,
-            CircuitBreakerRegistry circuitBreakerRegistry,
-            RetryRegistry retryRegistry
+            ExternalApiResilience resilience
     ) {
         this.enabled = clientId != null && !clientId.isBlank();
         this.webClient = WebClients.withTimeout(
                 builder.defaultHeader("X-Naver-Client-Id", clientId != null ? clientId : "")
                         .defaultHeader("X-Naver-Client-Secret", clientSecret != null ? clientSecret : ""),
                 BASE_URL, requestTimeoutMs);
-        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("naver-local");
-        this.retry = retryRegistry.retry("naver-local");
+        this.guard = resilience.forApi("naver-local");
         this.errorCounter = meterRegistry.counter("navigation.naver.fallback.total", "api", "local_search", "reason", "error");
     }
 
@@ -101,8 +92,7 @@ public class NaverLocalSearchClient {
                             .filter(p -> p != null)
                             .toList();
                 })
-                .transformDeferred(RetryOperator.of(retry))
-                .transformDeferred(CircuitBreakerOperator.of(circuitBreaker))
+                .as(guard::protect)
                 .onErrorResume(e -> {
                     errorCounter.increment();
                     log.warn("[Naver] 장소 검색 실패(최종) → 빈 결과. query=\"{}\" err={}", query, e.toString());

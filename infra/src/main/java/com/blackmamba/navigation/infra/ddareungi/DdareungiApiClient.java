@@ -5,14 +5,9 @@ import com.blackmamba.navigation.infra.common.http.ExternalApiException;
 import com.blackmamba.navigation.infra.common.http.WebClients;
 import com.blackmamba.navigation.infra.ddareungi.dto.DdareungiStation;
 import com.blackmamba.navigation.infra.ddareungi.dto.DdareungiStationResponse;
+import com.blackmamba.navigation.infra.common.resilience.ExternalApiResilience;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
-import io.github.resilience4j.reactor.retry.RetryOperator;
-import io.github.resilience4j.retry.Retry;
-import io.github.resilience4j.retry.RetryRegistry;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.annotation.Observed;
@@ -76,9 +71,7 @@ public class DdareungiApiClient {
     private final long requestTimeoutMs;
     private final long refreshBackoffMs;
     private final long maxStaleAgeMs;
-    // T-3: Resilience4j
-    private final CircuitBreaker circuitBreaker;
-    private final Retry retry;
+    private final ExternalApiResilience.Guard guard;
 
     public DdareungiApiClient(
             WebClient.Builder webClientBuilder,
@@ -90,8 +83,7 @@ public class DdareungiApiClient {
             @Value("${ddareungi.refresh-backoff-ms:30000}") long refreshBackoffMs,
             @Value("${ddareungi.max-stale-age-ms:900000}") long maxStaleAgeMs,
             MeterRegistry meterRegistry,
-            CircuitBreakerRegistry circuitBreakerRegistry,
-            RetryRegistry retryRegistry
+            ExternalApiResilience resilience
     ) {
         this.objectMapper = objectMapper;
         this.apiKey = apiKey;
@@ -99,8 +91,7 @@ public class DdareungiApiClient {
         this.requestTimeoutMs = requestTimeoutMs;
         this.refreshBackoffMs = refreshBackoffMs;
         this.maxStaleAgeMs = maxStaleAgeMs;
-        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("ddareungi");
-        this.retry = retryRegistry.retry("ddareungi");
+        this.guard = resilience.forApi("ddareungi");
         this.webClient = WebClients.withTimeout(webClientBuilder, baseUrl, requestTimeoutMs);
         this.filter = new DdareungiStationFilter();
         this.snapshotCacheHitCounter = meterRegistry.counter(
@@ -205,7 +196,7 @@ public class DdareungiApiClient {
             Mono<StationSnapshot> loader = fetchStationsFrom(1)
                     .map(this::storeSnapshot)
                     // T-3: Retry 는 페이지 단위(fetchPage), CircuitBreaker 는 갱신 1회 단위 → 최종 onErrorResume 에서 stale snapshot fallback
-                    .transformDeferred(CircuitBreakerOperator.of(circuitBreaker))
+                    .as(guard::circuitBreak)
                     .onErrorResume(ex -> {
                         long blockedUntil = System.currentTimeMillis() + refreshBackoffMs;
                         refreshBlockedUntilMs.set(blockedUntil);
@@ -254,7 +245,7 @@ public class DdareungiApiClient {
                 .bodyToMono(String.class)
                 .timeout(Duration.ofMillis(requestTimeoutMs))
                 .map(this::parse)
-                .transformDeferred(RetryOperator.of(retry));
+                .as(guard::retry);
     }
 
     private DdareungiStationResponse parse(String body) {

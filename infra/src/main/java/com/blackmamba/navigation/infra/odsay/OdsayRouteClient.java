@@ -10,14 +10,9 @@ import com.blackmamba.navigation.infra.common.cache.TtlCacheRegistry;
 import com.blackmamba.navigation.infra.common.http.ExternalApiException;
 import com.blackmamba.navigation.infra.common.http.WebClients;
 import com.blackmamba.navigation.infra.odsay.dto.OdsayRouteResponse;
+import com.blackmamba.navigation.infra.common.resilience.ExternalApiResilience;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
-import io.github.resilience4j.reactor.retry.RetryOperator;
-import io.github.resilience4j.retry.Retry;
-import io.github.resilience4j.retry.RetryRegistry;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.annotation.Observed;
@@ -53,9 +48,7 @@ public class OdsayRouteClient {
     private final AtomicLong nextPermitMs = new AtomicLong(0);
     // B-3: Geohash 기반 키 → 150m 격자 내 좌표는 동일 키로 캐시 공유
     private final TtlCache<String, List<Leg>> routeCache;
-    // T-3: Resilience4j — 회로 차단 + 재시도 + 최종 폴백
-    private final CircuitBreaker circuitBreaker;
-    private final Retry retry;
+    private final ExternalApiResilience.Guard guard;
 
     public OdsayRouteClient(
             WebClient.Builder webClientBuilder,
@@ -66,8 +59,7 @@ public class OdsayRouteClient {
             @Value("${navigation.cache.odsay-route-ttl-ms:30000}") long routeCacheTtlMs,
             @Value("${odsay.request-timeout-ms:5000}") long requestTimeoutMs,
             MeterRegistry meterRegistry,
-            CircuitBreakerRegistry circuitBreakerRegistry,
-            RetryRegistry retryRegistry,
+            ExternalApiResilience resilience,
             TtlCacheRegistry cacheRegistry
     ) {
         this.mapper = mapper;
@@ -75,8 +67,7 @@ public class OdsayRouteClient {
         this.apiKey = apiKey;
         this.routeCache = cacheRegistry.create("odsay_route", routeCacheTtlMs);
         this.webClient = WebClients.withTimeout(webClientBuilder, baseUrl, requestTimeoutMs);
-        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("odsay");
-        this.retry = retryRegistry.retry("odsay");
+        this.guard = resilience.forApi("odsay");
         this.transitRouteErrorFallbackCounter = meterRegistry.counter(
                 "navigation.odsay.fallback.total",
                 "type", "transit_route",
@@ -194,8 +185,7 @@ public class OdsayRouteClient {
                     return Mono.just(legs);
                 })
                 // T-3: Retry (안쪽) + CircuitBreaker (바깥) → 최종 onErrorResume 으로 폴백
-                .transformDeferred(RetryOperator.of(retry))
-                .transformDeferred(CircuitBreakerOperator.of(circuitBreaker))
+                .as(guard::protect)
                 .onErrorResume(ex -> {
                     transitRouteErrorFallbackCounter.increment();
                     if (ex instanceof ExternalApiException) {

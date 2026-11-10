@@ -2,6 +2,7 @@ package com.blackmamba.navigation.infra.tmap;
 
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.infra.common.cache.TtlCacheRegistry;
+import com.blackmamba.navigation.infra.common.resilience.ExternalApiResilience;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
@@ -54,7 +55,7 @@ class TmapPedestrianClientTest {
         meterRegistry = new SimpleMeterRegistry();
         RetryRegistry retryRegistry = RetryRegistry.of(RetryConfig.custom().maxAttempts(1).build());
         client = new TmapPedestrianClient(WebClient.builder(), "test-app-key", wireMock.baseUrl(), ROUTE_TTL_MS, QUOTA_BACKOFF_MS, 5_000L,
-                meterRegistry, CircuitBreakerRegistry.ofDefaults(), retryRegistry, new TtlCacheRegistry(meterRegistry));
+                meterRegistry, new ExternalApiResilience(CircuitBreakerRegistry.ofDefaults(), retryRegistry), new TtlCacheRegistry(meterRegistry));
     }
 
     @Test
