@@ -27,7 +27,9 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -86,9 +88,12 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                         log.info("[OPTIMAL] baseLegs={}개 totalMin={}", baseLegs.size(), baseline.minutes());
                     }
 
-                    // 후보 지점 진단
-                    List<Hub> diagHubs = hubSelector.selectLastMileHubs(baseLegs, destination, MobilityConfig.bike());
-                    log.info("[OPTIMAL] lastMile 허브={}개 (ddareungi 기준)", diagHubs.size());
+                    // 라스트마일 허브 우선순위화는 요청당·수단당 한 번만 — 패턴 C·D 와 진단이 같은 결과를 공유한다.
+                    // (따릉이는 허브마다 최근접 정류소 조회가 따라붙어, 예전엔 같은 계산을 요청마다 2~3번 반복했다)
+                    Map<MobilityType, Mono<List<Hub>>> lastMileHubsByType = new EnumMap<>(MobilityType.class);
+                    for (MobilityType type : ALL_TYPES) {
+                        lastMileHubsByType.put(type, hubPrioritizer.prioritize(baseLegs, destination, type, MobilityConfigs.forType(type)).cache());
+                    }
 
                     Route baseRoute = baseline.toRoute();
                     int baseMinutes = baseline.minutes();
@@ -98,8 +103,8 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                                 MobilityConfig config = MobilityConfigs.forType(type);
                                 return Flux.merge(
                                         patternB(origin, destination, baseLegs, type, config),
-                                        patternC(origin, destination, baseLegs, type, config),
-                                        patternD(origin, destination, baseLegs, type, config),
+                                        patternC(origin, destination, baseLegs, type, lastMileHubsByType.get(type)),
+                                        patternD(origin, destination, baseLegs, type, config, lastMileHubsByType.get(type)),
                                         patternE(origin, destination, type, config)
                                 );
                             });
@@ -109,7 +114,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                             .collectList()
                             .flatMap(candidates -> {
                                 if (hasOnlyTransitCandidate(candidates)) {
-                                    return buildNoMixedDiagnostics(origin, destination, baseLegs)
+                                    return buildNoMixedDiagnostics(origin, destination, baseLegs, lastMileHubsByType)
                                             .map(reasons -> {
                                                 Route enrichedBaseRoute = RouteRanker.withDiagnostics(baseRoute, reasons);
                                                 return ranker.rank(List.of(enrichedBaseRoute), enrichedBaseRoute, baseMinutes, preference);
@@ -160,8 +165,8 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
 
     // 패턴 C: 대중교통으로 환승점까지 → 이동수단으로 목적지
     private Flux<Route> patternC(Location origin, Location destination,
-                                  List<Leg> baseLegs, MobilityType type, MobilityConfig config) {
-        return hubPrioritizer.prioritize(baseLegs, destination, type, config)
+                                  List<Leg> baseLegs, MobilityType type, Mono<List<Hub>> lastMileHubs) {
+        return lastMileHubs
                 .flatMapMany(lastMile -> Flux.fromIterable(lastMile)
                 .flatMap(lastHub -> {
                     Location switchPoint = lastHub.location();
@@ -189,14 +194,14 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
 
     // 패턴 D: 이동수단→정류장 + 대중교통(중간) + 이동수단→목적지
     private Flux<Route> patternD(Location origin, Location destination,
-                                  List<Leg> baseLegs, MobilityType type, MobilityConfig config) {
+                                  List<Leg> baseLegs, MobilityType type, MobilityConfig config, Mono<List<Hub>> lastMileHubs) {
         return hasPickupNearOrigin(origin, type)
                 .flatMapMany(hasPickup -> {
                     if (!hasPickup) {
                         return Flux.empty();
                     }
                     List<Hub> firstMile = hubSelector.selectFirstMileHubs(origin, baseLegs, config);
-                    return hubPrioritizer.prioritize(baseLegs, destination, type, config)
+                    return lastMileHubs
                             .flatMapMany(lastMile -> {
                                 if (firstMile.isEmpty() || lastMile.isEmpty()) return Flux.empty();
 
@@ -273,21 +278,23 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
         return candidates.size() == 1 && candidates.getFirst().type() == RouteType.TRANSIT_ONLY;
     }
 
-    private Mono<List<GenerationDiagnostic>> buildNoMixedDiagnostics(Location origin, Location destination, List<Leg> baseLegs) {
+    private Mono<List<GenerationDiagnostic>> buildNoMixedDiagnostics(Location origin, Location destination, List<Leg> baseLegs,
+                                                                     Map<MobilityType, Mono<List<Hub>>> lastMileHubsByType) {
         return Flux.fromIterable(ALL_TYPES)
-                .flatMap(type -> diagnosticsForType(origin, destination, baseLegs, type))
+                .flatMap(type -> diagnosticsForType(origin, destination, baseLegs, type, lastMileHubsByType.get(type)))
                 .distinct()
                 .collectList()
                 .map(list -> list.isEmpty() ? List.of(MobilityDiagnostics.noMixedRoute()) : list);
     }
 
     /** 진단은 생성 때 실제로 시도한 허브 집합(라스트마일은 우선순위화된 상위 N, 퍼스트마일은 선택 상위 N)에 대해 수행한다. */
-    private Flux<GenerationDiagnostic> diagnosticsForType(Location origin, Location destination, List<Leg> baseLegs, MobilityType type) {
+    private Flux<GenerationDiagnostic> diagnosticsForType(Location origin, Location destination, List<Leg> baseLegs, MobilityType type,
+                                                          Mono<List<Hub>> lastMileHubsMono) {
         MobilityConfig config = MobilityConfigs.forType(type);
         List<Hub> firstMileHubs = hubSelector.selectFirstMileHubs(origin, baseLegs, config).stream()
                 .limit(MAX_CANDIDATE_HUBS)
                 .toList();
-        return hubPrioritizer.prioritize(baseLegs, destination, type, config)
+        return lastMileHubsMono
                 .flatMapMany(lastMileHubs -> diagnosticsForHubs(origin, destination, type, config, firstMileHubs, lastMileHubs));
     }
 

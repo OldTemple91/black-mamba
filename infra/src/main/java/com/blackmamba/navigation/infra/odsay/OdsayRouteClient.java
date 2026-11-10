@@ -54,7 +54,7 @@ public class OdsayRouteClient {
             OdsayRouteMapper mapper,
             @Value("${odsay.api-key}") String apiKey,
             @Value("${odsay.base-url:https://api.odsay.com/v1/api}") String baseUrl,
-            @Value("${navigation.cache.odsay-route-ttl-ms:30000}") long routeCacheTtlMs,
+            @Value("${navigation.cache.odsay-route-ttl-ms:300000}") long routeCacheTtlMs,
             @Value("${odsay.request-timeout-ms:5000}") long requestTimeoutMs,
             MeterRegistry meterRegistry,
             ExternalApiResilience resilience,

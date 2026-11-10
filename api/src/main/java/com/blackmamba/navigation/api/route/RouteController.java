@@ -110,6 +110,7 @@ public class RouteController {
         WeatherContext weatherContext = WeatherContext.of(WeatherCondition.parse(weather));
 
         Timer.Sample sample = Timer.start(meterRegistry);
+        long startedAtNanos = System.nanoTime();
         try {
             List<Route> routes = routeOptimizationService
                     .findRoutes(origin, destination, mobilityTypes, searchMode, recommendationPreference, accessibilityContext, weatherContext)
@@ -119,8 +120,10 @@ public class RouteController {
             // RAG-4: 추천 경로의 carComparison.narrative 를 LLM 설명으로 업그레이드
             // (N개 경로 중 recommended=true 인 것만 LLM 호출 → 지연 제어)
             if (routes != null && !routes.isEmpty()) {
+                // LLM 은 탐색이 쓰고 남은 시간만 쓴다 — 응답 상한은 탐색 타임아웃 하나다
+                Duration remaining = ROUTE_SEARCH_TIMEOUT.minus(Duration.ofNanos(System.nanoTime() - startedAtNanos));
                 routes = narrativeEnhancer.enhanceRecommended(
-                        routes, origin, destination, recommendationPreference.name());
+                        routes, origin, destination, recommendationPreference.name(), remaining);
             }
 
             int count = routes != null ? routes.size() : 0;

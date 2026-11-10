@@ -153,7 +153,10 @@ navigation:
   cache:
     # 만료 엔트리 주기 청소 간격 (@Scheduled fixedDelay) — 재조회 없는 키의 힙 잔류 방지
     purge-interval-ms: 300000
-    odsay-route-ttl-ms: 30000
+    # ODsay 경로는 시간표 기반(실시간 아님)이라 분 단위로 바뀌지 않는다.
+    # 30초였을 땐 SSE 재탐색 주기(30초)와 같아 재탐색마다 전부 miss — 스트림 하나가 5분간 ODsay 를 약 120회 불렀다.
+    # 5분이면 재탐색은 가용성(20초 TTL)만 다시 보고 대중교통 구간은 캐시에서 온다
+    odsay-route-ttl-ms: 300000
     ddareungi-snapshot-ttl-ms: 30000
     kickboard-snapshot-ttl-ms: 30000
     mobility-availability-ttl-ms: 20000

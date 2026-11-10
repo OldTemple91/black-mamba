@@ -44,7 +44,7 @@ class RouteControllerTest {
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
         // RAG-4 narrativeEnhancer 는 Mock — 기본적으로 입력 routes 를 그대로 반환 (pass-through)
-        when(narrativeEnhancer.enhanceRecommended(any(), any(), any(), any()))
+        when(narrativeEnhancer.enhanceRecommended(any(), any(), any(), any(), any()))
                 .thenAnswer((InvocationOnMock inv) -> inv.getArgument(0));
     }
 

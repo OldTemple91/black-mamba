@@ -49,6 +49,8 @@ public class RouteNarrativeEnhancer {
     private static final int SIMILAR_TOP_K = 3;
     private static final double SIMILAR_MIN_SCORE = 0.35; // 무관한 이력 배제
     private static final Duration LLM_TIMEOUT = Duration.ofSeconds(15);
+    /** 이보다 적게 남았으면 LLM 을 시도하지 않는다 — 로컬 모델은 그 안에 답하지 못한다 */
+    private static final Duration MIN_LLM_BUDGET = Duration.ofSeconds(2);
 
     private final NarrativeGenerator narrativeGenerator; // 없을 수 있음
     private final RouteHistoryPort routeHistoryPort;      // 없을 수 있음
@@ -96,15 +98,37 @@ public class RouteNarrativeEnhancer {
                                            Location origin,
                                            Location destination,
                                            String preference) {
+        return enhanceRecommended(routes, origin, destination, preference, LLM_TIMEOUT);
+    }
+
+    /**
+     * @param budget 호출자가 줄 수 있는 남은 시간. 경로 탐색에 시간을 다 썼으면 LLM 을 기다리지 않고 원본을 돌려준다 —
+     *               탐색 타임아웃 뒤에 LLM 타임아웃이 따로 붙어 응답이 두 상한의 합까지 늘어지지 않게.
+     */
+    public List<Route> enhanceRecommended(List<Route> routes,
+                                           Location origin,
+                                           Location destination,
+                                           String preference,
+                                           Duration budget) {
         if (routes == null || routes.isEmpty()) return routes;
         if (narrativeGenerator == null) return routes; // 비활성화 상태
+        if (budget.compareTo(MIN_LLM_BUDGET) < 0) {
+            timeoutCounter.increment();
+            log.warn("[RAG4] 남은 시간 {}ms < {}ms → LLM 생략, 원본 narrative 유지", budget.toMillis(), MIN_LLM_BUDGET.toMillis());
+            return routes;
+        }
+        Duration timeout = LLM_TIMEOUT;
+        if (budget.compareTo(LLM_TIMEOUT) < 0) {
+            timeout = budget;
+        }
+        Duration llmTimeout = timeout;
 
         return routes.stream()
-                .map(r -> r.recommended() ? enhanceOne(r, origin, destination, preference) : r)
+                .map(r -> r.recommended() ? enhanceOne(r, origin, destination, preference, llmTimeout) : r)
                 .toList();
     }
 
-    private Route enhanceOne(Route route, Location origin, Location destination, String preference) {
+    private Route enhanceOne(Route route, Location origin, Location destination, String preference, Duration llmTimeout) {
         try {
             String originalNarrative = route.carComparison() == null ? null : route.carComparison().narrative();
             // Retrieval(포트, 어댑터가 스케줄러 격리) → Augmented + Generation(LLM, boundedElastic 격리)
@@ -117,11 +141,11 @@ public class RouteNarrativeEnhancer {
                                     narrativeGenerator.generate(
                                             route, origin, destination, preference, similar, originalNarrative))
                             .subscribeOn(Schedulers.boundedElastic()))
-                    .timeout(LLM_TIMEOUT)
+                    .timeout(llmTimeout)
                     .onErrorResume(e -> {
                         if (e instanceof TimeoutException) {
                             timeoutCounter.increment();
-                            log.warn("[RAG4] LLM 타임아웃({}s) → 원본 narrative 유지. routeId={}", LLM_TIMEOUT.getSeconds(), route.routeId());
+                            log.warn("[RAG4] LLM 타임아웃({}ms) → 원본 narrative 유지. routeId={}", llmTimeout.toMillis(), route.routeId());
                         } else {
                             enhancerErrorCounter.increment();
                             log.warn("[RAG4] narrative 생성 실패 → 원본 유지. routeId={} err={}", route.routeId(), e.getMessage());
