@@ -162,43 +162,48 @@ public class OdsayRouteClient {
                     var apiError = response.findApiError();
                     if (apiError.isPresent()) {
                         OdsayRouteResponse.ApiError error = apiError.get();
-                        if (error.isSearchResult()) {
+                        if (error.isNoRoute()) {
                             transitRouteEmptyResultCounter.increment();
                             log.info("[ODsay] 경로 없음 응답 (code={} {})", error.code(), error.message());
                             return Mono.just(List.<Leg>of());
                         }
-                        // 200 OK 로 내려오는 키·한도·서버 오류 — 예외여야 회로 차단기가 실패로 집계하고 조용한 추정 경로 대체가 멈춘다
-                        return Mono.error(ExternalApiException.of("ODsay", 400, "HTTP 200 오류 봉투 code=" + error.code() + " " + error.message()));
+                        if (error.isBadRequest()) {
+                            log.error("[ODsay] 요청 형식 오류 — 호출 코드의 버그 (code={} {}) {} → {}", error.code(), error.message(), origin, destination);
+                        }
+                        // 200 OK 로 내려오는 서버·키·한도 오류 — 예외여야 회로 차단기가 실패로 집계하고 조용한 추정 경로 대체가 멈춘다.
+                        // 서버 오류(500)만 재시도 대상이다
+                        int status = 400;
+                        if (error.isServerError()) {
+                            status = 500;
+                        }
+                        return Mono.error(ExternalApiException.of("ODsay", status, "HTTP 200 오류 봉투 code=" + error.code() + " " + error.message()));
                     }
                     if (response.result() == null) {
                         transitRouteEmptyResultCounter.increment();
                         log.warn("[ODsay] result 없음 — 경로 없음으로 처리. raw={}", rawJson);
                         return Mono.just(List.<Leg>of());
                     }
-                    {
-                        var paths = response.result().path();
-                        if (paths == null || paths.isEmpty()) {
-                            transitRouteEmptyResultCounter.increment();
-                            log.warn("[ODsay] 경로(path) 배열 비어있음");
-                            return Mono.just(List.<Leg>of());
-                        }
-                        List<Leg> legs = normalizeWalkLegs(mapper.toLegs(paths.get(0)), origin, destination);
-                        log.info("[ODsay] 파싱 성공 — leg {}개: {}", legs.size(),
-                                legs.stream().map(l ->
-                                        l.type() + "(transitInfo=" + (l.transitInfo() != null
-                                                ? l.transitInfo().lineName() + "/" + l.transitInfo().stationCount() + "역"
-                                                : "null")
-                                        + " start=" + (l.start() != null ? l.start().name() : "null") + ")"
-                                ).toList());
-                        return Mono.just(legs);
+                    var paths = response.result().path();
+                    if (paths == null || paths.isEmpty()) {
+                        transitRouteEmptyResultCounter.increment();
+                        log.warn("[ODsay] 경로(path) 배열 비어있음");
+                        return Mono.just(List.<Leg>of());
                     }
+                    List<Leg> legs = normalizeWalkLegs(mapper.toLegs(paths.get(0)), origin, destination);
+                    log.debug("[ODsay] 파싱 성공 — leg {}개", legs.size());
+                    return Mono.just(legs);
                 })
                 // T-3: Retry (안쪽) + CircuitBreaker (바깥) → 최종 onErrorResume 으로 폴백
                 .transformDeferred(RetryOperator.of(retry))
                 .transformDeferred(CircuitBreakerOperator.of(circuitBreaker))
                 .onErrorResume(ex -> {
                     transitRouteErrorFallbackCounter.increment();
-                    log.warn("[ODsay] 호출 실패(최종) → 빈 리스트 반환. 원인: {}", ex.getMessage());
+                    if (ex instanceof ExternalApiException) {
+                        log.warn("[ODsay] 호출 실패(최종) → 빈 리스트 반환. 원인: {}", ex.getMessage());
+                    } else {
+                        // 매퍼 NPE 같은 우리 쪽 버그 — 스택 없이 WARN 한 줄로 묻지 않는다
+                        log.error("[ODsay] 응답 처리 중 예기치 못한 오류 → 빈 리스트 반환", ex);
+                    }
                     return Mono.just(List.of());
                 }));
     }

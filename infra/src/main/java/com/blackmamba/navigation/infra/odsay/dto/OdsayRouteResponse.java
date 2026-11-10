@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * ODsay 응답. 키 오류·일일 한도 초과·서버 오류는 HTTP 200 + {@code error} 봉투로 내려온다
@@ -33,10 +34,30 @@ public record OdsayRouteResponse(Result result, JsonNode error) {
         return Optional.of(new ApiError(node.path("code").asText(""), message));
     }
 
-    /** 음수 코드는 "이 출발/도착 조합에 경로 없음" 류의 검색 결과이고, 양수(500 등)는 키·한도·서버 오류다. */
+    /**
+     * ODsay 공식 오류 코드(lab.odsay.com 레퍼런스) 기준 분류. 부호로는 가를 수 없다 —
+     * 3·4·5·6 은 양수지만 "정류장 없음·서비스 지역 아님" 이고, -8·-9 는 음수지만 우리 요청의 버그다.
+     */
     public record ApiError(String code, String message) {
-        public boolean isSearchResult() {
-            return code.startsWith("-");
+
+        /** 3 출발지 정류장 없음, 4 도착지 정류장 없음, 5 출·도착 정류장 없음, 6 서비스 지역 아님, -98 700m 이내, -99 검색 결과 없음 */
+        private static final Set<String> NO_ROUTE_CODES = Set.of("3", "4", "5", "6", "-98", "-99");
+        /** -8 입력값 형식·범위 오류, -9 필수 입력값 누락 */
+        private static final Set<String> BAD_REQUEST_CODES = Set.of("-8", "-9");
+        private static final String SERVER_ERROR_CODE = "500";
+
+        /** 이 출발/도착 조합에 경로가 없다는 정상 답 — 장애가 아니다. */
+        public boolean isNoRoute() {
+            return NO_ROUTE_CODES.contains(code);
+        }
+
+        /** 우리가 보낸 요청이 잘못됨 — 재시도해도 같은 답이고, 조용히 넘기면 안 된다. */
+        public boolean isBadRequest() {
+            return BAD_REQUEST_CODES.contains(code);
+        }
+
+        public boolean isServerError() {
+            return SERVER_ERROR_CODE.equals(code);
         }
     }
 

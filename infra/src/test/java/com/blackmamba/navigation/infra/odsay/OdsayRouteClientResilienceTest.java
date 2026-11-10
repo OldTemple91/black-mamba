@@ -2,6 +2,7 @@ package com.blackmamba.navigation.infra.odsay;
 
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.infra.common.cache.TtlCacheRegistry;
+import com.blackmamba.navigation.infra.common.http.ExternalApiServerException;
 import com.blackmamba.navigation.domain.route.Leg;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.WireMockServer;
@@ -15,11 +16,16 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import reactor.test.StepVerifier;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -87,6 +93,8 @@ class OdsayRouteClientResilienceTest {
                 RetryConfig.custom()
                         .maxAttempts(3)
                         .waitDuration(Duration.ofMillis(50))
+                        // application.yml 의 retryExceptions 와 같은 구성 — 4xx 계열(ExternalApiClientException)은 재시도하지 않는다
+                        .retryExceptions(IOException.class, TimeoutException.class, ExternalApiServerException.class, WebClientRequestException.class)
                         .build());
         this.meterRegistry = new SimpleMeterRegistry();
         OdsayRouteMapper mapper = new OdsayRouteMapper();
@@ -145,14 +153,11 @@ class OdsayRouteClientResilienceTest {
     }
 
     @Test
-    void 오류_봉투_200_응답은_실패로_집계되어_Retry_후_빈리스트_fallback() {
-        // given — ODsay 는 키 오류·일일 한도 초과를 HTTP 200 으로 돌려준다
-        wireMock.stubFor(get(urlPathEqualTo(PATH))
-                .willReturn(aResponse().withStatus(200)
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("""
-                                {"error":{"code":"500","msg":"ApiKeyAuthFailed"}}
-                                """)));
+    void 서버_오류_봉투_200_응답은_실패로_집계되어_Retry_후_빈리스트_fallback() {
+        // given — ODsay 는 서버 내부 오류를 HTTP 200 + code 500 봉투로 돌려준다
+        stubErrorEnvelope("""
+                {"error":{"code":"500","msg":"Internal Server Error"}}
+                """);
 
         // when & then
         StepVerifier.create(client.getTransitRoute(ORIGIN, DESTINATION))
@@ -165,15 +170,13 @@ class OdsayRouteClientResilienceTest {
                 .verifyComplete();
     }
 
-    @Test
-    void 음수_코드_오류_봉투는_경로_없음으로_본다() {
-        // given — 검색 결과 없음은 장애가 아니라 빈 결과
-        wireMock.stubFor(get(urlPathEqualTo(PATH))
-                .willReturn(aResponse().withStatus(200)
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("""
-                                {"error":[{"code":"-98","message":"출발지와 도착지가 너무 가깝습니다."}]}
-                                """)));
+    @ParameterizedTest
+    @ValueSource(strings = {"3", "4", "5", "6", "-98", "-99"})
+    void 정류장_없음과_검색결과_없음_코드는_장애가_아니라_경로_없음이다(String code) {
+        // given — 양수 3~6 도 "정류장 없음·서비스 지역 아님" 이라 회로에 실패로 쌓이면 안 된다
+        stubErrorEnvelope("""
+                {"error":[{"code":"%s","message":"검색 결과가 없습니다."}]}
+                """.formatted(code));
 
         // when & then
         StepVerifier.create(client.getTransitRoute(ORIGIN, DESTINATION))
@@ -182,6 +185,25 @@ class OdsayRouteClientResilienceTest {
                     wireMock.verify(1, getRequestedFor(urlPathEqualTo(PATH)));
                     assertThat(fallbackCount("empty_result")).isEqualTo(1.0);
                     assertThat(fallbackCount("error")).isZero();
+                })
+                .verifyComplete();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"-8", "-9"})
+    void 요청_형식_오류_코드는_경로_없음으로_묻지_않고_재시도_없이_실패로_집계한다(String code) {
+        // given
+        stubErrorEnvelope("""
+                {"error":[{"code":"%s","message":"필수 입력값 형식 및 범위 오류"}]}
+                """.formatted(code));
+
+        // when & then
+        StepVerifier.create(client.getTransitRoute(ORIGIN, DESTINATION))
+                .assertNext(legs -> {
+                    assertThat(legs).isEmpty();
+                    wireMock.verify(1, getRequestedFor(urlPathEqualTo(PATH)));
+                    assertThat(fallbackCount("error")).isEqualTo(1.0);
+                    assertThat(fallbackCount("empty_result")).isZero();
                 })
                 .verifyComplete();
     }
@@ -201,6 +223,13 @@ class OdsayRouteClientResilienceTest {
     }
 
     // ─── 헬퍼: 최소한의 ODsay 샘플 응답 ───
+
+    private void stubErrorEnvelope(String body) {
+        wireMock.stubFor(get(urlPathEqualTo(PATH))
+                .willReturn(aResponse().withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(body)));
+    }
 
     private double fallbackCount(String reason) {
         return meterRegistry.get("navigation.odsay.fallback.total")
