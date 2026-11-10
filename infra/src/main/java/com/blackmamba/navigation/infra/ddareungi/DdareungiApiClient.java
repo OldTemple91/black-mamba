@@ -5,6 +5,8 @@ import com.blackmamba.navigation.infra.common.http.ExternalApiException;
 import com.blackmamba.navigation.infra.common.http.WebClients;
 import com.blackmamba.navigation.infra.ddareungi.dto.DdareungiStation;
 import com.blackmamba.navigation.infra.ddareungi.dto.DdareungiStationResponse;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
@@ -20,7 +22,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
@@ -40,10 +41,13 @@ import java.util.stream.Stream;
  *
  * <h3>snapshot 신뢰 규칙</h3>
  * <ul>
- *   <li>API 는 1회 최대 1,000행이라 서울 전체(약 2,700개)를 페이지로 이어 받는다</li>
- *   <li>HTTP 200 오류 봉투는 {@link DdareungiStationResponse#requireSuccess()} 가 예외로 바꿔 재시도·회로·stale 폴백을 태운다</li>
- *   <li>정류소 0개의 "성공" 은 믿지 않는다 — 멀쩡한 이전 snapshot 을 빈 것으로 덮지 않는다</li>
+ *   <li>API 는 1회 최대 1,000행이라 서울 전체(약 2,700개)를 페이지로 이어 받는다. 응답에 전체 건수가 없어
+ *       "페이지가 가득 찼으면 다음 페이지" 로 진행한다</li>
+ *   <li>HTTP 200 오류 봉투(JSON)·XML 오류 본문은 예외로 바꿔 재시도·회로·stale 폴백을 태운다</li>
+ *   <li>정류소 0개의 "성공" 도 실패로 본다 — 서울 전체가 0개일 수는 없다. 실패와 같은 경로라
+ *       이전 snapshot 재사용·나이 상한·backoff 가 그대로 적용된다</li>
  *   <li>stale 재사용은 조회 후 {@code ddareungi.max-stale-age-ms} 까지만 — 몇 시간 전 재고로 "대여 여유" 를 판정하지 않는다</li>
+ *   <li>재시도는 페이지 단위 — 3페이지째 실패가 앞 페이지까지 다시 받게 하지 않는다. 부분 결과는 저장하지 않는다</li>
  * </ul>
  */
 @Component
@@ -55,6 +59,7 @@ public class DdareungiApiClient {
     /** 조회 상한 페이지 — 5,000개. 서울 대여소는 약 2,700개 */
     private static final int MAX_PAGES = 5;
     private final WebClient webClient;
+    private final ObjectMapper objectMapper;
     private final String apiKey;
     private final DdareungiStationFilter filter;
     private final AtomicReference<SnapshotCache> stationSnapshot = new AtomicReference<>();
@@ -65,7 +70,6 @@ public class DdareungiApiClient {
     private final Counter staleFallbackCounter;
     private final Counter staleExpiredCounter;
     private final Counter emptyFallbackCounter;
-    private final Counter emptyLiveIgnoredCounter;
     private final Counter refreshBackoffCounter;
     private final Counter refreshShortCircuitCounter;
     private final long snapshotCacheTtlMs;
@@ -78,6 +82,7 @@ public class DdareungiApiClient {
 
     public DdareungiApiClient(
             WebClient.Builder webClientBuilder,
+            ObjectMapper objectMapper,
             @Value("${ddareungi.api-key}") String apiKey,
             @Value("${ddareungi.base-url:http://openapi.seoul.go.kr:8088}") String baseUrl,
             @Value("${navigation.cache.ddareungi-snapshot-ttl-ms:30000}") long snapshotCacheTtlMs,
@@ -88,6 +93,7 @@ public class DdareungiApiClient {
             CircuitBreakerRegistry circuitBreakerRegistry,
             RetryRegistry retryRegistry
     ) {
+        this.objectMapper = objectMapper;
         this.apiKey = apiKey;
         this.snapshotCacheTtlMs = snapshotCacheTtlMs;
         this.requestTimeoutMs = requestTimeoutMs;
@@ -110,7 +116,6 @@ public class DdareungiApiClient {
         this.staleFallbackCounter = fallbackCounter(meterRegistry, "stale_snapshot");
         this.staleExpiredCounter = fallbackCounter(meterRegistry, "stale_expired");
         this.emptyFallbackCounter = fallbackCounter(meterRegistry, "empty_snapshot");
-        this.emptyLiveIgnoredCounter = fallbackCounter(meterRegistry, "empty_live_ignored");
         this.refreshBackoffCounter = fallbackCounter(meterRegistry, "refresh_backoff");
         this.refreshShortCircuitCounter = fallbackCounter(meterRegistry, "refresh_short_circuit");
     }
@@ -132,6 +137,11 @@ public class DdareungiApiClient {
 
         StationSnapshot asStale() {
             return new StationSnapshot(stations, AvailabilitySource.STALE);
+        }
+
+        /** snapshot 자체를 확보하지 못함 — "반경 내 정류소 없음" 과 다른 상태다. */
+        public boolean isUnavailable() {
+            return source == AvailabilitySource.EMPTY;
         }
 
         StationSnapshot withStations(List<DdareungiStation> filtered) {
@@ -192,10 +202,9 @@ public class DdareungiApiClient {
             }
             snapshotCacheMissCounter.increment();
 
-            Mono<StationSnapshot> loader = fetchAllStations()
+            Mono<StationSnapshot> loader = fetchStationsFrom(1)
                     .map(this::storeSnapshot)
-                    // T-3: Retry(안쪽) + CircuitBreaker(바깥) → 최종 onErrorResume 에서 stale snapshot fallback
-                    .transformDeferred(RetryOperator.of(retry))
+                    // T-3: Retry 는 페이지 단위(fetchPage), CircuitBreaker 는 갱신 1회 단위 → 최종 onErrorResume 에서 stale snapshot fallback
                     .transformDeferred(CircuitBreakerOperator.of(circuitBreaker))
                     .onErrorResume(ex -> {
                         long blockedUntil = System.currentTimeMillis() + refreshBackoffMs;
@@ -212,22 +221,25 @@ public class DdareungiApiClient {
         }
     }
 
-    /** 1,000행 단위로 전체 정류소를 이어 받는다. 첫 페이지의 {@code list_total_count} 로 남은 페이지 수를 정한다. */
-    private Mono<List<DdareungiStation>> fetchAllStations() {
-        return fetchPage(1).flatMap(first -> {
-            List<DdareungiStation> firstStations = first.toStations();
-            int pageCount = Math.min(MAX_PAGES, Math.ceilDiv(first.totalCount(), PAGE_SIZE));
-            if (first.totalCount() > MAX_PAGES * PAGE_SIZE) {
-                log.warn("[따릉이 API] 전체 정류소 {}개가 조회 상한 {}개를 넘음 — 초과분은 조회되지 않는다", first.totalCount(), MAX_PAGES * PAGE_SIZE);
+    /**
+     * {@code page} 부터 끝까지 이어 받는다. 페이지가 가득 차 있으면(행 수 = PAGE_SIZE) 다음 페이지가 있다고 본다.
+     * 첫 페이지부터 0개면 실패로 올린다.
+     */
+    private Mono<List<DdareungiStation>> fetchStationsFrom(int page) {
+        return fetchPage(page).flatMap(response -> {
+            List<DdareungiStation> stations = response.toStations();
+            if (page == 1 && response.rowCount() == 0) {
+                return Mono.error(ExternalApiException.of("따릉이", 500, "정류소 0개 응답"));
             }
-            if (pageCount <= 1) {
-                return Mono.just(firstStations);
+            if (response.rowCount() < PAGE_SIZE) {
+                return Mono.just(stations);
             }
-            return Flux.range(2, pageCount - 1)
-                    .concatMap(this::fetchPage)
-                    .map(DdareungiStationResponse::toStations)
-                    .collectList()
-                    .map(rest -> Stream.concat(firstStations.stream(), rest.stream().flatMap(List::stream)).toList());
+            if (page >= MAX_PAGES) {
+                log.warn("[따릉이 API] 조회 상한 {}페이지({}개)까지 가득 참 — 초과분은 조회되지 않는다", MAX_PAGES, MAX_PAGES * PAGE_SIZE);
+                return Mono.just(stations);
+            }
+            return fetchStationsFrom(page + 1)
+                    .map(rest -> Stream.concat(stations.stream(), rest.stream()).toList());
         });
     }
 
@@ -238,26 +250,23 @@ public class DdareungiApiClient {
                 .uri("/{apiKey}/json/bikeList/{start}/{end}/", apiKey, startIndex, endIndex)
                 .retrieve()
                 .onStatus(HttpStatusCode::isError, response -> ExternalApiException.from("따릉이", response))
-                .bodyToMono(DdareungiStationResponse.class)
+                // 인증키 오류는 XML 로 내려와 record 디코딩이 깨진다 — 문자열로 받아 직접 판별한다
+                .bodyToMono(String.class)
                 .timeout(Duration.ofMillis(requestTimeoutMs))
-                .map(DdareungiStationResponse::requireSuccess);
+                .map(this::parse)
+                .transformDeferred(RetryOperator.of(retry));
     }
 
-    /**
-     * 성공 응답만 snapshot 으로 저장한다.
-     * 정류소 0개는 API 가 빈 목록을 "성공" 으로 준 경우인데, 이전 snapshot 이 있으면 그쪽이 더 믿을 만하다 —
-     * TTL 만 연장해 폭주 재조회를 막고 출처는 STALE 로 표시한다.
-     */
+    private DdareungiStationResponse parse(String body) {
+        try {
+            return objectMapper.readValue(body, DdareungiStationResponse.class).requireSuccess();
+        } catch (JsonProcessingException e) {
+            throw DdareungiStationResponse.nonJsonError(body);
+        }
+    }
+
     private StationSnapshot storeSnapshot(List<DdareungiStation> stations) {
         long now = System.currentTimeMillis();
-        SnapshotCache previous = stationSnapshot.get();
-        if (stations.isEmpty() && previous != null && previous.hasStations()) {
-            emptyLiveIgnoredCounter.increment();
-            StationSnapshot kept = previous.snapshot().asStale();
-            stationSnapshot.set(new SnapshotCache(kept, previous.fetchedAtMs(), now + snapshotCacheTtlMs));
-            log.warn("[따릉이 API] 정류소 0개 응답 — 이전 snapshot({}개, {}초 전 조회) 유지", kept.stations().size(), previous.ageSeconds(now));
-            return kept;
-        }
         StationSnapshot snapshot = StationSnapshot.live(stations);
         stationSnapshot.set(new SnapshotCache(snapshot, now, now + snapshotCacheTtlMs));
         log.info("[따릉이 API] 서울시 전체 정류소 {}개 snapshot 갱신", stations.size());
@@ -293,10 +302,6 @@ public class DdareungiApiClient {
 
         private boolean isTooOld(long nowMs, long maxAgeMs) {
             return nowMs - fetchedAtMs >= maxAgeMs;
-        }
-
-        private boolean hasStations() {
-            return !snapshot.stations().isEmpty();
         }
 
         private long ageSeconds(long nowMs) {

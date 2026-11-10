@@ -6,14 +6,22 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 서울 열린데이터광장 따릉이 응답.
  * <p>
  * 이 API 는 키 오류·요청 오류·서버 오류를 <b>HTTP 200 + 최상위 {@code RESULT}</b> 봉투로 돌려준다
  * ({@code {"RESULT":{"CODE":"INFO-100","MESSAGE":"인증키가 유효하지 않습니다."}}}).
- * 정상 응답은 {@code rentBikeStatus} 안에 {@code list_total_count}·{@code RESULT(INFO-000)}·{@code row} 가 실린다.
+ * 정상 응답은 {@code rentBikeStatus} 안에 {@code RESULT(INFO-000)}·{@code row} 가 실린다.
  * 봉투를 보지 않으면 오류가 "정류소 0개" 라는 성공으로 둔갑한다.
+ * <p>
+ * {@code list_total_count} 는 전체 건수가 아니라 <b>이번 응답의 행 수</b>다(실호출 확인: 1/5 → 5, 1/3 → 3).
+ * 페이징 종료 판단에 쓸 수 없어 매핑하지 않고, {@link #rowCount()} 로 "페이지가 가득 찼는가" 만 본다.
+ * <p>
+ * 인증키 오류(INFO-100) 는 {@code /json/} 경로에서도 XML 로 내려온다 — JSON 으로 읽히지 않는 본문은
+ * {@link #nonJsonError(String)} 로 같은 예외 체계에 태운다.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record DdareungiStationResponse(RentBikeStatus rentBikeStatus, @JsonProperty("RESULT") Result envelopeResult) {
@@ -23,13 +31,11 @@ public record DdareungiStationResponse(RentBikeStatus rentBikeStatus, @JsonPrope
     /** 요청 범위에 데이터 없음 — 마지막 페이지 너머를 요청했을 때. 오류가 아니라 빈 페이지. */
     private static final String NO_DATA_CODE = "INFO-200";
     private static final String SERVER_ERROR_CODE_PREFIX = "ERROR-5";
+    private static final Pattern XML_CODE_PATTERN = Pattern.compile("<CODE>([^<]+)</CODE>");
+    private static final int MAX_ERROR_BODY_LENGTH = 200;
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record RentBikeStatus(
-            @JsonProperty("list_total_count") int listTotalCount,
-            @JsonProperty("RESULT") Result result,
-            List<Row> row
-    ) {}
+    public record RentBikeStatus(@JsonProperty("RESULT") Result result, List<Row> row) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Result(@JsonProperty("CODE") String code, @JsonProperty("MESSAGE") String message) {}
@@ -65,12 +71,25 @@ public record DdareungiStationResponse(RentBikeStatus rentBikeStatus, @JsonPrope
         throw toException(envelopeResult);
     }
 
-    /** 전체 정류소 수 — 1,000행 단위 페이징 계산용. */
-    public int totalCount() {
-        if (rentBikeStatus == null) {
+    /** 이번 응답의 원본 행 수 — 요청 크기와 같으면 다음 페이지가 있을 수 있다. */
+    public int rowCount() {
+        if (rentBikeStatus == null || rentBikeStatus.row() == null) {
             return 0;
         }
-        return rentBikeStatus.listTotalCount();
+        return rentBikeStatus.row().size();
+    }
+
+    /** JSON 이 아닌 본문(XML 오류 등)을 예외로. 본문에 {@code <CODE>} 가 있으면 그 코드로 재시도 여부를 가른다. */
+    public static ExternalApiException nonJsonError(String body) {
+        String abbreviated = body;
+        if (body.length() > MAX_ERROR_BODY_LENGTH) {
+            abbreviated = body.substring(0, MAX_ERROR_BODY_LENGTH) + "…";
+        }
+        Matcher matcher = XML_CODE_PATTERN.matcher(body);
+        if (matcher.find()) {
+            return toException(new Result(matcher.group(1), "JSON 아닌 응답: " + abbreviated));
+        }
+        return ExternalApiException.of(API_NAME, 500, "HTTP 200 이지만 JSON 이 아닌 응답: " + abbreviated);
     }
 
     public List<DdareungiStation> toStations() {
