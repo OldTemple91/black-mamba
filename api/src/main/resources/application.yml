@@ -77,9 +77,11 @@ springdoc:
 # Ollama 가 연결만 받고 응답하지 않으면 자연어 검색 요청이 45초 넘게 붙잡혔다(실측).
 # 로컬 LLM 은 재시도로 회복되는 장애가 드물다 — 빨리 포기하고 폴백(원본 narrative / 503)한다.
 # 주의: Spring AI 2.0 의 max-attempts 는 "재시도 횟수" 다(RetryPolicy.maxRetries). 1 이면 호출 2회 + backoff 2초.
+# 읽기 타임아웃은 "모델을 처음 메모리에 올리는 시간" 보다 길어야 한다. 실측: llama3.2:3b 첫 호출 11.3초, 이후 0.2초.
+# 10초로 두면 모델이 내려간 뒤(기본 5분 유휴) 첫 요청이 매번 타임아웃이 된다.
 spring.http.clients:
   connect-timeout: 2s
-  read-timeout: 10s
+  read-timeout: 30s
 
 spring.ai:
   retry:
@@ -87,15 +89,16 @@ spring.ai:
   ollama:
     base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
     chat:
-      options:
-        model: ${OLLAMA_MODEL:llama3.2:3b}
-        temperature: 0.2    # JSON 파싱용이라 결정성 높게
+      model: ${OLLAMA_MODEL:llama3.2:3b}
+      temperature: 0.2    # JSON 파싱용이라 결정성 높게
+      # 모델을 메모리에 붙들어 두는 시간 — 기본 5분이면 한가한 시간 뒤 첫 요청마다 다시 올리느라 10초 넘게 걸린다
+      keep-alive: 30m
     # RAG Phase 2: 경로 이력 임베딩용 모델
     # - bge-m3 (BAAI, 1024차원, 다국어/한국어 강함, 1.2GB)
     # - 사용 전 `ollama pull bge-m3` 필요
     embedding:
-      options:
-        model: ${OLLAMA_EMBEDDING_MODEL:bge-m3}
+      model: ${OLLAMA_EMBEDDING_MODEL:bge-m3}
+      keep-alive: 30m
 
   # RAG Phase 2: Qdrant Vector Store (경로 이력 저장 + 유사 검색)
   # - gRPC 연결 (HTTP REST 보다 빠름, Spring AI 기본값)

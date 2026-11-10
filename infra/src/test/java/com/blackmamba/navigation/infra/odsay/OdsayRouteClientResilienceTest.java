@@ -183,6 +183,24 @@ class OdsayRouteClientResilienceTest {
                 .verifyComplete();
     }
 
+    @Test
+    void 일일_한도_초과는_재시도하지_않고_실패로_집계한다() {
+        // given — 실제 운영 키로 받은 응답 그대로. 한도는 재시도해도 풀리지 않는다
+        stubErrorEnvelope("""
+                {"error":[{"code":"429","message":"Daily quota exceeded"}]}
+                """);
+
+        // when & then
+        StepVerifier.create(client.getTransitRoute(ORIGIN, DESTINATION))
+                .assertNext(legs -> {
+                    assertThat(legs).isEmpty();
+                    wireMock.verify(1, getRequestedFor(urlPathEqualTo(PATH)));
+                    assertThat(fallbackCount("error")).isEqualTo(1.0);
+                    assertThat(fallbackCount("empty_result")).isZero();
+                })
+                .verifyComplete();
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"3", "4", "5", "6", "-98", "-99"})
     void 정류장_없음과_검색결과_없음_코드는_장애가_아니라_경로_없음이다(String code) {

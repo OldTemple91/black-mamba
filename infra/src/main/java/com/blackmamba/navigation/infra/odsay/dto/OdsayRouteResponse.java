@@ -35,7 +35,10 @@ public record OdsayRouteResponse(Result result, JsonNode error) {
     }
 
     /**
-     * ODsay 공식 오류 코드(lab.odsay.com 레퍼런스) 기준 분류. 부호로는 가를 수 없다 —
+     * ODsay 공식 오류 코드(lab.odsay.com 레퍼런스) 기준 분류. 실응답으로 확인한 것:
+     * 인증 실패 {@code code "500" + "[ApiKeyAuthFailed]"}, 일일 한도 초과 {@code code "429" "Daily quota exceeded"}
+     * (둘 다 배열 꼴 {@code {"error":[{...}]}}). 한도 초과는 아래 어느 분류에도 들지 않아 재시도 없는 실패가 된다.
+     * 부호로는 가를 수 없다 —
      * 3·4·5·6 은 양수지만 "정류장 없음·서비스 지역 아님" 이고, -8·-9 는 음수지만 우리 요청의 버그다.
      */
     public record ApiError(String code, String message) {
