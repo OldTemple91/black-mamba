@@ -6,6 +6,7 @@ import com.blackmamba.navigation.application.route.hub.LastMileHubPrioritizer;
 import com.blackmamba.navigation.application.route.hub.MobilityConfig;
 import com.blackmamba.navigation.application.route.port.MobilityAvailabilityPort;
 import com.blackmamba.navigation.application.route.port.MobilityTimePort;
+import com.blackmamba.navigation.application.route.port.TransitBudgetPort;
 import com.blackmamba.navigation.application.route.port.TransitRoutePort;
 import com.blackmamba.navigation.application.route.segment.MobilitySegmentBuilder;
 import com.blackmamba.navigation.application.route.strategy.MobilityDiagnostics.Phase;
@@ -33,6 +34,7 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
     private static final int MAX_CANDIDATE_HUBS = LastMileHubPrioritizer.MAX_CANDIDATE_HUBS;
 
     private final TransitRoutePort transitRoutePort;
+    private final TransitBudgetPort transitBudgetPort;
     private final RouteEvaluator routeEvaluator;
     private final CandidateRouteBuilder candidateRoutes;
     private final LastMileHubPrioritizer hubPrioritizer;
@@ -44,6 +46,16 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
                                      MobilityAvailabilityPort mobilityAvailabilityPort,
                                      HubSelector hubSelector,
                                      RouteEvaluator routeEvaluator) {
+        this(transitRoutePort, mobilityTimePort, mobilityAvailabilityPort, hubSelector, routeEvaluator, TransitBudgetPort.UNLIMITED);
+    }
+
+    public SpecificMobilityStrategy(TransitRoutePort transitRoutePort,
+                                     MobilityTimePort mobilityTimePort,
+                                     MobilityAvailabilityPort mobilityAvailabilityPort,
+                                     HubSelector hubSelector,
+                                     RouteEvaluator routeEvaluator,
+                                     TransitBudgetPort transitBudgetPort) {
+        this.transitBudgetPort = transitBudgetPort;
         this.transitRoutePort = transitRoutePort;
         this.routeEvaluator = routeEvaluator;
         this.candidateRoutes = new CandidateRouteBuilder(transitRoutePort, mobilityAvailabilityPort, new MobilitySegmentBuilder(mobilityTimePort));
@@ -87,7 +99,8 @@ public class SpecificMobilityStrategy implements RouteSearchStrategy {
         return Flux.fromIterable(mobilityTypes)
                 .flatMap(type -> {
                     MobilityConfig config = MobilityConfigs.forType(type);
-                    return hubPrioritizer.prioritize(context.baseLegs(), context.destination(), type, config)
+                    int hubLimit = transitBudgetPort.level().candidateHubLimit(MAX_CANDIDATE_HUBS);
+                    return hubPrioritizer.prioritize(context.baseLegs(), context.destination(), type, config, hubLimit)
                             .flatMapMany(candidateHubs -> {
                                 if (candidateHubs.isEmpty()) {
                                     return candidateRoutes.direct(context, type, config).flux();

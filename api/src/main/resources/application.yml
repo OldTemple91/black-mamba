@@ -158,6 +158,14 @@ management:
 navigation:
   mobility:
     search-radius-meters: 700
+  budget:
+    # 외부 API 일일 호출 예산. OPTIMAL 탐색 한 번이 ODsay 를 최대 12회 쓴다.
+    # 남은 비율이 saving-remaining-ratio 아래로 내려가면 후보 허브를 5 → 2개로 줄이고 패턴 D 를 건너뛰어
+    # 기준 경로만큼은 실제 값인 요청을 오래 유지한다. 소진되면 내일까지 호출을 보내지 않고 근사 경로로 답한다.
+    # 한도는 요금제에 맞춰 ODSAY_DAILY_LIMIT 로 조정한다(기본 1,000은 무료 요금제 가정 — 콘솔에서 실제 값 확인 필요)
+    odsay:
+      daily-limit: ${ODSAY_DAILY_LIMIT:1000}
+      saving-remaining-ratio: 0.3
   cache:
     # ODsay 경로는 시간표 기반(실시간 아님)이라 분 단위로 바뀌지 않는다.
     # 30초였을 땐 SSE 재탐색 주기(30초)와 같아 재탐색마다 전부 miss — 스트림 하나가 5분간 ODsay 를 약 120회 불렀다.

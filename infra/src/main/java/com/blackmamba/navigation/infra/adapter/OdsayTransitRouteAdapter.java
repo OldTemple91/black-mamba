@@ -1,5 +1,7 @@
 package com.blackmamba.navigation.infra.adapter;
 
+import com.blackmamba.navigation.application.route.port.BudgetLevel;
+import com.blackmamba.navigation.application.route.port.TransitBudgetPort;
 import com.blackmamba.navigation.application.route.port.TransitRoutePort;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Leg;
@@ -10,7 +12,7 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 
 @Component
-public class OdsayTransitRouteAdapter implements TransitRoutePort {
+public class OdsayTransitRouteAdapter implements TransitRoutePort, TransitBudgetPort {
 
     private final OdsayRouteClient odsayRouteClient;
 
@@ -26,5 +28,10 @@ public class OdsayTransitRouteAdapter implements TransitRoutePort {
     @Override
     public Mono<Integer> getTransitTimeMinutes(Location origin, Location destination) {
         return odsayRouteClient.getTransitTimeMinutes(origin, destination);
+    }
+
+    @Override
+    public BudgetLevel level() {
+        return odsayRouteClient.budgetLevel();
     }
 }

@@ -45,12 +45,21 @@ public class LastMileHubPrioritizer {
                                       Location destination,
                                       MobilityType type,
                                       MobilityConfig config) {
+        return prioritize(baseLegs, destination, type, config, MAX_CANDIDATE_HUBS);
+    }
+
+    /** @param limit 돌려줄 후보 수 상한 — 조회 예산이 줄면 호출자가 낮춘다 */
+    public Mono<List<Hub>> prioritize(List<Leg> baseLegs,
+                                      Location destination,
+                                      MobilityType type,
+                                      MobilityConfig config,
+                                      int limit) {
         List<Hub> rawHubs = hubSelector.selectLastMileHubs(baseLegs, destination, config);
         if (rawHubs.isEmpty()) {
             return Mono.just(List.of());
         }
         if (type != MobilityType.DDAREUNGI) {
-            return Mono.just(rawHubs.stream().limit(MAX_CANDIDATE_HUBS).toList());
+            return Mono.just(rawHubs.stream().limit(limit).toList());
         }
 
         return Flux.fromIterable(rawHubs)
@@ -68,7 +77,7 @@ public class LastMileHubPrioritizer {
                         .comparing((Hub hub) -> hasReasonablePickupHint(hub) ? 0 : 1)
                         .thenComparingInt(Hub::pickupHintDistanceOrMax)
                         .thenComparingInt(Hub::selectionRankOrMax))
-                .take(MAX_CANDIDATE_HUBS)
+                .take(limit)
                 .collectList();
     }
 

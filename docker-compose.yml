@@ -17,6 +17,8 @@ services:
       # → /api/routes 기본 탐색은 완전 정상, narrative 만 템플릿으로 폴백
       - SPRING_AUTOCONFIGURE_EXCLUDE=${SPRING_AUTOCONFIGURE_EXCLUDE:-}
       - ODSAY_API_KEY=${ODSAY_API_KEY}
+      # ODsay 일일 호출 한도 — 요금제에 맞춰 조정 (미지정 시 1000)
+      - ODSAY_DAILY_LIMIT=${ODSAY_DAILY_LIMIT:-1000}
       - DDAREUNGI_API_KEY=${DDAREUNGI_API_KEY}
       - TAGO_API_KEY=${TAGO_API_KEY}
       - TMAP_APP_KEY=${TMAP_APP_KEY}

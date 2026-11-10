@@ -13,6 +13,7 @@ import com.blackmamba.navigation.domain.route.comparison.CarbonFootprintCalculat
 import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
 import com.blackmamba.navigation.domain.route.evaluation.RouteInsightFactory;
 import com.blackmamba.navigation.domain.route.evaluation.RouteScoreCalculator;
+import com.blackmamba.navigation.application.route.port.TransitBudgetPort;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,7 +61,7 @@ class RouteOptimizationServiceTest {
     @BeforeEach
     void setUp() {
         RouteSearchStrategyRegistry strategyRegistry = new RouteSearchStrategyRegistry(
-                transitRoutePort, mobilityTimePort, mobilityAvailabilityPort, hubSelector, routeEvaluator);
+                transitRoutePort, mobilityTimePort, mobilityAvailabilityPort, hubSelector, routeEvaluator, TransitBudgetPort.UNLIMITED);
         service = new RouteOptimizationService(strategyRegistry, enrichmentPipeline, routeHistoryRecorder);
         when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of());
         when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of());

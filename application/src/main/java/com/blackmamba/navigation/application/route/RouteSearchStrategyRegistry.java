@@ -3,6 +3,7 @@ package com.blackmamba.navigation.application.route;
 import com.blackmamba.navigation.application.route.hub.HubSelector;
 import com.blackmamba.navigation.application.route.port.MobilityAvailabilityPort;
 import com.blackmamba.navigation.application.route.port.MobilityTimePort;
+import com.blackmamba.navigation.application.route.port.TransitBudgetPort;
 import com.blackmamba.navigation.application.route.port.TransitRoutePort;
 import com.blackmamba.navigation.application.route.strategy.OptimalSearchStrategy;
 import com.blackmamba.navigation.application.route.strategy.RouteSearchStrategy;
@@ -29,11 +30,12 @@ public class RouteSearchStrategyRegistry {
                                        MobilityTimePort mobilityTimePort,
                                        MobilityAvailabilityPort mobilityAvailabilityPort,
                                        HubSelector hubSelector,
-                                       RouteEvaluator routeEvaluator) {
+                                       RouteEvaluator routeEvaluator,
+                                       TransitBudgetPort transitBudgetPort) {
         strategies.put(SearchMode.OPTIMAL, new OptimalSearchStrategy(
-                transitRoutePort, mobilityTimePort, mobilityAvailabilityPort, hubSelector, routeEvaluator));
+                transitRoutePort, mobilityTimePort, mobilityAvailabilityPort, hubSelector, routeEvaluator, transitBudgetPort));
         strategies.put(SearchMode.SPECIFIC, new SpecificMobilityStrategy(
-                transitRoutePort, mobilityTimePort, mobilityAvailabilityPort, hubSelector, routeEvaluator));
+                transitRoutePort, mobilityTimePort, mobilityAvailabilityPort, hubSelector, routeEvaluator, transitBudgetPort));
     }
 
     public RouteSearchStrategy strategyFor(SearchMode searchMode) {

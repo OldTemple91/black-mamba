@@ -140,6 +140,35 @@ groups:
           runbook: "Loki 에서 '[ODsay] 호출 실패(최종)' 의 원인 코드 확인"
 
       # ───────────────────────────────────────────────
+      # ④-c2 외부 API 일일 예산 — 소진되면 그날 남은 요청의 대중교통 구간이 전부 추정값이 된다
+      # ───────────────────────────────────────────────
+      - alert: ApiBudgetLow
+        expr: |
+          navigation_api_budget_remaining / navigation_api_budget_limit < 0.3
+        for: 1m
+        labels:
+          severity: warning
+          service: navigation
+        annotations:
+          summary: "💸 {{ $labels.api }} 일일 호출 예산 30% 미만"
+          description: |
+            절약 수준에 들어가 후보 허브 수가 줄고 패턴 D 가 생략됩니다(추천 폭 감소).
+          runbook: "External APIs 대시보드에서 호출량 추이 확인 → 한도 상향 또는 캐시 TTL 조정 검토"
+
+      - alert: ApiBudgetExhausted
+        expr: |
+          navigation_api_budget_remaining <= 0
+        for: 1m
+        labels:
+          severity: critical
+          service: navigation
+        annotations:
+          summary: "💸 {{ $labels.api }} 일일 호출 예산 소진"
+          description: |
+            내일까지 이 API 를 호출하지 않습니다. 대중교통 구간은 기준 경로·직선거리 기반 추정값으로 응답 중입니다.
+          runbook: "요금제 한도 확인(ODSAY_DAILY_LIMIT) → 필요 시 상향 후 재기동"
+
+      # ───────────────────────────────────────────────
       # ④-d 경로 탐색 오류율 (타임아웃이 아닌 실패)
       # ───────────────────────────────────────────────
       - alert: RouteSearchErrorRateHigh

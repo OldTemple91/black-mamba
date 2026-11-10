@@ -11,8 +11,11 @@ import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreferenc
 import com.blackmamba.navigation.domain.route.mobility.MobilityInfo;
 import com.blackmamba.navigation.domain.route.mobility.MobilityRouteResult;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
+import com.blackmamba.navigation.application.route.port.BudgetLevel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -74,6 +77,29 @@ class OptimalSearchStrategyTest {
                     double score = route.type() == RouteType.TRANSIT_ONLY ? 0.8 : 0.5;
                     return route.withScore(score, recommended);
                 });
+    }
+
+    @ParameterizedTest
+    @CsvSource({"NORMAL, true", "SAVING, false", "EXHAUSTED, false"})
+    void 조회_예산이_줄면_호출이_많은_양쪽_이동수단_패턴을_건너뛴다(BudgetLevel level, boolean expectsBothEndsRoute) {
+        // given — 퍼스트·라스트마일 허브와 이동수단이 모두 있어 패턴 D 가 성립하는 상황
+        OptimalSearchStrategy budgeted = new OptimalSearchStrategy(
+                transitRoutePort, mobilityTimePort, mobilityAvailabilityPort, hubSelector, routeEvaluator, () -> level);
+        MobilityInfo bike = new MobilityInfo(MobilityType.DDAREUNGI, "따릉이", null, 100, "정류소", 37.52, 127.0, 5, 100);
+        when(hubSelector.selectLastMileHubs(any(), any(), any())).thenReturn(List.of(hub(candidate)));
+        when(hubSelector.selectFirstMileHubs(any(), any(), any())).thenReturn(List.of(hub(candidate)));
+        when(mobilityAvailabilityPort.findNearbyMobility(anyDouble(), anyDouble(), any())).thenReturn(Mono.just(Optional.of(bike)));
+        when(mobilityAvailabilityPort.findSegmentMobility(anyDouble(), anyDouble(), anyDouble(), anyDouble(), any())).thenReturn(Mono.just(bike));
+        when(mobilityTimePort.getMobilityRoute(any(), any(), any())).thenReturn(Mono.just(MobilityRouteResult.timeOnly(8)));
+
+        // when
+        List<Route> routes = budgeted.search(origin, destination, List.of(), RecommendationPreference.RELIABILITY).block();
+
+        // then — 기준 경로는 예산과 무관하게 항상 남는다
+        assertThat(routes)
+                .extracting(Route::type)
+                .contains(RouteType.TRANSIT_ONLY);
+        assertThat(routes.stream().anyMatch(route -> route.type() == RouteType.MOBILITY_TRANSIT_MOBILITY)).isEqualTo(expectsBothEndsRoute);
     }
 
     @Test

@@ -6,6 +6,8 @@ import com.blackmamba.navigation.application.route.hub.LastMileHubPrioritizer;
 import com.blackmamba.navigation.application.route.hub.MobilityConfig;
 import com.blackmamba.navigation.application.route.port.MobilityAvailabilityPort;
 import com.blackmamba.navigation.application.route.port.MobilityTimePort;
+import com.blackmamba.navigation.application.route.port.BudgetLevel;
+import com.blackmamba.navigation.application.route.port.TransitBudgetPort;
 import com.blackmamba.navigation.application.route.port.TransitRoutePort;
 import com.blackmamba.navigation.application.route.segment.MobilitySegmentBuilder;
 import com.blackmamba.navigation.application.route.strategy.MobilityDiagnostics.Phase;
@@ -50,6 +52,7 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
             List.of(MobilityType.DDAREUNGI);
 
     private final TransitRoutePort transitRoutePort;
+    private final TransitBudgetPort transitBudgetPort;
     private final HubSelector hubSelector;
     private final CandidateRouteBuilder candidateRoutes;
     private final LastMileHubPrioritizer hubPrioritizer;
@@ -61,6 +64,16 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                                   MobilityAvailabilityPort mobilityAvailabilityPort,
                                   HubSelector hubSelector,
                                   RouteEvaluator routeEvaluator) {
+        this(transitRoutePort, mobilityTimePort, mobilityAvailabilityPort, hubSelector, routeEvaluator, TransitBudgetPort.UNLIMITED);
+    }
+
+    public OptimalSearchStrategy(TransitRoutePort transitRoutePort,
+                                  MobilityTimePort mobilityTimePort,
+                                  MobilityAvailabilityPort mobilityAvailabilityPort,
+                                  HubSelector hubSelector,
+                                  RouteEvaluator routeEvaluator,
+                                  TransitBudgetPort transitBudgetPort) {
+        this.transitBudgetPort = transitBudgetPort;
         this.transitRoutePort = transitRoutePort;
         this.hubSelector = hubSelector;
         this.candidateRoutes = new CandidateRouteBuilder(transitRoutePort, mobilityAvailabilityPort, new MobilitySegmentBuilder(mobilityTimePort));
@@ -85,9 +98,15 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
 
                     // 라스트마일 허브 우선순위화는 요청당·수단당 한 번만 — 패턴 C·D 와 진단이 같은 결과를 공유한다.
                     // (따릉이는 허브마다 최근접 정류소 조회가 따라붙어, 예전엔 같은 계산을 요청마다 2~3번 반복했다)
+                    // 조회 예산이 줄면 후보 허브 수를 줄이고 패턴 D 를 건너뛴다 — 기준 경로만큼은 실제 값인 요청을 오래 유지한다
+                    BudgetLevel budget = transitBudgetPort.level();
+                    int hubLimit = budget.candidateHubLimit(MAX_CANDIDATE_HUBS);
+                    if (budget != BudgetLevel.NORMAL) {
+                        log.info("[OPTIMAL] 대중교통 조회 예산 {} → 후보 허브 {}개, 패턴 D {}", budget, hubLimit, budget.allowsBothEndsPattern() ? "유지" : "생략");
+                    }
                     Map<MobilityType, Mono<List<Hub>>> lastMileHubsByType = new EnumMap<>(MobilityType.class);
                     for (MobilityType type : ALL_TYPES) {
-                        lastMileHubsByType.put(type, hubPrioritizer.prioritize(baseLegs, destination, type, MobilityConfigs.forType(type)).cache());
+                        lastMileHubsByType.put(type, hubPrioritizer.prioritize(baseLegs, destination, type, MobilityConfigs.forType(type), hubLimit).cache());
                     }
 
                     Route baseRoute = baseline.toRoute();
@@ -97,10 +116,14 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
                     Flux<Route> allPatterns = Flux.fromIterable(ALL_TYPES)
                             .flatMap(type -> {
                                 MobilityConfig config = MobilityConfigs.forType(type);
+                                Flux<Route> bothEnds = Flux.empty();
+                                if (budget.allowsBothEndsPattern()) {
+                                    bothEnds = patternD(context, type, config, lastMileHubsByType.get(type));
+                                }
                                 return Flux.merge(
-                                        patternB(context, type, config),
+                                        patternB(context, type, config, hubLimit),
                                         patternC(context, type, lastMileHubsByType.get(type)),
-                                        patternD(context, type, config, lastMileHubsByType.get(type)),
+                                        bothEnds,
                                         patternE(context, type, config)
                                 );
                             });
@@ -122,14 +145,14 @@ public class OptimalSearchStrategy implements RouteSearchStrategy {
     }
 
     // 패턴 B: 이동수단으로 첫 정류장까지 → 대중교통으로 목적지
-    private Flux<Route> patternB(SearchContext context, MobilityType type, MobilityConfig config) {
+    private Flux<Route> patternB(SearchContext context, MobilityType type, MobilityConfig config, int hubLimit) {
         return candidateRoutes.hasPickupNearOrigin(context.origin(), type)
                 .flatMapMany(hasPickup -> {
                     if (!hasPickup) {
                         return Flux.empty();
                     }
                     List<Hub> firstMile = hubSelector.selectFirstMileHubs(context.origin(), context.baseLegs(), config).stream()
-                            .limit(MAX_CANDIDATE_HUBS)
+                            .limit(hubLimit)
                             .toList();
                     return Flux.fromIterable(firstMile)
                             .flatMap(firstHub -> candidateRoutes.firstMileVia(context, type, firstHub));

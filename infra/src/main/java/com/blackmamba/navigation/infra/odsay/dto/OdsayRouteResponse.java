@@ -48,6 +48,7 @@ public record OdsayRouteResponse(Result result, JsonNode error) {
         /** -8 입력값 형식·범위 오류, -9 필수 입력값 누락 */
         private static final Set<String> BAD_REQUEST_CODES = Set.of("-8", "-9");
         private static final String SERVER_ERROR_CODE = "500";
+        private static final String QUOTA_EXCEEDED_CODE = "429";
         private static final String AUTH_FAILURE_MARKER = "ApiKeyAuthFailed";
 
         /** 이 출발/도착 조합에 경로가 없다는 정상 답 — 장애가 아니다. */
@@ -64,6 +65,11 @@ public record OdsayRouteResponse(Result result, JsonNode error) {
          * 500 은 서버 내부 오류뿐 아니라 인증 실패에도 쓰인다(실응답: {@code "[ApiKeyAuthFailed] ApiKey authentication failed."}).
          * 인증 실패는 재시도해도 같은 답이라 서버 오류에서 뺀다.
          */
+        /** 일일 호출 한도 초과 — 실응답 {@code "429" "Daily quota exceeded"}. 내일까지 풀리지 않는다. */
+        public boolean isQuotaExceeded() {
+            return QUOTA_EXCEEDED_CODE.equals(code);
+        }
+
         public boolean isServerError() {
             return SERVER_ERROR_CODE.equals(code) && !message.contains(AUTH_FAILURE_MARKER);
         }

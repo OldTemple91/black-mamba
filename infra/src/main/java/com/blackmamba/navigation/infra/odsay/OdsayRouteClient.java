@@ -4,6 +4,8 @@ import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.location.GeoDistance;
 import com.blackmamba.navigation.domain.route.Leg;
 import com.blackmamba.navigation.domain.route.TransitSearchDistancePolicy;
+import com.blackmamba.navigation.application.route.port.BudgetLevel;
+import com.blackmamba.navigation.infra.common.budget.DailyApiBudget;
 import com.blackmamba.navigation.infra.common.GeohashKeyGenerator;
 import com.blackmamba.navigation.infra.common.cache.TtlCache;
 import com.blackmamba.navigation.infra.common.cache.TtlCacheRegistry;
@@ -26,7 +28,9 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientException;
 import reactor.core.publisher.Mono;
 
+import java.time.Clock;
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
@@ -38,11 +42,15 @@ public class OdsayRouteClient {
     private static final Logger log = LoggerFactory.getLogger(OdsayRouteClient.class);
 
     private static final long RATE_INTERVAL_MS = 200L; // max 5 req/sec
+    /** 일일 예산이 바뀌는 날짜 기준 — ODsay 는 국내 서비스라 한국 시간으로 본다 */
+    private static final ZoneId BUDGET_ZONE = ZoneId.of("Asia/Seoul");
     private final WebClient webClient;
     private final OdsayRouteMapper mapper;
     private final String apiKey;
     private final Counter transitRouteErrorFallbackCounter;
     private final Counter transitRouteEmptyResultCounter;
+    private final Counter transitRouteBudgetExhaustedCounter;
+    private final DailyApiBudget budget;
     private final Counter transitTimeEstimateFallbackCounter;
     private final Counter transitRouteShortDistanceSkipCounter;
     private final Counter transitTimeShortDistanceSkipCounter;
@@ -58,6 +66,8 @@ public class OdsayRouteClient {
             @Value("${odsay.base-url:https://api.odsay.com/v1/api}") String baseUrl,
             @Value("${navigation.cache.odsay-route-ttl-ms:300000}") long routeCacheTtlMs,
             @Value("${odsay.request-timeout-ms:5000}") long requestTimeoutMs,
+            @Value("${navigation.budget.odsay.daily-limit:1000}") int dailyLimit,
+            @Value("${navigation.budget.odsay.saving-remaining-ratio:0.3}") double savingRemainingRatio,
             MeterRegistry meterRegistry,
             ExternalApiResilience resilience,
             TtlCacheRegistry cacheRegistry
@@ -65,6 +75,12 @@ public class OdsayRouteClient {
         this.mapper = mapper;
         this.apiKey = apiKey;
         this.routeCache = cacheRegistry.create("odsay_route", routeCacheTtlMs);
+        this.budget = new DailyApiBudget("odsay", dailyLimit, savingRemainingRatio, Clock.system(BUDGET_ZONE), meterRegistry);
+        this.transitRouteBudgetExhaustedCounter = meterRegistry.counter(
+                "navigation.odsay.fallback.total",
+                "type", "transit_route",
+                "reason", "budget_exhausted"
+        );
         this.webClient = WebClients.withTimeout(webClientBuilder, baseUrl, requestTimeoutMs);
         this.guard = resilience.forApi("odsay");
         this.transitRouteErrorFallbackCounter = meterRegistry.counter(
@@ -126,7 +142,24 @@ public class OdsayRouteClient {
         return routeCache.get(key, () -> requestTransitRoute(origin, destination), legs -> !legs.isEmpty());
     }
 
+    /** 전략이 탐색 폭을 정할 때 읽는 남은 예산 수준. */
+    public BudgetLevel budgetLevel() {
+        return budget.level();
+    }
+
     private Mono<List<Leg>> requestTransitRoute(Location origin, Location destination) {
+        return Mono.defer(() -> {
+            // 캐시에 없는 실제 호출만 예산을 쓴다. 예산이 없으면 어차피 거절될 요청을 보내지 않는다 —
+            // 호출자는 빈 결과를 받아 기준 경로 기반 근사로 대체한다(재시도·회로 집계 대상 아님)
+            if (!budget.tryAcquire()) {
+                transitRouteBudgetExhaustedCounter.increment();
+                return Mono.just(List.<Leg>of());
+            }
+            return callTransitRoute(origin, destination);
+        });
+    }
+
+    private Mono<List<Leg>> callTransitRoute(Location origin, Location destination) {
         return Mono.defer(() -> rateLimit().then(webClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/searchPubTransPathT")
@@ -156,6 +189,10 @@ public class OdsayRouteClient {
                             transitRouteEmptyResultCounter.increment();
                             log.info("[ODsay] 경로 없음 응답 (code={} {})", error.code(), error.message());
                             return Mono.just(List.<Leg>of());
+                        }
+                        if (error.isQuotaExceeded()) {
+                            // 집계가 재기동으로 초기화됐어도 실제 한도는 찼다 — 오늘은 더 보내지 않는다
+                            budget.markExhausted();
                         }
                         if (error.isBadRequest()) {
                             log.error("[ODsay] 요청 형식 오류 — 호출 코드의 버그 (code={} {}) {} → {}", error.code(), error.message(), origin, destination);

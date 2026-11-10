@@ -1,6 +1,7 @@
 package com.blackmamba.navigation.infra.odsay;
 
 import com.blackmamba.navigation.domain.location.Location;
+import com.blackmamba.navigation.application.route.port.BudgetLevel;
 import com.blackmamba.navigation.infra.common.cache.TtlCacheRegistry;
 import com.blackmamba.navigation.infra.common.http.ExternalApiServerException;
 import com.blackmamba.navigation.infra.common.resilience.ExternalApiResilience;
@@ -24,6 +25,7 @@ import reactor.test.StepVerifier;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.TimeoutException;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
@@ -59,6 +61,7 @@ class OdsayRouteClientResilienceTest {
     private SimpleMeterRegistry meterRegistry;
 
     private static final String PATH = "/searchPubTransPathT";
+    private static final int DAILY_LIMIT = 4;
     // 700m 이상 떨어진 좌표 (ODsay 거리 하한을 넘어야 실제 호출 발생)
     private static final Location ORIGIN = new Location("서울역", 37.5547, 126.9706);
     private static final Location DESTINATION = new Location("강남역", 37.4979, 127.0276);
@@ -105,6 +108,8 @@ class OdsayRouteClientResilienceTest {
                 wireMock.baseUrl(),        // odsay.base-url 을 WireMock 으로 오버라이드
                 0L,                         // cache TTL = 0 → 매 테스트마다 실제 호출
                 5_000L,                     // request timeout
+                DAILY_LIMIT,                // 일일 예산
+                0.3,                        // 절약 수준 기준(남은 비율)
                 meterRegistry,
                 new ExternalApiResilience(cbRegistry, retryRegistry),
                 new TtlCacheRegistry(meterRegistry)
@@ -181,6 +186,42 @@ class OdsayRouteClientResilienceTest {
                     assertThat(fallbackCount("error")).isEqualTo(1.0);
                 })
                 .verifyComplete();
+    }
+
+    @Test
+    void 한도_초과_응답을_받으면_그_뒤로는_호출을_보내지_않는다() {
+        // given — 집계는 여유가 있지만(재기동 직후 등) API 가 한도 초과로 답한다
+        stubErrorEnvelope("""
+                {"error":[{"code":"429","message":"Daily quota exceeded"}]}
+                """);
+        client.getTransitRoute(ORIGIN, DESTINATION).block();
+
+        // when — 다른 구간을 조회해도
+        List<Leg> legs = client.getTransitRoute(DESTINATION, ORIGIN).block();
+
+        // then — 요청은 첫 1건뿐이고, 두 번째는 예산 소진으로 바로 빈 결과
+        assertThat(legs).isEmpty();
+        wireMock.verify(1, getRequestedFor(urlPathEqualTo(PATH)));
+        assertThat(client.budgetLevel()).isEqualTo(BudgetLevel.EXHAUSTED);
+        assertThat(fallbackCount("budget_exhausted")).isEqualTo(1.0);
+    }
+
+    @Test
+    void 일일_예산을_다_쓰면_호출을_보내지_않고_캐시된_구간은_예산을_쓰지_않는다() {
+        // given — 한도 4건. 캐시 TTL 0 이라 매 호출이 실제 요청이다
+        wireMock.stubFor(get(urlPathEqualTo(PATH))
+                .willReturn(aResponse().withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(sampleSubwayResponseJson())));
+
+        // when — 6번 조회
+        for (int i = 0; i < 6; i++) {
+            client.getTransitRoute(ORIGIN, DESTINATION).block();
+        }
+
+        // then — 4건만 나가고 2건은 보내지 않았다
+        wireMock.verify(DAILY_LIMIT, getRequestedFor(urlPathEqualTo(PATH)));
+        assertThat(fallbackCount("budget_exhausted")).isEqualTo(2.0);
     }
 
     @Test
