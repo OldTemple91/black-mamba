@@ -1,7 +1,7 @@
 plugins {
     id 'java'
     id 'jacoco'
-    id 'org.springframework.boot' version '3.5.13' apply false
+    id 'org.springframework.boot' version '3.5.16' apply false
     id 'io.spring.dependency-management' version '1.1.7' apply false
 }
 
@@ -13,6 +13,11 @@ subprojects {
     apply plugin: 'java'
     apply plugin: 'io.spring.dependency-management'
     apply plugin: 'jacoco'
+
+    // Gradle 기본 JaCoCo 는 최신 JDK 바이트코드를 못 읽는다 — 명시 고정
+    jacoco {
+        toolVersion = '0.8.16'
+    }
 
     group = 'com.blackmamba'
     version = '0.0.1-SNAPSHOT'
@@ -29,7 +34,7 @@ subprojects {
 
     dependencyManagement {
         imports {
-            mavenBom "org.springframework.boot:spring-boot-dependencies:3.5.13"
+            mavenBom "org.springframework.boot:spring-boot-dependencies:3.5.16"
         }
     }
 
@@ -51,6 +56,10 @@ subprojects {
             html.required = true
         }
     }
+}
+
+jacoco {
+    toolVersion = '0.8.16'
 }
 
 // 전체 모듈 커버리지 통합 리포트

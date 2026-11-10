@@ -9,7 +9,7 @@ dependencies {
     // B-3: 공간 인덱스 기반 캐시 키 생성 (Geohash)
     implementation 'ch.hsr:geohash:1.4.0'
     // RAG Phase 2: Spring AI VectorStore API (Qdrant 어댑터에서 사용)
-    implementation platform('org.springframework.ai:spring-ai-bom:1.0.2')
+    implementation platform('org.springframework.ai:spring-ai-bom:1.0.9')
     implementation 'org.springframework.ai:spring-ai-vector-store'
     // RAG Phase 4: Spring AI Chat API (OllamaNarrativeGenerator 에서 ChatClient 사용)
     implementation 'org.springframework.ai:spring-ai-client-chat'
@@ -21,6 +21,6 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-aop'
 
     // T-2: WireMock — 외부 API 모킹 + Resilience4j fallback E2E 검증
-    testImplementation 'org.wiremock:wiremock-standalone:3.10.0'
+    testImplementation 'org.wiremock:wiremock-standalone:3.13.2'
     testImplementation 'io.projectreactor:reactor-test'
 }
