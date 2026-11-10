@@ -52,7 +52,7 @@ public final class RouteHubExtractor {
     }
 
     public static RouteHub fromSelectedHub(Hub hub, String role) {
-        return new RouteHub(hub.name(), hub.type(), role, "selected-candidate", hub.metadata());
+        return new RouteHub(hub.name(), hub.type(), role, "selected-candidate", hub.displayMetadata());
     }
 
     private static void addHub(Map<String, RouteHub> hubs, String name, HubType type, String role, String source, Map<String, String> metadata) {

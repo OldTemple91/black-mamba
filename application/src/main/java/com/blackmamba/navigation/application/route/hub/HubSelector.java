@@ -1,6 +1,7 @@
 package com.blackmamba.navigation.application.route.hub;
 
 import com.blackmamba.navigation.domain.hub.Hub;
+import com.blackmamba.navigation.domain.hub.HubSelection;
 import com.blackmamba.navigation.domain.hub.HubType;
 import com.blackmamba.navigation.domain.location.GeoDistance;
 import com.blackmamba.navigation.domain.location.Location;
@@ -27,7 +28,7 @@ public class HubSelector {
     public List<Hub> selectLastMileHubs(List<Leg> legs, Location destination, MobilityConfig config) {
         List<Location> primaryCandidates = hubSearch.findLastMilePrimaryCandidates(legs, destination, config);
         if (!primaryCandidates.isEmpty()) {
-            return toTransitHubs(primaryCandidates, legs, config, destination, "LAST_MILE", "PRIMARY");
+            return toTransitHubs(primaryCandidates, legs, config, destination, "LAST_MILE", HubSelection.Strategy.PRIMARY);
         }
 
         return toTransitHubs(
@@ -36,14 +37,14 @@ public class HubSelector {
                 config,
                 destination,
                 "LAST_MILE",
-                "FALLBACK_NEAREST"
+                HubSelection.Strategy.FALLBACK_NEAREST
         );
     }
 
     public List<Hub> selectFirstMileHubs(Location origin, List<Leg> legs, MobilityConfig config) {
         List<Location> primaryCandidates = hubSearch.findFirstMilePrimaryCandidates(origin, legs, config);
         if (!primaryCandidates.isEmpty()) {
-            return toTransitHubs(primaryCandidates, legs, config, origin, "FIRST_MILE", "PRIMARY");
+            return toTransitHubs(primaryCandidates, legs, config, origin, "FIRST_MILE", HubSelection.Strategy.PRIMARY);
         }
 
         return toTransitHubs(
@@ -52,7 +53,7 @@ public class HubSelector {
                 config,
                 origin,
                 "FIRST_MILE",
-                "FALLBACK_NEAREST"
+                HubSelection.Strategy.FALLBACK_NEAREST
         );
     }
 
@@ -72,7 +73,7 @@ public class HubSelector {
                                     MobilityConfig config,
                                     Location anchor,
                                     String selectionPhase,
-                                    String selectionStrategy) {
+                                    HubSelection.Strategy selectionStrategy) {
         int candidateCount = candidates.size();
         return java.util.stream.IntStream.range(0, candidates.size())
                 .mapToObj(index -> toTransitHub(
@@ -93,7 +94,7 @@ public class HubSelector {
                              MobilityConfig config,
                              Location anchor,
                              String selectionPhase,
-                             String selectionStrategy,
+                             HubSelection.Strategy selectionStrategy,
                              int selectionRank,
                              int candidateCount) {
         HubType type = inferTransitHubType(location, legs);
@@ -101,8 +102,6 @@ public class HubSelector {
         metadata.put("source", "baseline-transit-candidate");
         metadata.put("preferredMobility", config.mobilityType().name());
         metadata.put("selectionPhase", selectionPhase);
-        metadata.put("selectionStrategy", selectionStrategy);
-        metadata.put("selectionRank", String.valueOf(selectionRank));
         metadata.put("candidateCount", String.valueOf(candidateCount));
         metadata.put("distanceToAnchorMeters", String.valueOf((int) Math.round(distanceMeters(location, anchor))));
         metadata.put("transitHubType", type.name());
@@ -112,6 +111,8 @@ public class HubSelector {
                 type,
                 location,
                 DEFAULT_HUB_RADIUS_METERS,
+                new HubSelection(selectionStrategy, selectionRank),
+                null,
                 metadata
         );
     }

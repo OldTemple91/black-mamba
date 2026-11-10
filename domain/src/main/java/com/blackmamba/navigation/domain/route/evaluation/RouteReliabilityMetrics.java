@@ -1,5 +1,6 @@
 package com.blackmamba.navigation.domain.route.evaluation;
 
+import com.blackmamba.navigation.domain.hub.Hub;
 import com.blackmamba.navigation.domain.route.Leg;
 import com.blackmamba.navigation.domain.route.LegType;
 import com.blackmamba.navigation.domain.route.Route;
@@ -78,7 +79,7 @@ final class RouteReliabilityMetrics {
     static int maxPickupHintDistance(Route route) {
         return route.selectedHubs().stream()
                 .map(RouteHub::metadata)
-                .map(metadata -> metadata.get("pickupHintDistanceMeters"))
+                .map(metadata -> metadata.get(Hub.META_PICKUP_HINT_DISTANCE_METERS))
                 .filter(java.util.Objects::nonNull)
                 .mapToInt(RouteReliabilityMetrics::parseDistanceOrZero)
                 .max()

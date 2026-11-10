@@ -2,6 +2,7 @@ package com.blackmamba.navigation.application.route.hub;
 
 import com.blackmamba.navigation.application.route.port.MobilityAvailabilityPort;
 import com.blackmamba.navigation.domain.hub.Hub;
+import com.blackmamba.navigation.domain.hub.HubSelection;
 import com.blackmamba.navigation.domain.hub.HubType;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.mobility.MobilitySearchHint;
@@ -64,10 +65,13 @@ class LastMileHubPrioritizerTest {
 
         // then
         assertThat(result).extracting(Hub::hubId).containsExactly("H2", "H3");
-        assertThat(result.getFirst().metadata())
-                .containsEntry("pickupHintDistanceMeters", "900")
-                .containsKey("pickupHintStationId")
-                .containsKey("pickupHintAvailableCount");
+        assertThat(result.getFirst().pickupHint().distanceMeters()).isEqualTo(900);
+        // 응답·신뢰도 평가는 문자열 맵을 읽는다 — 타입 필드가 같은 키로 실려야 한다
+        assertThat(result.getFirst().displayMetadata())
+                .containsEntry(Hub.META_PICKUP_HINT_DISTANCE_METERS, "900")
+                .containsKey(Hub.META_PICKUP_HINT_STATION_ID)
+                .containsKey(Hub.META_PICKUP_HINT_AVAILABLE_COUNT)
+                .containsEntry(Hub.META_SELECTION_RANK, String.valueOf(result.getFirst().selection().rank()));
     }
 
     @Test
@@ -107,6 +111,7 @@ class LastMileHubPrioritizerTest {
     }
 
     private static Hub hub(String id, int rank, double lat) {
-        return new Hub(id, id, HubType.SUBWAY_STATION, new Location(id, lat, 127.0), 150, Map.of("selectionRank", String.valueOf(rank)));
+        return new Hub(id, id, HubType.SUBWAY_STATION, new Location(id, lat, 127.0), 150,
+                new HubSelection(HubSelection.Strategy.PRIMARY, rank), null, Map.of());
     }
 }

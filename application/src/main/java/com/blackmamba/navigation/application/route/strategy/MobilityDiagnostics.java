@@ -43,9 +43,6 @@ final class MobilityDiagnostics {
 
     private static final String PHASE_ROUTE_COMPOSITION = "ROUTE_COMPOSITION";
     private static final String PHASE_DIRECT = "DIRECT";
-    private static final String SELECTION_STRATEGY_KEY = "selectionStrategy";
-    private static final String SELECTION_PRIMARY = "PRIMARY";
-    private static final String SELECTION_FALLBACK = "FALLBACK_NEAREST";
 
     private final MobilityAvailabilityPort mobilityAvailabilityPort;
 
@@ -172,10 +169,10 @@ final class MobilityDiagnostics {
 
     private static String candidateSummary(List<Hub> hubs) {
         long primaryCount = hubs.stream()
-                .filter(hub -> SELECTION_PRIMARY.equals(hub.metadata().get(SELECTION_STRATEGY_KEY)))
+                .filter(Hub::isPrimarySelection)
                 .count();
         long fallbackCount = hubs.stream()
-                .filter(hub -> SELECTION_FALLBACK.equals(hub.metadata().get(SELECTION_STRATEGY_KEY)))
+                .filter(Hub::isFallbackSelection)
                 .count();
         if (fallbackCount == 0) {
             return hubs.size() + "개";

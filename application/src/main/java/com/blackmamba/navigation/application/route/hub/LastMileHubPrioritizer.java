@@ -64,57 +64,20 @@ public class LastMileHubPrioritizer {
                                 type,
                                 false
                         )
-                        .map(optionalHint -> hubWithPickupHint(hub, optionalHint)))
+                        .map(optionalHint -> optionalHint.map(hub::withPickupHint).orElse(hub)))
                 .collectList()
                 .map(this::preferPickupAccessibleHubs)
                 .flatMapMany(Flux::fromIterable)
                 .sort(Comparator
                         .comparing((Hub hub) -> hasReasonablePickupHint(hub) ? 0 : 1)
-                        .thenComparingInt(this::pickupHintDistanceOrMax)
-                        .thenComparingInt(this::selectionRankOrMax))
+                        .thenComparingInt(Hub::pickupHintDistanceOrMax)
+                        .thenComparingInt(Hub::selectionRankOrMax))
                 .take(MAX_CANDIDATE_HUBS)
                 .collectList();
     }
 
-    private Hub hubWithPickupHint(Hub hub, Optional<MobilitySearchHint> optionalHint) {
-        Map<String, String> metadata = new LinkedHashMap<>(hub.metadata());
-        optionalHint.ifPresent(hint -> {
-            metadata.put("pickupHintDistanceMeters", String.valueOf(hint.distanceMeters()));
-            metadata.put("pickupHintStationId", hint.stationId());
-            metadata.put("pickupHintStationName", hint.stationName());
-            metadata.put("pickupHintAvailableCount", String.valueOf(hint.availableCount()));
-        });
-        return new Hub(hub.hubId(), hub.name(), hub.type(), hub.location(), hub.radiusMeters(), metadata);
-    }
-
     private boolean hasReasonablePickupHint(Hub hub) {
-        String raw = hub.metadata().get("pickupHintDistanceMeters");
-        if (raw == null) return false;
-        try {
-            return Integer.parseInt(raw) <= MAX_HINT_PRIORITY_DISTANCE_METERS;
-        } catch (NumberFormatException _) {
-            return false;
-        }
-    }
-
-    private int pickupHintDistanceOrMax(Hub hub) {
-        String raw = hub.metadata().get("pickupHintDistanceMeters");
-        if (raw == null) return Integer.MAX_VALUE;
-        try {
-            return Integer.parseInt(raw);
-        } catch (NumberFormatException _) {
-            return Integer.MAX_VALUE;
-        }
-    }
-
-    private int selectionRankOrMax(Hub hub) {
-        String raw = hub.metadata().get("selectionRank");
-        if (raw == null) return Integer.MAX_VALUE;
-        try {
-            return Integer.parseInt(raw);
-        } catch (NumberFormatException _) {
-            return Integer.MAX_VALUE;
-        }
+        return hub.hasPickupHintWithin(MAX_HINT_PRIORITY_DISTANCE_METERS);
     }
 
     /** 합리적 픽업 후보가 하나라도 있으면 그것만, 없으면 전체 유지 (전멸 방지). */
