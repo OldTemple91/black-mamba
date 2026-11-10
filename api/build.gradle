@@ -42,6 +42,11 @@ dependencies {
     // T-2: WireMock E2E — 외부 API 모킹으로 end-to-end 테스트
     testImplementation 'org.wiremock:wiremock-standalone:3.13.2'
 
+    // 리플레이 테스트 — infra 의 실제 클라이언트를 Spring 없이 직접 조립한다 (infra 의 implementation 의존은 여기로 전이되지 않는다)
+    testImplementation 'org.springframework.boot:spring-boot-starter-webclient'
+    testImplementation 'io.github.resilience4j:resilience4j-spring-boot4:2.4.0'
+    testImplementation 'io.github.resilience4j:resilience4j-reactor:2.4.0'
+
     // 아키텍처 경계 강제 — Hexagonal 의존 방향을 컴파일러 수준에서 검증
     // (api 모듈은 4개 모듈 전체를 클래스패스에 가지므로 여기서 전수 검사)
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.5.1'

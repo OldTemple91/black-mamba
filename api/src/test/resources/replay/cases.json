@@ -1,0 +1,8 @@
+[
+  {"id": "gupabal_res_to_bukhan_entrance_fast_2", "origin": {"name": "구파발 주거지 B", "lat": 37.6353, "lng": 126.9181}, "destination": {"name": "북한산 입구", "lat": 37.6587, "lng": 126.9386}},
+  {"id": "hapjeong_res_to_worldcup_park_fast_mobility", "origin": {"name": "합정 주거지 A", "lat": 37.5511, "lng": 126.9097}, "destination": {"name": "월드컵공원 내부", "lat": 37.5676, "lng": 126.8786}},
+  {"id": "banpo_res_to_hangang_park", "origin": {"name": "반포 주거지", "lat": 37.5038, "lng": 127.0118}, "destination": {"name": "반포한강공원", "lat": 37.5129, "lng": 126.9958}},
+  {"id": "seodaemun_res_to_yonsei_campus_no_mixed", "origin": {"name": "서대문 주거지", "lat": 37.5662, "lng": 126.9496}, "destination": {"name": "연세대 캠퍼스 내부", "lat": 37.5668, "lng": 126.9398}},
+  {"id": "jamwon_personal_to_banpo_hangang", "origin": {"name": "잠원 주거지", "lat": 37.5218, "lng": 127.0161}, "destination": {"name": "반포한강공원 내부", "lat": 37.5137, "lng": 126.9955}},
+  {"id": "seodaemun_res_to_yongsan_hill", "origin": {"name": "서대문 주거지", "lat": 37.5738, "lng": 126.9474}, "destination": {"name": "후암동 언덕", "lat": 37.5452, "lng": 126.9829}}
+]
