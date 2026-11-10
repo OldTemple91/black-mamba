@@ -4,7 +4,8 @@ import com.blackmamba.navigation.application.route.port.MobilityAvailabilityPort
 import com.blackmamba.navigation.domain.hub.Hub;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.evaluation.GenerationDiagnostic;
-import com.blackmamba.navigation.domain.route.mobility.MobilityInfo;
+import com.blackmamba.navigation.application.route.segment.SegmentAvailabilityChecker;
+import com.blackmamba.navigation.domain.route.mobility.SegmentAvailability;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -23,8 +24,8 @@ import java.util.Optional;
  *   대여만 실패                        → NO_PICKUP    (+ 가장 가까운 대여 정류소 힌트)
  *   그 외                              → NO_VALID_COMBINATION
  * </pre>
- * 원래 {@code OptimalSearchStrategy} / {@code SpecificMobilityStrategy} 에 통째로
- * 중복되어 있던 로직을 단일 컴포넌트로 추출했다.
+ * 구간이 왜 성립하지 않는지는 경로 생성과 같은 도메인 판정({@link SegmentAvailability})을 쓴다 —
+ * 진단이 따로 규칙을 구현하면 "못 만든 이유" 가 실제 생성 로직과 어긋난다.
  */
 final class MobilityDiagnostics {
 
@@ -88,21 +89,21 @@ final class MobilityDiagnostics {
 
         return Flux.fromIterable(hubs)
                 .flatMap(hub -> phase == Phase.FIRST_MILE
-                        ? diagnoseSegment(origin, hub.location(), type)
-                        : diagnoseSegment(hub.location(), destination, type))
+                        ? SegmentAvailabilityChecker.check(mobilityAvailabilityPort, origin, hub.location(), type)
+                        : SegmentAvailabilityChecker.check(mobilityAvailabilityPort, hub.location(), destination, type))
                 .collectList()
                 .flatMap(items -> summarize(phase, type, hubs, items, noPickupHintAt, noDropoffHintAt));
     }
 
     private Mono<Optional<GenerationDiagnostic>> summarize(Phase phase, MobilityType type, List<Hub> hubs,
-                                                           List<SegmentDiagnostic> items,
+                                                           List<SegmentAvailability> items,
                                                            Location noPickupHintAt, Location noDropoffHintAt) {
-        if (items.isEmpty() || items.stream().anyMatch(item -> item instanceof SegmentDiagnostic.Valid)) {
+        if (items.isEmpty() || items.stream().anyMatch(item -> item instanceof SegmentAvailability.Available)) {
             return Mono.just(Optional.empty());
         }
-        long noPickup = countReason(items, DiagnosticReason.NO_PICKUP);
-        long noDropoff = countReason(items, DiagnosticReason.NO_DROPOFF);
-        long sameStation = countReason(items, DiagnosticReason.SAME_STATION);
+        long noPickup = count(items, SegmentAvailability.NoPickup.class);
+        long noDropoff = count(items, SegmentAvailability.NoDropoff.class);
+        long sameStation = count(items, SegmentAvailability.SamePickupDropoff.class);
 
         String prefix = type.displayName() + " " + phase.label + " 후보 " + candidateSummary(hubs) + "를 확인했지만 ";
         int hubCount = hubs.size();
@@ -123,40 +124,6 @@ final class MobilityDiagnostics {
         }
         return Mono.just(Optional.of(diagnostic(phase.code, type, "NO_VALID_COMBINATION", hubCount,
                 prefix + "대여/반납 가능한 수단을 찾지 못했습니다.")));
-    }
-
-    /** 대여/반납 가용성 기준의 구간 진단. 따릉이만 반납 조건이 있다. */
-    private Mono<SegmentDiagnostic> diagnoseSegment(Location start, Location end, MobilityType type) {
-        Mono<Optional<MobilityInfo>> pickup = mobilityAvailabilityPort.findNearbyMobility(start.lat(), start.lng(), type);
-
-        if (type != MobilityType.DDAREUNGI) {
-            return pickup.map(result -> result.isPresent()
-                    ? new SegmentDiagnostic.Valid()
-                    : new SegmentDiagnostic.Invalid(DiagnosticReason.NO_PICKUP));
-        }
-
-        Mono<Optional<MobilityInfo>> dropoff = mobilityAvailabilityPort.findNearbyDropoff(end.lat(), end.lng(), type);
-        return Mono.zip(pickup, dropoff)
-                .map(tuple -> {
-                    Optional<MobilityInfo> pickupInfo = tuple.getT1();
-                    Optional<MobilityInfo> dropoffInfo = tuple.getT2();
-                    if (pickupInfo.isEmpty()) {
-                        return new SegmentDiagnostic.Invalid(DiagnosticReason.NO_PICKUP);
-                    }
-                    if (dropoffInfo.isEmpty()) {
-                        return new SegmentDiagnostic.Invalid(DiagnosticReason.NO_DROPOFF);
-                    }
-                    MobilityInfo enriched = pickupInfo.get().withDropoffStation(
-                            dropoffInfo.get().stationId(),
-                            dropoffInfo.get().stationName(),
-                            dropoffInfo.get().lat(),
-                            dropoffInfo.get().lng()
-                    );
-                    if (enriched.hasSamePickupAndDropoffStation()) {
-                        return new SegmentDiagnostic.Invalid(DiagnosticReason.SAME_STATION);
-                    }
-                    return new SegmentDiagnostic.Valid();
-                });
     }
 
     /** 가장 가까운 대여/반납 정류소 힌트 문구 (" " 접두). 없으면 빈 문자열. */
@@ -184,22 +151,9 @@ final class MobilityDiagnostics {
         return new GenerationDiagnostic(phase, type, reasonCode, candidateCount, message);
     }
 
-    private static long countReason(List<SegmentDiagnostic> items, DiagnosticReason reason) {
+    private static long count(List<SegmentAvailability> items, Class<? extends SegmentAvailability> kind) {
         return items.stream()
-                .filter(item -> item instanceof SegmentDiagnostic.Invalid(DiagnosticReason actual) && actual == reason)
+                .filter(kind::isInstance)
                 .count();
-    }
-
-    /** 구간 1개의 대여/반납 판정 — 사유는 불가일 때만 존재하므로 boolean+enum 대신 타입으로 구분한다. */
-    private sealed interface SegmentDiagnostic {
-        record Valid() implements SegmentDiagnostic {}
-
-        record Invalid(DiagnosticReason reason) implements SegmentDiagnostic {}
-    }
-
-    private enum DiagnosticReason {
-        NO_PICKUP,
-        NO_DROPOFF,
-        SAME_STATION
     }
 }

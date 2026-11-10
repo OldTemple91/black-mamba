@@ -1,6 +1,9 @@
 package com.blackmamba.navigation.infra.adapter;
 
 import com.blackmamba.navigation.application.route.port.MobilityAvailabilityPort;
+import com.blackmamba.navigation.domain.route.mobility.SegmentAvailability;
+import com.blackmamba.navigation.domain.location.Location;
+import com.blackmamba.navigation.application.route.segment.SegmentAvailabilityChecker;
 import com.blackmamba.navigation.domain.location.GeoDistance;
 import com.blackmamba.navigation.domain.route.mobility.AvailabilitySource;
 import com.blackmamba.navigation.domain.route.mobility.MobilityInfo;
@@ -98,30 +101,13 @@ public class MobilityAvailabilityAdapter implements MobilityAvailabilityPort {
     }
 
     /**
-     * 세그먼트 단위 캐시는 두지 않는다 — 입력인 대여·반납 조회가 각각 캐시되고 조합 비용은 없다.
-     * 예전 세그먼트 캐시는 조회 실패로 비어 버린 결과(empty Mono)까지 TTL 동안 재생했다.
+     * 성립 규칙(대여 있음 AND 반납 있음 AND 서로 다른 정류소)은 도메인의 {@link SegmentAvailability} 가 판정한다 —
+     * 어댑터는 조회만 한다. 세그먼트 단위 캐시는 두지 않는다: 입력인 대여·반납 조회가 각각 캐시되고 조합 비용은 없다.
      */
     @Override
     public Mono<MobilityInfo> findSegmentMobility(double startLat, double startLng, double endLat, double endLng, MobilityType type) {
-        Mono<Optional<MobilityInfo>> pickup = findNearbyMobility(startLat, startLng, type);
-
-        if (type != MobilityType.DDAREUNGI) {
-            return pickup.flatMap(Mono::justOrEmpty);
-        }
-
-        // pickup/dropoff 는 어느 쪽이 비었는지 진단(NO_PICKUP/NO_DROPOFF)에 쓰이므로 Optional 유지.
-        // 세그먼트 결과는 "둘 다 성립" 일 때만 의미가 있어 여기서 empty Mono 로 평탄화한다.
-        Mono<Optional<MobilityInfo>> dropoff = findNearbyDropoff(endLat, endLng, type);
-        return Mono.zip(pickup, dropoff)
-                .flatMap(tuple -> Mono.justOrEmpty(tuple.getT1()
-                        .flatMap(pickupInfo -> tuple.getT2()
-                                .map(dropoffInfo -> pickupInfo.withDropoffStation(
-                                        dropoffInfo.stationId(),
-                                        dropoffInfo.stationName(),
-                                        dropoffInfo.lat(),
-                                        dropoffInfo.lng()
-                                ))
-                                .filter(info -> !info.hasSamePickupAndDropoffStation()))));
+        return SegmentAvailabilityChecker.check(this, new Location(null, startLat, startLng), new Location(null, endLat, endLng), type)
+                .flatMap(availability -> Mono.justOrEmpty(availability.findInfo()));
     }
 
     @Override

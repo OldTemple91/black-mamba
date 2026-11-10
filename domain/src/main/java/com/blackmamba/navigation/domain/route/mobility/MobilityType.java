@@ -20,6 +20,11 @@ public enum MobilityType {
         return displayName;
     }
 
+    /** 정해진 정류소에 반납해야 하는 수단 — 도착 지점에 반납 정류소가 없으면 구간이 성립하지 않는다. */
+    public boolean requiresDropoffStation() {
+        return this == DDAREUNGI;
+    }
+
     public boolean isKickboard() {
         return this == KICKBOARD_SHARED || this == PERSONAL_KICKBOARD;
     }
