@@ -73,7 +73,16 @@ springdoc:
 # - qwen2.5:7b    (4.7GB, 한국어 품질 훨씬 좋음, 수식어 포함 쿼리 정확)
 # - exaone3.5:7.8b (5GB, LG AI 연구원, 한국어 특화)
 # 모델 교체: `ollama pull qwen2.5:7b && OLLAMA_MODEL=qwen2.5:7b` 후 재기동
+# Spring AI 의 Ollama 호출은 RestClient 를 쓴다. 기본값은 읽기 타임아웃 없음 + 재시도 10회라,
+# Ollama 가 연결만 받고 응답하지 않으면 자연어 검색 요청이 45초 넘게 붙잡혔다(실측).
+# 로컬 LLM 은 재시도로 회복되는 장애가 드물다 — 빨리 포기하고 폴백(원본 narrative / 503)한다.
+spring.http.clients:
+  connect-timeout: 2s
+  read-timeout: 10s
+
 spring.ai:
+  retry:
+    max-attempts: 1
   ollama:
     base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
     chat:
