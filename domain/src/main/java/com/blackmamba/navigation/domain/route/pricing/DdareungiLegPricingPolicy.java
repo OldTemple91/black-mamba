@@ -1,7 +1,6 @@
 package com.blackmamba.navigation.domain.route.pricing;
 
 import com.blackmamba.navigation.domain.route.Leg;
-import com.blackmamba.navigation.domain.route.LegType;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 
 final class DdareungiLegPricingPolicy implements LegPricingPolicy {
@@ -14,7 +13,7 @@ final class DdareungiLegPricingPolicy implements LegPricingPolicy {
 
     @Override
     public boolean supports(Leg leg) {
-        return leg.type() == LegType.BIKE
+        return leg.isBike()
                 && leg.mobilityInfo() != null
                 && leg.mobilityInfo().mobilityType() == MobilityType.DDAREUNGI;
     }

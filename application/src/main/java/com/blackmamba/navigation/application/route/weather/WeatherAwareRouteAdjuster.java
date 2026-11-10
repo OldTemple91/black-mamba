@@ -1,7 +1,6 @@
 package com.blackmamba.navigation.application.route.weather;
 
 import com.blackmamba.navigation.domain.route.Leg;
-import com.blackmamba.navigation.domain.route.LegType;
 import com.blackmamba.navigation.domain.route.Route;
 import com.blackmamba.navigation.domain.route.evaluation.RouteInsights;
 import com.blackmamba.navigation.domain.weather.WeatherCondition;
@@ -145,12 +144,12 @@ public class WeatherAwareRouteAdjuster {
 
     private boolean hasRidingLeg(Route route) {
         return route.legs().stream()
-                .anyMatch(leg -> leg.type() == LegType.BIKE || leg.type() == LegType.KICKBOARD);
+                .anyMatch(leg -> leg.isRiding());
     }
 
     private boolean hasLongWalk(Route route) {
         return route.legs().stream()
-                .filter(leg -> leg.type() == LegType.WALK)
+                .filter(leg -> leg.isWalk())
                 .mapToInt(Leg::distanceMeters)
                 .sum() >= LONG_WALK_THRESHOLD_METERS;
     }

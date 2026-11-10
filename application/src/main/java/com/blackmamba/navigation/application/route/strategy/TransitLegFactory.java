@@ -36,7 +36,7 @@ final class TransitLegFactory {
      */
     static Leg approximate(int minutes, Location from, Location to, List<Leg> baseLegs) {
         List<Leg> transitLegs = baseLegs.stream()
-                .filter(l -> l.type() == LegType.TRANSIT && l.transitInfo() != null)
+                .filter(l -> l.isTransit() && l.transitInfo() != null)
                 .toList();
 
         if (transitLegs.isEmpty()) {

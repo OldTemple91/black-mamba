@@ -199,7 +199,7 @@ public class OdsayRouteClient {
         List<Leg> normalized = new ArrayList<>();
         for (int i = 0; i < legs.size(); i++) {
             Leg leg = legs.get(i);
-            if (leg.type().name().equals("WALK") && (leg.start() == null || leg.end() == null)) {
+            if (leg.isWalk() && (leg.start() == null || leg.end() == null)) {
                 Location start = leg.start() != null ? leg.start() : findPreviousEndpoint(legs, i, origin);
                 Location end = leg.end() != null ? leg.end() : findNextStartpoint(legs, i, destination);
                 normalized.add(new Leg(
@@ -223,7 +223,7 @@ public class OdsayRouteClient {
     }
 
     private boolean isDegenerateWalk(Leg leg) {
-        if (!leg.type().name().equals("WALK")) return false;
+        if (!leg.isWalk()) return false;
         if (leg.durationMinutes() <= 0 || leg.distanceMeters() <= 0) return true;
         if (leg.start() == null || leg.end() == null) return false;
         return Double.compare(leg.start().lat(), leg.end().lat()) == 0

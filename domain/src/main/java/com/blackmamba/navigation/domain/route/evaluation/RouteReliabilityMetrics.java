@@ -2,7 +2,6 @@ package com.blackmamba.navigation.domain.route.evaluation;
 
 import com.blackmamba.navigation.domain.hub.Hub;
 import com.blackmamba.navigation.domain.route.Leg;
-import com.blackmamba.navigation.domain.route.LegType;
 import com.blackmamba.navigation.domain.route.Route;
 
 final class RouteReliabilityMetrics {
@@ -15,14 +14,14 @@ final class RouteReliabilityMetrics {
 
     static int walkingDistance(Route route) {
         return route.legs().stream()
-                .filter(leg -> leg.type() == LegType.WALK)
+                .filter(leg -> leg.isWalk())
                 .mapToInt(Leg::distanceMeters)
                 .sum();
     }
 
     static int transferCount(Route route) {
         long transitLegs = route.legs().stream()
-                .filter(leg -> leg.type() == LegType.TRANSIT)
+                .filter(leg -> leg.isTransit())
                 .count();
         return (int) Math.max(transitLegs - 1, 0);
     }
@@ -31,7 +30,7 @@ final class RouteReliabilityMetrics {
         int max = 0;
         for (int i = 0; i < route.legs().size(); i++) {
             Leg leg = route.legs().get(i);
-            if (leg.type() != LegType.WALK) continue;
+            if (!leg.isWalk()) continue;
 
             boolean beforeMobility = i > 0 && isMobility(route.legs().get(i - 1));
             boolean afterMobility = i < route.legs().size() - 1 && isMobility(route.legs().get(i + 1));
@@ -53,7 +52,7 @@ final class RouteReliabilityMetrics {
 
     static boolean hasWeakDropoff(Route route) {
         return route.legs().stream()
-                .filter(leg -> leg.type() == LegType.BIKE)
+                .filter(leg -> leg.isBike())
                 .anyMatch(leg -> leg.mobilityInfo() == null || !leg.mobilityInfo().hasDropoffStation());
     }
 
@@ -65,7 +64,7 @@ final class RouteReliabilityMetrics {
         return route.legs().stream()
                 .filter(RouteReliabilityMetrics::isMobility)
                 .filter(leg -> leg.mobilityInfo() != null)
-                .anyMatch(leg -> (leg.type() == LegType.BIKE && leg.mobilityInfo().availableCount() <= 2)
+                .anyMatch(leg -> (leg.isBike() && leg.mobilityInfo().availableCount() <= 2)
                         || leg.mobilityInfo().hasEstimatedAvailability());
     }
 
@@ -111,19 +110,19 @@ final class RouteReliabilityMetrics {
     }
 
     private static boolean isSharedKickboard(Leg leg) {
-        return leg.type() == LegType.KICKBOARD
+        return leg.isKickboard()
                 && leg.mobilityInfo() != null
                 && leg.mobilityInfo().isSharedKickboard();
     }
 
     static boolean hasBikeDropoff(Route route) {
         return route.legs().stream()
-                .filter(leg -> leg.type() == LegType.BIKE)
+                .filter(leg -> leg.isBike())
                 .anyMatch(leg -> leg.mobilityInfo() != null && leg.mobilityInfo().hasDropoffStation());
     }
 
     private static boolean isMobility(Leg leg) {
-        return leg.type() == LegType.BIKE || leg.type() == LegType.KICKBOARD;
+        return leg.isRiding();
     }
 
     private static int parseDistanceOrZero(String raw) {

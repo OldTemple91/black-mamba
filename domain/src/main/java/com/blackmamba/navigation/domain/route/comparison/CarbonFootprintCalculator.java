@@ -2,6 +2,8 @@ package com.blackmamba.navigation.domain.route.comparison;
 
 import com.blackmamba.navigation.domain.route.Leg;
 import com.blackmamba.navigation.domain.route.Route;
+import com.blackmamba.navigation.domain.route.mobility.MobilityType;
+import com.blackmamba.navigation.domain.route.TransitMode;
 
 /**
  * C-2: 경로별 탄소 배출량 계산기 (순수 계산 — 부수효과 없음).
@@ -51,8 +53,6 @@ public class CarbonFootprintCalculator {
     private static final double ECO_INTENSITY_G_PER_KM = 20.0;
 
     // === 모드 문자열 상수 (ODsay Mapper 와 일치) ===
-    private static final String MODE_SUBWAY = "SUBWAY";
-    private static final String MODE_BUS = "BUS";
 
     /**
      * Route 전체의 CO₂ 배출량 (g) 계산. 반환값은 음수가 될 수 없다.
@@ -91,33 +91,37 @@ public class CarbonFootprintCalculator {
     }
 
     private double coefficientFor(Leg leg) {
-        return switch (leg.type()) {
-            case WALK -> WALK_G_PER_KM;
-            case BIKE -> BIKE_G_PER_KM;   // 따릉이 / 일반 자전거
-            case KICKBOARD -> mobilityCoefficientByMode(leg);
-            case TRANSIT -> transitCoefficient(leg);
+        if (leg.isWalk()) {
+            return WALK_G_PER_KM;
+        }
+        if (leg.isTransit()) {
+            return transitCoefficient(leg.transitMode());
+        }
+        // 탑승 구간: LegType(BIKE/KICKBOARD)이 아니라 실제 수단으로 계수를 고른다.
+        // 수단을 알 수 없으면 구간 종류의 기본값(자전거 / 개인 킥보드)
+        double fallback = PERSONAL_KICKBOARD_G_PER_KM;
+        if (leg.isBike()) {
+            fallback = BIKE_G_PER_KM;
+        }
+        return leg.findMobilityType()
+                .map(CarbonFootprintCalculator::mobilityCoefficient)
+                .orElse(fallback);
+    }
+
+    private static double transitCoefficient(TransitMode mode) {
+        return switch (mode) {
+            case SUBWAY -> SUBWAY_G_PER_KM;
+            case BUS -> BUS_G_PER_KM;
+            case ESTIMATED, OTHER -> TRANSIT_DEFAULT_G_PER_KM;
         };
     }
 
-    private double transitCoefficient(Leg leg) {
-        String mode = leg.mode();
-        if (MODE_SUBWAY.equalsIgnoreCase(mode)) return SUBWAY_G_PER_KM;
-        if (MODE_BUS.equalsIgnoreCase(mode)) return BUS_G_PER_KM;
-        return TRANSIT_DEFAULT_G_PER_KM;
-    }
-
-    /**
-     * LegType.KICKBOARD 에는 실제 킥보드 외에 PERSONAL_EBIKE 까지 포함된다
-     * (MobilitySegmentBuilder 매핑 상). leg.mode() 로 세분해 정확 계수 적용.
-     */
-    private double mobilityCoefficientByMode(Leg leg) {
-        String mode = leg.mode();
-        if (mode == null) return PERSONAL_KICKBOARD_G_PER_KM;
-        return switch (mode) {
-            case "PERSONAL_EBIKE"     -> EBIKE_G_PER_KM;
-            case "PERSONAL_KICKBOARD" -> PERSONAL_KICKBOARD_G_PER_KM;
-            case "KICKBOARD_SHARED"   -> SHARED_KICKBOARD_G_PER_KM;
-            default                   -> PERSONAL_KICKBOARD_G_PER_KM;
+    private static double mobilityCoefficient(MobilityType type) {
+        return switch (type) {
+            case DDAREUNGI -> BIKE_G_PER_KM;
+            case PERSONAL_EBIKE -> EBIKE_G_PER_KM;
+            case PERSONAL_KICKBOARD -> PERSONAL_KICKBOARD_G_PER_KM;
+            case KICKBOARD_SHARED -> SHARED_KICKBOARD_G_PER_KM;
         };
     }
 }

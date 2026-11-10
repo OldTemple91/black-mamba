@@ -2,7 +2,6 @@ package com.blackmamba.navigation.infra.vector;
 
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Leg;
-import com.blackmamba.navigation.domain.route.LegType;
 import com.blackmamba.navigation.domain.route.Route;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
@@ -120,7 +119,7 @@ public final class RouteHistoryDescriber {
     private static int sumWalkMinutes(List<Leg> legs) {
         if (legs == null) return 0;
         return legs.stream()
-                .filter(leg -> leg.type() == LegType.WALK)
+                .filter(leg -> leg.isWalk())
                 .mapToInt(Leg::durationMinutes)
                 .sum();
     }

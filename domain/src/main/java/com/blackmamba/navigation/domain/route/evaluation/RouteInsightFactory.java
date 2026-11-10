@@ -1,7 +1,6 @@
 package com.blackmamba.navigation.domain.route.evaluation;
 
 import com.blackmamba.navigation.domain.route.Leg;
-import com.blackmamba.navigation.domain.route.LegType;
 import com.blackmamba.navigation.domain.route.Route;
 import com.blackmamba.navigation.domain.route.mobility.MobilityInfo;
 
@@ -117,7 +116,7 @@ public class RouteInsightFactory {
         Set<String> diagnostics = new LinkedHashSet<>(existingDiagnostics);
 
         boolean walkingFallback = route.legs().stream()
-                .anyMatch(leg -> leg.type() == LegType.WALK
+                .anyMatch(leg -> leg.isWalk()
                         && leg.distanceMeters() > 0
                         && (leg.routeCoordinates() == null || leg.routeCoordinates().isEmpty()));
         if (walkingFallback) {
@@ -125,7 +124,7 @@ public class RouteInsightFactory {
         }
 
         boolean mobilityFallback = route.legs().stream()
-                .anyMatch(leg -> (leg.type() == LegType.BIKE || leg.type() == LegType.KICKBOARD)
+                .anyMatch(leg -> leg.isRiding()
                         && leg.distanceMeters() > 0
                         && (leg.routeCoordinates() == null || leg.routeCoordinates().isEmpty()));
         if (mobilityFallback) {

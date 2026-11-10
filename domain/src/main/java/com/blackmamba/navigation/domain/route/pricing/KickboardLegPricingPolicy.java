@@ -1,7 +1,6 @@
 package com.blackmamba.navigation.domain.route.pricing;
 
 import com.blackmamba.navigation.domain.route.Leg;
-import com.blackmamba.navigation.domain.route.LegType;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 
 /**
@@ -19,9 +18,9 @@ final class KickboardLegPricingPolicy implements LegPricingPolicy {
 
     @Override
     public boolean supports(Leg leg) {
-        return leg.type() == LegType.KICKBOARD || leg.type() == LegType.BIKE
-                && leg.mobilityInfo() != null
-                && leg.mobilityInfo().mobilityType() == MobilityType.PERSONAL_EBIKE;
+        // 따릉이가 아닌 탑승 구간 전부. 개인 전기자전거는 현재 KICKBOARD 구간으로 만들어지지만,
+        // BIKE 구간으로 오더라도 따릉이 요금이 아니라 여기 요금을 적용한다
+        return leg.isKickboard() || (leg.isBike() && leg.hasMobilityType(MobilityType.PERSONAL_EBIKE));
     }
 
     @Override

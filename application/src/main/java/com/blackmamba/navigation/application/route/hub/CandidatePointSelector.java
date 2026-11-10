@@ -3,7 +3,6 @@ package com.blackmamba.navigation.application.route.hub;
 import com.blackmamba.navigation.domain.location.GeoDistance;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Leg;
-import com.blackmamba.navigation.domain.route.LegType;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
 import org.springframework.stereotype.Component;
 
@@ -133,7 +132,7 @@ public class CandidatePointSelector {
     private List<Location> extractTransitStops(List<Leg> legs) {
         List<Location> stops = new ArrayList<>();
         for (Leg leg : legs) {
-            if (leg.type() != LegType.TRANSIT) continue;
+            if (!leg.isTransit()) continue;
             if (leg.start() == null || leg.end() == null) continue;
 
             List<Location> realStops = (leg.transitInfo() != null

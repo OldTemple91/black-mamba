@@ -6,7 +6,7 @@ import com.blackmamba.navigation.domain.hub.HubType;
 import com.blackmamba.navigation.domain.location.GeoDistance;
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Leg;
-import com.blackmamba.navigation.domain.route.LegType;
+import com.blackmamba.navigation.domain.route.TransitMode;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -125,17 +125,17 @@ public class HubSelector {
         }
 
         return legs.stream()
-                .filter(leg -> leg.type() == LegType.TRANSIT)
+                .filter(leg -> leg.isTransit())
                 .filter(leg -> isNear(location, leg.start()) || isNear(location, leg.end()))
                 .findFirst()
-                .map(Leg::mode)
+                .map(Leg::transitMode)
                 .map(this::toHubType)
                 .orElse(HubType.MOBILITY_TRANSFER_POINT);
     }
 
-    private HubType toHubType(String mode) {
-        if ("SUBWAY".equalsIgnoreCase(mode)) return HubType.SUBWAY_STATION;
-        if ("BUS".equalsIgnoreCase(mode)) return HubType.BUS_STOP;
+    private HubType toHubType(TransitMode mode) {
+        if (mode.isSubway()) return HubType.SUBWAY_STATION;
+        if (mode.isBus()) return HubType.BUS_STOP;
         return HubType.MOBILITY_TRANSFER_POINT;
     }
 

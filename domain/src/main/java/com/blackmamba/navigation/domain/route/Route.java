@@ -106,8 +106,8 @@ public record Route(
         List<Leg> normalized = new ArrayList<>();
         for (Leg leg : legs) {
             if (!normalized.isEmpty()
-                    && normalized.getLast().type() == LegType.WALK
-                    && leg.type() == LegType.WALK) {
+                    && normalized.getLast().isWalk()
+                    && leg.isWalk()) {
                 normalized.set(normalized.size() - 1, mergeWalkLegs(normalized.getLast(), leg));
                 continue;
             }

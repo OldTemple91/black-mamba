@@ -2,7 +2,6 @@ package com.blackmamba.navigation.application.route.accessibility;
 
 import com.blackmamba.navigation.domain.location.Location;
 import com.blackmamba.navigation.domain.route.Leg;
-import com.blackmamba.navigation.domain.route.LegType;
 import com.blackmamba.navigation.domain.route.Route;
 import com.blackmamba.navigation.domain.route.TransitInfo;
 import com.blackmamba.navigation.domain.route.evaluation.Comparison;
@@ -64,12 +63,12 @@ public class AccessibilityPostProcessor {
 
     private boolean containsRidingLeg(Route route) {
         return route.legs().stream()
-                .anyMatch(leg -> leg.type() == LegType.BIKE || leg.type() == LegType.KICKBOARD);
+                .anyMatch(leg -> leg.isRiding());
     }
 
     private boolean containsInaccessibleStation(Route route) {
         return route.legs().stream()
-                .filter(leg -> leg.type() == LegType.TRANSIT)
+                .filter(leg -> leg.isTransit())
                 .anyMatch(leg -> !isStationAccessible(leg));
     }
 
@@ -99,7 +98,7 @@ public class AccessibilityPostProcessor {
         int totalDelta = 0;
 
         for (Leg leg : route.legs()) {
-            if (leg.type() == LegType.WALK && leg.distanceMeters() > 0) {
+            if (leg.isWalk() && leg.distanceMeters() > 0) {
                 int newDuration = (int) Math.ceil(leg.durationMinutes() * speedRatio);
                 totalDelta += newDuration - leg.durationMinutes();
                 recomputedLegs.add(new Leg(

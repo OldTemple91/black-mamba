@@ -2,7 +2,6 @@ package com.blackmamba.navigation.application.route.history;
 
 import com.blackmamba.navigation.application.route.port.RouteHistoryPort;
 import com.blackmamba.navigation.domain.location.Location;
-import com.blackmamba.navigation.domain.route.LegType;
 import com.blackmamba.navigation.domain.route.Route;
 import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
 import io.micrometer.core.instrument.Counter;
@@ -153,7 +152,7 @@ public class RouteHistoryRecorder {
             return false;
         }
         // TRANSIT 또는 이동수단이 최소 하나는 있어야 의미 있는 경로
-        boolean hasNonWalkLeg = route.legs().stream().anyMatch(leg -> leg.type() != LegType.WALK);
+        boolean hasNonWalkLeg = route.legs().stream().anyMatch(leg -> !leg.isWalk());
         if (!hasNonWalkLeg) {
             log.debug("[RAG] 품질 게이트: 도보만 있는 경로 → 제외 routeId={}", route.routeId());
             return false;
