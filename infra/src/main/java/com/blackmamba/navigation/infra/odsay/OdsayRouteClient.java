@@ -8,11 +8,11 @@ import com.blackmamba.navigation.infra.common.GeohashKeyGenerator;
 import com.blackmamba.navigation.infra.common.cache.TtlCache;
 import com.blackmamba.navigation.infra.common.cache.TtlCacheRegistry;
 import com.blackmamba.navigation.infra.common.http.ExternalApiException;
+import com.blackmamba.navigation.infra.common.http.ExternalApiJson;
 import com.blackmamba.navigation.infra.common.http.WebClients;
 import com.blackmamba.navigation.infra.odsay.dto.OdsayRouteResponse;
 import com.blackmamba.navigation.infra.common.resilience.ExternalApiResilience;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.annotation.Observed;
@@ -38,7 +38,6 @@ public class OdsayRouteClient {
     private static final long RATE_INTERVAL_MS = 200L; // max 5 req/sec
     private final WebClient webClient;
     private final OdsayRouteMapper mapper;
-    private final ObjectMapper objectMapper;
     private final String apiKey;
     private final Counter transitRouteErrorFallbackCounter;
     private final Counter transitRouteEmptyResultCounter;
@@ -53,7 +52,6 @@ public class OdsayRouteClient {
     public OdsayRouteClient(
             WebClient.Builder webClientBuilder,
             OdsayRouteMapper mapper,
-            ObjectMapper objectMapper,
             @Value("${odsay.api-key}") String apiKey,
             @Value("${odsay.base-url:https://api.odsay.com/v1/api}") String baseUrl,
             @Value("${navigation.cache.odsay-route-ttl-ms:30000}") long routeCacheTtlMs,
@@ -63,7 +61,6 @@ public class OdsayRouteClient {
             TtlCacheRegistry cacheRegistry
     ) {
         this.mapper = mapper;
-        this.objectMapper = objectMapper;
         this.apiKey = apiKey;
         this.routeCache = cacheRegistry.create("odsay_route", routeCacheTtlMs);
         this.webClient = WebClients.withTimeout(webClientBuilder, baseUrl, requestTimeoutMs);
@@ -144,8 +141,8 @@ public class OdsayRouteClient {
                     log.debug("[ODsay] raw 응답 (첫 500자): {}", rawJson.length() > 500 ? rawJson.substring(0, 500) : rawJson);
                     OdsayRouteResponse response;
                     try {
-                        response = objectMapper.readValue(rawJson, OdsayRouteResponse.class);
-                    } catch (JsonProcessingException ex) {
+                        response = ExternalApiJson.MAPPER.readValue(rawJson, OdsayRouteResponse.class);
+                    } catch (JacksonException ex) {
                         // 응답이 JSON 이 아니면 상대 쪽 문제 — 예외로 올려야 재시도·회로가 반응한다
                         log.error("[ODsay] JSON 파싱 실패: {} — raw={}", ex.getOriginalMessage(), rawJson);
                         return Mono.error(ExternalApiException.of("ODsay", 500, "JSON 파싱 실패: " + ex.getOriginalMessage()));

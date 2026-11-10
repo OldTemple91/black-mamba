@@ -4,31 +4,34 @@ dependencies {
     implementation project(':application')
     implementation project(':domain')
     implementation project(':infra')
-    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'io.projectreactor:reactor-core'
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.2.0'
 
     // Phase 1: Prometheus Metrics — actuator /prometheus 엔드포인트 노출
     implementation 'io.micrometer:micrometer-registry-prometheus'
 
     // Phase 2: Loki 로그 Push (loki4j 2.0.0 - Structured Metadata 지원)
-    implementation 'com.github.loki4j:loki-logback-appender:2.0.0'
+    implementation 'com.github.loki4j:loki-logback-appender:2.1.0'
 
     // Phase 3: 분산 추적 (Micrometer Tracing → OTLP/gRPC → Tempo)
     // 기존 Zipkin/HTTP → OTLP/gRPC 전환 (2026-04-17)
     // - Protobuf 직렬화로 페이로드 약 60% 감소
     // - HTTP/2 멀티플렉싱으로 전송 지연 감소
     // - OpenTelemetry 표준 준수 (벤더 중립)
+    // Boot 4: 트레이싱 자동 구성이 별도 모듈로 분리됨.
+    // spring-boot-starter-opentelemetry 는 쓰지 않는다 — OTLP 메트릭 레지스트리까지 딸려 와 Prometheus 와 이중 수집이 된다
+    implementation 'org.springframework.boot:spring-boot-micrometer-tracing-opentelemetry'
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
     implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
     // @Observed 어노테이션을 AOP로 처리
-    implementation 'org.springframework.boot:spring-boot-starter-aop'
+    implementation 'org.springframework.boot:spring-boot-starter-aspectj'
 
     // RAG Phase 1: Spring AI + Ollama — 자연어 경로 검색 인터페이스
     // runtimeOnly: starter 는 ChatModel/EmbeddingModel/VectorStore 빈 자동구성만 담당한다.
     // api 코드는 Spring AI 에 컴파일 의존하지 않는다 — 모델 접근은 infra 어댑터 (ArchUnit 로 강제)
-    runtimeOnly platform('org.springframework.ai:spring-ai-bom:1.0.9')
+    runtimeOnly platform('org.springframework.ai:spring-ai-bom:2.0.2')
     runtimeOnly 'org.springframework.ai:spring-ai-starter-model-ollama'
 
     // RAG Phase 2: Qdrant Vector Store — 경로 이력 유사 검색

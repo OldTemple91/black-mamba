@@ -5,7 +5,6 @@ import com.blackmamba.navigation.infra.common.cache.TtlCacheRegistry;
 import com.blackmamba.navigation.infra.common.http.ExternalApiServerException;
 import com.blackmamba.navigation.infra.common.resilience.ExternalApiResilience;
 import com.blackmamba.navigation.domain.route.Leg;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
@@ -99,12 +98,10 @@ class OdsayRouteClientResilienceTest {
                         .build());
         this.meterRegistry = new SimpleMeterRegistry();
         OdsayRouteMapper mapper = new OdsayRouteMapper();
-        ObjectMapper objectMapper = new ObjectMapper();
 
         this.client = new OdsayRouteClient(
                 WebClient.builder(),
                 mapper,
-                objectMapper,
                 "test-api-key",
                 wireMock.baseUrl(),        // odsay.base-url 을 WireMock 으로 오버라이드
                 0L,                         // cache TTL = 0 → 매 테스트마다 실제 호출
@@ -166,6 +163,23 @@ class OdsayRouteClientResilienceTest {
                     wireMock.verify(3, getRequestedFor(urlPathEqualTo(PATH)));
                     assertThat(fallbackCount("error")).isEqualTo(1.0);
                     assertThat(fallbackCount("empty_result")).isZero();
+                })
+                .verifyComplete();
+    }
+
+    @Test
+    void 인증_실패는_code_500_이어도_재시도하지_않는다() {
+        // given — 실제 응답 형식. 키가 틀리면 재시도해도 같은 답이다
+        stubErrorEnvelope("""
+                {"error":[{"code":"500","message":"[ApiKeyAuthFailed] ApiKey authentication failed."}]}
+                """);
+
+        // when & then
+        StepVerifier.create(client.getTransitRoute(ORIGIN, DESTINATION))
+                .assertNext(legs -> {
+                    assertThat(legs).isEmpty();
+                    wireMock.verify(1, getRequestedFor(urlPathEqualTo(PATH)));
+                    assertThat(fallbackCount("error")).isEqualTo(1.0);
                 })
                 .verifyComplete();
     }

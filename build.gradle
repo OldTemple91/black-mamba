@@ -1,7 +1,7 @@
 plugins {
     id 'java'
     id 'jacoco'
-    id 'org.springframework.boot' version '3.5.16' apply false
+    id 'org.springframework.boot' version '4.1.2' apply false
     id 'io.spring.dependency-management' version '1.1.7' apply false
 }
 
@@ -34,13 +34,13 @@ subprojects {
 
     dependencyManagement {
         imports {
-            mavenBom "org.springframework.boot:spring-boot-dependencies:3.5.16"
+            mavenBom "org.springframework.boot:spring-boot-dependencies:4.1.2"
         }
     }
 
     dependencies {
         testImplementation 'org.springframework.boot:spring-boot-starter-test'
-        // Gradle 8.14+ 는 테스트 실행기가 junit-platform-launcher 를 직접 필요로 함
+        // Gradle 8.14+ (9.x 포함) 는 테스트 실행기가 junit-platform-launcher 를 직접 필요로 함
         testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     }
 

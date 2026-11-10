@@ -7,6 +7,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.blackmamba.navigation.infra.common.http.ExternalApiException;
+import com.blackmamba.navigation.infra.common.http.WebClients;
 import com.blackmamba.navigation.infra.common.resilience.ExternalApiResilience;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
@@ -60,7 +61,7 @@ public class KickboardApiClient {
         this.cityCode = cityCode;
         this.snapshotCacheTtlMs = snapshotCacheTtlMs;
         this.requestTimeoutMs = requestTimeoutMs;
-        this.webClient = webClientBuilder.baseUrl(BASE_URL).build();
+        this.webClient = WebClients.withTimeout(webClientBuilder, BASE_URL, requestTimeoutMs);
         this.filter = new KickboardDeviceFilter();
         this.guard = resilience.forApi("kickboard");
         this.snapshotCacheHitCounter = meterRegistry.counter(

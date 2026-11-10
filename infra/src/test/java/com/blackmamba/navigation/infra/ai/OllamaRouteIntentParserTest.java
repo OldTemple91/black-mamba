@@ -3,6 +3,7 @@ package com.blackmamba.navigation.infra.ai;
 import com.blackmamba.navigation.application.route.RouteIntent;
 import com.blackmamba.navigation.domain.route.evaluation.RecommendationPreference;
 import com.blackmamba.navigation.domain.route.mobility.MobilityType;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -10,6 +11,7 @@ import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 
 import java.util.List;
@@ -27,7 +29,14 @@ import static org.mockito.Mockito.when;
 class OllamaRouteIntentParserTest {
 
     private final ChatModel chatModel = mock(ChatModel.class);
-    private final OllamaRouteIntentParser parser = new OllamaRouteIntentParser(chatModel);
+    private OllamaRouteIntentParser parser;
+
+    @BeforeEach
+    void setUp() {
+        // ChatClient 는 호출마다 모델의 기본 옵션을 읽는다
+        when(chatModel.getOptions()).thenReturn(ChatOptions.builder().build());
+        parser = new OllamaRouteIntentParser(chatModel);
+    }
 
     @Test
     void JSON_한_줄_응답을_의도로_변환한다() {

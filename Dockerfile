@@ -10,7 +10,7 @@ COPY infra/ infra/
 RUN chmod +x gradlew && ./gradlew :api:bootJar --no-daemon -x test
 
 # === Frontend Build ===
-FROM node:20-alpine AS frontend-build
+FROM node:24-alpine AS frontend-build
 WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci

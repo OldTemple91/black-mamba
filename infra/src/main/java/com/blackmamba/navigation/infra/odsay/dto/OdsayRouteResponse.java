@@ -2,7 +2,7 @@ package com.blackmamba.navigation.infra.odsay.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 
 import java.util.List;
 import java.util.Optional;
@@ -27,11 +27,11 @@ public record OdsayRouteResponse(Result result, JsonNode error) {
             }
             node = node.get(0);
         }
-        String message = node.path("msg").asText("");
+        String message = node.path("msg").asString("");
         if (node.hasNonNull("message")) {
-            message = node.path("message").asText();
+            message = node.path("message").asString();
         }
-        return Optional.of(new ApiError(node.path("code").asText(""), message));
+        return Optional.of(new ApiError(node.path("code").asString(""), message));
     }
 
     /**
@@ -45,6 +45,7 @@ public record OdsayRouteResponse(Result result, JsonNode error) {
         /** -8 입력값 형식·범위 오류, -9 필수 입력값 누락 */
         private static final Set<String> BAD_REQUEST_CODES = Set.of("-8", "-9");
         private static final String SERVER_ERROR_CODE = "500";
+        private static final String AUTH_FAILURE_MARKER = "ApiKeyAuthFailed";
 
         /** 이 출발/도착 조합에 경로가 없다는 정상 답 — 장애가 아니다. */
         public boolean isNoRoute() {
@@ -56,8 +57,12 @@ public record OdsayRouteResponse(Result result, JsonNode error) {
             return BAD_REQUEST_CODES.contains(code);
         }
 
+        /**
+         * 500 은 서버 내부 오류뿐 아니라 인증 실패에도 쓰인다(실응답: {@code "[ApiKeyAuthFailed] ApiKey authentication failed."}).
+         * 인증 실패는 재시도해도 같은 답이라 서버 오류에서 뺀다.
+         */
         public boolean isServerError() {
-            return SERVER_ERROR_CODE.equals(code);
+            return SERVER_ERROR_CODE.equals(code) && !message.contains(AUTH_FAILURE_MARKER);
         }
     }
 

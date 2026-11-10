@@ -2,12 +2,12 @@ package com.blackmamba.navigation.infra.ddareungi;
 
 import com.blackmamba.navigation.domain.route.mobility.AvailabilitySource;
 import com.blackmamba.navigation.infra.common.http.ExternalApiException;
+import com.blackmamba.navigation.infra.common.http.ExternalApiJson;
 import com.blackmamba.navigation.infra.common.http.WebClients;
 import com.blackmamba.navigation.infra.ddareungi.dto.DdareungiStation;
 import com.blackmamba.navigation.infra.ddareungi.dto.DdareungiStationResponse;
 import com.blackmamba.navigation.infra.common.resilience.ExternalApiResilience;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.annotation.Observed;
@@ -54,7 +54,6 @@ public class DdareungiApiClient {
     /** 조회 상한 페이지 — 5,000개. 서울 대여소는 약 2,700개 */
     private static final int MAX_PAGES = 5;
     private final WebClient webClient;
-    private final ObjectMapper objectMapper;
     private final String apiKey;
     private final DdareungiStationFilter filter;
     private final AtomicReference<SnapshotCache> stationSnapshot = new AtomicReference<>();
@@ -75,7 +74,6 @@ public class DdareungiApiClient {
 
     public DdareungiApiClient(
             WebClient.Builder webClientBuilder,
-            ObjectMapper objectMapper,
             @Value("${ddareungi.api-key}") String apiKey,
             @Value("${ddareungi.base-url:http://openapi.seoul.go.kr:8088}") String baseUrl,
             @Value("${navigation.cache.ddareungi-snapshot-ttl-ms:30000}") long snapshotCacheTtlMs,
@@ -85,7 +83,6 @@ public class DdareungiApiClient {
             MeterRegistry meterRegistry,
             ExternalApiResilience resilience
     ) {
-        this.objectMapper = objectMapper;
         this.apiKey = apiKey;
         this.snapshotCacheTtlMs = snapshotCacheTtlMs;
         this.requestTimeoutMs = requestTimeoutMs;
@@ -250,8 +247,8 @@ public class DdareungiApiClient {
 
     private DdareungiStationResponse parse(String body) {
         try {
-            return objectMapper.readValue(body, DdareungiStationResponse.class).requireSuccess();
-        } catch (JsonProcessingException e) {
+            return ExternalApiJson.MAPPER.readValue(body, DdareungiStationResponse.class).requireSuccess();
+        } catch (JacksonException e) {
             throw DdareungiStationResponse.nonJsonError(body);
         }
     }

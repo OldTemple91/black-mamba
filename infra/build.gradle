@@ -2,23 +2,24 @@ dependencies {
     implementation project(':domain')
     compileOnly project(':application')
     testImplementation project(':application')
-    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    // Boot 4: WebClient 만 쓰는 모듈은 webflux 서버 스타터 대신 webclient 스타터
+    implementation 'org.springframework.boot:spring-boot-starter-webclient'
     implementation 'io.micrometer:micrometer-core'
     // @Observed 어노테이션 기반 span 자동 생성
     implementation 'io.micrometer:micrometer-observation'
     // B-3: 공간 인덱스 기반 캐시 키 생성 (Geohash)
     implementation 'ch.hsr:geohash:1.4.0'
     // RAG Phase 2: Spring AI VectorStore API (Qdrant 어댑터에서 사용)
-    implementation platform('org.springframework.ai:spring-ai-bom:1.0.9')
+    implementation platform('org.springframework.ai:spring-ai-bom:2.0.2')
     implementation 'org.springframework.ai:spring-ai-vector-store'
     // RAG Phase 4: Spring AI Chat API (OllamaNarrativeGenerator 에서 ChatClient 사용)
     implementation 'org.springframework.ai:spring-ai-client-chat'
 
     // T-3: Resilience4j — 외부 API 장애 대응 (CircuitBreaker / Retry / Bulkhead)
     // Reactor 모듈은 Mono/Flux 리턴 타입에 operator 를 자동 연결
-    implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.2.0'
-    implementation 'io.github.resilience4j:resilience4j-reactor:2.2.0'
-    implementation 'org.springframework.boot:spring-boot-starter-aop'
+    implementation 'io.github.resilience4j:resilience4j-spring-boot4:2.4.0'
+    implementation 'io.github.resilience4j:resilience4j-reactor:2.4.0'
+    implementation 'org.springframework.boot:spring-boot-starter-aspectj'
 
     // T-2: WireMock — 외부 API 모킹 + Resilience4j fallback E2E 검증
     testImplementation 'org.wiremock:wiremock-standalone:3.13.2'

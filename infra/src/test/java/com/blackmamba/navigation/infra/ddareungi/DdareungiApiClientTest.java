@@ -5,7 +5,6 @@ import com.blackmamba.navigation.infra.common.http.ExternalApiException;
 import com.blackmamba.navigation.infra.common.resilience.ExternalApiResilience;
 import com.blackmamba.navigation.infra.ddareungi.DdareungiApiClient.StationSnapshot;
 import com.blackmamba.navigation.infra.ddareungi.dto.DdareungiStation;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
@@ -210,7 +209,7 @@ class DdareungiApiClientTest {
                 .build());
         circuitBreaker = circuitBreakerRegistry.circuitBreaker("ddareungi");
         RetryRegistry retryRegistry = RetryRegistry.of(RetryConfig.custom().maxAttempts(1).build());
-        return new DdareungiApiClient(WebClient.builder(), new ObjectMapper(), API_KEY, wireMock.baseUrl(), snapshotTtlMs, 5_000L, 0L, maxStaleAgeMs,
+        return new DdareungiApiClient(WebClient.builder(), API_KEY, wireMock.baseUrl(), snapshotTtlMs, 5_000L, 0L, maxStaleAgeMs,
                 meterRegistry, new ExternalApiResilience(circuitBreakerRegistry, retryRegistry));
     }
 

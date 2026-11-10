@@ -11,7 +11,7 @@
   2. **신뢰도 기반 다차원 스코어링** — 시간뿐 아니라 따릉이 재고, 반납 확인, 도보 거리까지 반영
   3. **이중 추천 축** — RELIABILITY(안정 우선) vs TIME_PRIORITY(시간 우선) 사용자 선호 반영
   4. **확장 가능한 도메인 설계** — MobilityType/HubType 추가 시 전략 코드 변경 불필요
-- **스택:** Java 21 · Spring Boot 3.5.13 · Gradle 8.14 (멀티모듈) · Reactor/WebClient · JUnit 5 · Micrometer · Spring AI 1.0.2 (Ollama + Qdrant) · Resilience4j 2.2 · Prometheus/Grafana/Loki/Tempo/Alertmanager | React 19 · Vite 7 · TailwindCSS v4 · 네이버 지도 SDK
+- **스택:** Java 21 · Spring Boot 4.1.2 · Gradle 9.9 (멀티모듈) · Reactor/WebClient · JUnit 6 · Jackson 3 · Micrometer · Spring AI 2.0.2 (Ollama + Qdrant) · Resilience4j 2.4 · Prometheus/Grafana/Loki/Tempo/Alertmanager | React 19 · Vite 7 · TailwindCSS v4 · 네이버 지도 SDK
 
 ## 모듈 구조
 
